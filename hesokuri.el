@@ -81,7 +81,7 @@ the hesokuri-sources special variable."
 (defun hesokuri-sources-on-machine (mac)
   "Returns a list of sources on the machine identified with the given MAC
 address. List is in the form of:
-\((depo-id1 path-string1) (depo-id2 path-string2) ...)
+\((source-id1 path-string1) (source-id2 path-string2) ...)
 Each path string indicates the location of the source on the machine specified
 by MAC."
   (let (res)
@@ -89,15 +89,49 @@ by MAC."
       (when (find mac (cadr source))
         (push `(,(car source) ,(cl-caadr source)) res)))))
 
+(defun hesokuri-do-kuri (what source-id local-path peer-path peer-ip)
+  (unless (cl-find what '(:push :pull))
+    (error "Invalid operation: %s" what))
+  (insert (format (if (eq what :push)
+                      "Pushing %s to %s\n"
+                    "Pulling %s from %s\n")
+                  source-id peer-ip))
+  "TODO")
+
 (defun hesokuri-kuri (peer-ip)
   "Kuris, or syncs, all repos shared between this machine and the one with the
 IP address specified in the string PEER-IP."
   (interactive "MIP address to sync with: ")
   (let* ((peer-mac (hesokuri-mac-of peer-ip))
+         (peer-sources (hesokuri-sources-on-machine peer-mac))
          (local-macs
           (with-temp-buffer
             (call-process "ifconfig" nil t nil "-a")
             (hesokuri-macs-in-buffer))))
+    (unless local-macs
+      (error "Could not figure out local MAC address from 'ifconfig -a'"))
+    (pop-to-buffer (get-buffer-create "*hesokuri*"))
+    (insert "\n\nkuri operation at "
+            (format-time-string "%c" (current-time))
+            ":\n")
+    (goto-char (point-max))
     (dolist (local-mac local-macs)
-      "TODO"
-      '(hesokuri-kuri-for-pair local-mac peer-mac))))
+      (let ((local-sources (hesokuri-sources-on-machine local-mac))
+            failed succeeded)
+        (dolist (local-source local-sources)
+          (let* ((source-id (car local-source))
+                 (peer-source (assq source-id peer-sources)))
+            (when peer-source
+              (dolist (what '(:push :pull))
+                (let ((args `(,what ,source-id
+                              ,(cadr local-source) ,(cadr peer-source)
+                              ,peer-ip)))
+                  (if (apply 'hesokuri-do-kuri args)
+                      (push args succeeded)
+                    (push args failed)))))))
+        (when succeeded (insert "\nThe following operations succeeded:\n"))
+        (dolist (s succeeded)
+          (insert (prin1-to-string s) "\n"))
+        (when failed (insert "\nThe following operations failed:\n"))
+        (dolist (f failed)
+          (insert (prin1-to-string f) "\n"))))))
