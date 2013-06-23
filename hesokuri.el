@@ -89,13 +89,20 @@ by MAC."
       (when (find mac (cadr source))
         (push `(,(car source) ,(cl-caadr source)) res)))))
 
-(defun hesokuri-do-kuri (what source-id local-path peer-path peer-ip)
+(defun hesokuri-do-kuri (what source-id peer-ip peer-path)
   (unless (cl-find what '(:push :pull))
     (error "Invalid operation: %s" what))
   (insert (format (if (eq what :push)
                       "Pushing %s to %s\n"
                     "Pulling %s from %s\n")
                   source-id peer-ip))
+  "TODO")
+
+(defun hesokuri-do-clone (source-id local-path peer-ip peer-path)
+  (when (file-exists-p local-path)
+    (error "Cannot clone to a path that already exists: %s" local-path))
+  (insert (format "Cloning %s from %s (%s) to %s\n"
+                  source-id peer-ip peer-path local-path))
   "TODO")
 
 (defun hesokuri-kuri (peer-ip)
@@ -111,27 +118,37 @@ IP address specified in the string PEER-IP."
     (unless local-macs
       (error "Could not figure out local MAC address from 'ifconfig -a'"))
     (pop-to-buffer (get-buffer-create "*hesokuri*"))
+    (goto-char (point-max))
     (insert "\n\nkuri operation at "
             (format-time-string "%c" (current-time))
             ":\n")
-    (goto-char (point-max))
     (dolist (local-mac local-macs)
       (let ((local-sources (hesokuri-sources-on-machine local-mac))
             failed succeeded)
         (dolist (local-source local-sources)
           (let* ((source-id (car local-source))
-                 (peer-source (assq source-id peer-sources)))
-            (when peer-source
+                 (local-path (cadr local-source))
+                 (peer-source (assq source-id peer-sources))
+                 (peer-path (cadr peer-source)))
+            (cond
+             ((not peer-source))
+             ((not (file-exists-p local-path))
+              (let ((args `(,source-id ,local-path ,peer-ip ,peer-path)))
+                (if (apply 'hesokuri-do-clone args)
+                    (push (cons :clone args) succeeded)
+                  (push (cons :clone args) failed))))
+             (t
+              (cd local-path)
               (dolist (what '(:push :pull))
-                (let ((args `(,what ,source-id
-                              ,(cadr local-source) ,(cadr peer-source)
-                              ,peer-ip)))
+                (let ((args `(,what ,source-id ,peer-ip ,peer-path)))
                   (if (apply 'hesokuri-do-kuri args)
                       (push args succeeded)
-                    (push args failed)))))))
-        (when succeeded (insert "\nThe following operations succeeded:\n"))
-        (dolist (s succeeded)
-          (insert (prin1-to-string s) "\n"))
-        (when failed (insert "\nThe following operations failed:\n"))
-        (dolist (f failed)
-          (insert (prin1-to-string f) "\n"))))))
+                    (push args failed))))))))
+        (when succeeded
+          (insert "\nThe following operations succeeded:\n")
+          (dolist (s succeeded)
+            (insert (prin1-to-string s) "\n")))
+        (when failed
+          (insert "\nThe following operations failed:\n")
+          (dolist (f failed)
+            (insert (prin1-to-string f) "\n")))))))
