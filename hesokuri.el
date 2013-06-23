@@ -43,6 +43,20 @@ Notice that the Mac OS machines use the same directory structure, so the
 directories only have to appear once in the list.
 ")
 
+(defun hesokuri-macs-in-buffer ()
+  "Returns a list of MAC addresses in the current buffer. The MAC address is
+returned as a symbol in the form ffffffffffff."
+  (let ((i -1)
+        (s (buffer-string))
+        res)
+    (while (setq i (string-match "..?:..?:..?:..?:..?:..? " s (+ i 2)))
+      (let* ((raw-mac (downcase (substring s i (1- (match-end 0)))))
+             (two-digits-each
+              (mapcar (lambda (s) (if (eql 1 (length s)) (concat "0" s) s))
+                      (split-string raw-mac ":"))))
+        (push (intern (apply 'concat two-digits-each)) res)))
+    res))
+
 (defun hesokuri-mac-of (ip)
   "Given an IP address as a string, attempts to find the MAC address associated
 with it. The MAC address is returned as a symbol in the form ffffffffffff.
@@ -52,16 +66,12 @@ Returns NIL if there was an error."
       (unless (eql 0 arp-result)
         (error "Error running arp for ip address %s (exitcode %s): %s"
                ip arp-result (buffer-string)))
-      (let* ((arp-output (downcase (buffer-string)))
-             (mac-str-index
-              (string-match "..?:..?:..?:..?:..?:..? " arp-output)))
-        (unless mac-str-index
-          (error "Could not find MAC addres in arp output: %s" arp-output))
-        (let* ((raw-mac (substring arp-output mac-str-index (1- (match-end 0))))
-               (two-digits-each
-                (mapcar (lambda (s) (if (eql 1 (length s)) (concat "0" s) s))
-                        (split-string raw-mac ":"))))
-          (intern (apply 'concat two-digits-each)))))))
+      (let* ((arp-out-macs (hesokuri-macs-in-buffer))
+             (found-count (length arp-out-macs)))
+        (unless (eql found-count 1)
+          (error "Expected 1 MAC address in arp output, but found %d: %s"
+                 found-count (buffer-string)))
+        (car arp-out-macs)))))
 
 (defun hesokuri-source-ids ()
   "Returns a list of all the known source IDs configured. The IDs are read from
@@ -78,3 +88,16 @@ by MAC."
     (dolist (source hesokuri-sources res)
       (when (find mac (cadr source))
         (push `(,(car source) ,(cl-caadr source)) res)))))
+
+(defun hesokuri-kuri (peer-ip)
+  "Kuris, or syncs, all repos shared between this machine and the one with the
+IP address specified in the string PEER-IP."
+  (interactive "MIP address to sync with: ")
+  (let* ((peer-mac (hesokuri-mac-of peer-ip))
+         (local-macs
+          (with-temp-buffer
+            (call-process "ifconfig" nil t nil "-a")
+            (hesokuri-macs-in-buffer))))
+    (dolist (local-mac local-macs)
+      "TODO"
+      '(hesokuri-kuri-for-pair local-mac peer-mac))))
