@@ -1,0 +1,3 @@
+Have to manually run ping to populate arp table.
+Most sources will not support pushing, should disable by default.
+Does not support different user names per machine.
