@@ -40,3 +40,19 @@ hypothetical user with two Mac OS machines and a Linux machine:
 Notice that the Mac OS machines use the same directory structure, so the
 directories only have to appear once in the list.
 ")
+
+(defun hesokuri-mac-of (ip)
+  "Given an IP address as a string, attempts to find the MAC address associated
+with it. The MAC address is returned as a symbol in the form ff:ff:ff:ff:ff:ff.
+Returns NIL if there was an error."
+  (with-temp-buffer
+    (let ((arp-result (call-process "arp" nil t nil ip)))
+      (unless (eql 0 arp-result)
+        (error "Error running arp for ip address %s (exitcode %s): %s"
+               ip arp-result (buffer-string)))
+      (let* ((arp-output (buffer-string))
+             (mac-str-index
+              (string-match "..?:..?:..?:..?:..?:..? " arp-output)))
+        (unless mac-str-index
+          (error "Could not find MAC addres in arp output: %s" arp-output))
+        (intern (substring arp-output mac-str-index (- (match-end 0) 1)))))))
