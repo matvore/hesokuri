@@ -1,6 +1,8 @@
 ;;; hesokuri -*- lexical-binding: t; coding: utf-8 -*-
 ;;; Personal distributed backup system
 
+(require 'cl-lib)
+
 (defvar hesokuri-sources '()
   "Defines the locations from which to read hesokuri repos. It is a list of zero
 or more REPO items, where a REPO item is in this form:
@@ -60,3 +62,19 @@ Returns NIL if there was an error."
                 (mapcar (lambda (s) (if (eql 1 (length s)) (concat "0" s) s))
                         (split-string raw-mac ":"))))
           (intern (apply 'concat two-digits-each)))))))
+
+(defun hesokuri-source-ids ()
+  "Returns a list of all the known source IDs configured. The IDs are read from
+the hesokuri-sources special variable."
+  (mapcar 'car hesokuri-sources))
+
+(defun hesokuri-sources-on-machine (mac)
+  "Returns a list of sources on the machine identified with the given MAC
+address. List is in the form of:
+\((depo-id1 path-string1) (depo-id2 path-string2) ...)
+Each path string indicates the location of the source on the machine specified
+by MAC."
+  (let (res)
+    (dolist (source hesokuri-sources res)
+      (when (find mac (cadr source))
+        (push `(,(car source) ,(cl-caadr source)) res)))))
