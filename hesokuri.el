@@ -103,7 +103,9 @@ by MAC."
     (error "Cannot clone to a path that already exists: %s" local-path))
   (insert (format "Cloning %s from %s (%s) to %s\n"
                   source-id peer-ip peer-path local-path))
-  "TODO")
+  (eq 0 (call-process "git" nil t t "clone"
+                      (format "ssh://%s%s" peer-ip peer-path)
+                      local-path)))
 
 (defun hesokuri-kuri (peer-ip)
   "Kuris, or syncs, all repos shared between this machine and the one with the
