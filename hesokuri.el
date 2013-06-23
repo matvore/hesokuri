@@ -5,7 +5,7 @@
 
 (defvar hesokuri-sources '()
   "Defines the locations from which to read hesokuri repos. It is a list of zero
-or more REPO items, where a REPO item is in this form:
+or more SOURCE items, where a SOURCE item is in this form:
  (NAME
   (\"/foo/bar/path1/\"
    MAC-ADDRESS-USING-PATH-1-A
@@ -16,7 +16,7 @@ or more REPO items, where a REPO item is in this form:
    MAC-ADDRESS-USING-PATH-2-B
    ...)
   ...)
-NAME is a lisp symbol identifying the repo in status and error messages. After
+NAME is a lisp symbol identifying the source in status and error messages. After
 name follows one or more path settings, each path settings a list which contains
 a path followed by one or more MAC addresses. Each MAC address has a copy of the
 repo at the given path. Here is an example value for this variable for a
@@ -89,26 +89,24 @@ by MAC."
       (when (find mac (cadr source))
         (push `(,(car source) ,(cl-caadr source)) res)))))
 
-(defun hesokuri-do-kuri (what source-id peer-ip peer-path)
+(defun hesokuri-do-kuri (what source-id peer-repo)
   (unless (cl-find what '(:push :pull))
     (error "Invalid operation: %s" what))
   (insert (format (if (eq what :push)
                       "Pushing %s to %s\n"
                     "Pulling %s from %s\n")
-                  source-id peer-ip))
+                  source-id peer-repo))
   "TODO")
 
-(defun hesokuri-do-clone (source-id local-path peer-ip peer-path)
+(defun hesokuri-do-clone (source-id local-path peer-repo)
   (when (file-exists-p local-path)
     (error "Cannot clone to a path that already exists: %s" local-path))
-  (insert (format "Cloning %s from %s (%s) to %s\n"
-                  source-id peer-ip peer-path local-path))
-  (eq 0 (call-process "git" nil t t "clone"
-                      (format "ssh://%s%s" peer-ip peer-path)
-                      local-path)))
+  (insert (format "Cloning %s from %s to %s\n"
+                  source-id peer-repo local-path))
+  (eq 0 (call-process "git" nil t t "clone" peer-repo local-path)))
 
 (defun hesokuri-kuri (peer-ip)
-  "Kuris, or syncs, all repos shared between this machine and the one with the
+  "Kuris, or syncs, all sources shared between this machine and the one with the
 IP address specified in the string PEER-IP."
   (interactive "MIP address to sync with: ")
   (let* ((peer-mac (hesokuri-mac-of peer-ip))
@@ -131,18 +129,19 @@ IP address specified in the string PEER-IP."
           (let* ((source-id (car local-source))
                  (local-path (cadr local-source))
                  (peer-source (assq source-id peer-sources))
-                 (peer-path (cadr peer-source)))
+                 (peer-path (cadr peer-source))
+                 (peer-repo (format "ssh://%s%s" peer-ip peer-path)))
             (cond
              ((not peer-source))
              ((not (file-exists-p local-path))
-              (let ((args `(,source-id ,local-path ,peer-ip ,peer-path)))
+              (let ((args `(,source-id ,local-path ,peer-repo)))
                 (if (apply 'hesokuri-do-clone args)
                     (push (cons :clone args) succeeded)
                   (push (cons :clone args) failed))))
              (t
               (cd local-path)
               (dolist (what '(:push :pull))
-                (let ((args `(,what ,source-id ,peer-ip ,peer-path)))
+                (let ((args `(,what ,source-id ,peer-repo)))
                   (if (apply 'hesokuri-do-kuri args)
                       (push args succeeded)
                     (push args failed))))))))
