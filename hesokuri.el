@@ -96,7 +96,9 @@ by MAC."
                       "Pushing %s to %s\n"
                     "Pulling %s from %s\n")
                   source-id peer-repo))
-  "TODO")
+  (eq 0 (call-process "git" nil t t
+                      (case what ((:push) "push") ((:pull) "pull"))
+                      peer-repo "master")))
 
 (defun hesokuri-do-clone (source-id local-path peer-repo)
   (when (file-exists-p local-path)
