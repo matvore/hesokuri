@@ -86,8 +86,9 @@ Each path string indicates the location of the source on the machine specified
 by MAC."
   (let (res)
     (dolist (source hesokuri-sources res)
-      (when (find mac (cadr source))
-        (push `(,(car source) ,(cl-caadr source)) res)))))
+      (dolist (path-spec (cdr source))
+        (when (cl-find mac path-spec)
+          (push `(,(car source) ,(car path-spec)) res))))))
 
 (defun hesokuri-do-kuri (what source-id peer-repo)
   (unless (cl-find what '(:push :pull))
@@ -97,7 +98,7 @@ by MAC."
                     "Pulling %s from %s\n")
                   source-id peer-repo))
   (eq 0 (call-process "git" nil t t
-                      (case what ((:push) "push") ((:pull) "pull"))
+                      (cl-case what ((:push) "push") ((:pull) "pull"))
                       peer-repo "master")))
 
 (defun hesokuri-do-clone (source-id local-path peer-repo)
