@@ -49,7 +49,7 @@ returned as a symbol in the form ffffffffffff."
   (let ((i -1)
         (s (buffer-string))
         res)
-    (while (setq i (string-match "..?:..?:..?:..?:..?:..? " s (+ i 2)))
+    (while (setq i (string-match "[0-9a-fA-F].?:..?:..?:..?:..?:..? " s (+ i 2)))
       (let* ((raw-mac (downcase (substring s i (1- (match-end 0)))))
              (two-digits-each
               (mapcar (lambda (s) (if (eql 1 (length s)) (concat "0" s) s))
@@ -120,6 +120,8 @@ IP address specified in the string PEER-IP."
             (hesokuri-macs-in-buffer))))
     (unless local-macs
       (error "Could not figure out local MAC address from 'ifconfig -a'"))
+    (unless peer-sources
+      (error "Could not find any sources on %s (MAC %s)" peer-ip peer-mac))
     (pop-to-buffer (get-buffer-create "*hesokuri*"))
     (goto-char (point-max))
     (insert "\n\nkuri operation at "
