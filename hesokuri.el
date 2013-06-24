@@ -90,9 +90,10 @@ by MAC."
         (when (cl-find mac path-spec)
           (push `(,(car source) ,(car path-spec)) res))))))
 
-(defun -hesokuri-push (source-id peer-repo)
+(defun -hesokuri-push (source-id peer-repo remote-branch)
   (insert (format "Pushing %s to %s\n" source-id peer-repo))
-  (call-process "git" nil t t "push" peer-repo "master"))
+  (call-process "git" nil t t "push" peer-repo 
+                (concat "master:" remote-branch)))
 
 (defun -hesokuri-pull (source-id peer-repo)
   (insert (format "Pulling %s from %s\n" source-id peer-repo))
@@ -133,6 +134,7 @@ IP address specified in the string PEER-IP."
             ":\n")
     (dolist (local-mac local-macs)
       (let ((local-sources (hesokuri-sources-on-machine local-mac))
+            (remote-track-name (concat (symbol-name local-mac) "-master"))
             failed succeeded)
         (dolist (local-source local-sources)
           (let* ((source-id (car local-source))
@@ -147,8 +149,11 @@ IP address specified in the string PEER-IP."
                                 source-id local-path peer-repo))
              (t
               (cd local-path)
-              (dolist (what '(-hesokuri-push -hesokuri-pull))
-                (-hesokuri-report what source-id peer-repo))))))
+              (or (-hesokuri-report '-hesokuri-push source-id
+                                    peer-repo "master")
+                  (-hesokuri-report '-hesokuri-push source-id
+                                    peer-repo remote-track-name)
+              (-hesokuri-report '-hesokuri-pull source-id peer-repo))))))
         (when succeeded
           (insert "\nThe following operations succeeded:\n")
           (dolist (s succeeded)
