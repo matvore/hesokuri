@@ -90,23 +90,27 @@ by MAC."
         (when (cl-find mac path-spec)
           (push `(,(car source) ,(car path-spec)) res))))))
 
-(defun hesokuri-do-kuri (what source-id peer-repo)
-  (unless (cl-find what '(:push :pull))
-    (error "Invalid operation: %s" what))
-  (insert (format (if (eq what :push)
-                      "Pushing %s to %s\n"
-                    "Pulling %s from %s\n")
-                  source-id peer-repo))
-  (eq 0 (call-process "git" nil t t
-                      (cl-case what ((:push) "push") ((:pull) "pull"))
-                      peer-repo "master")))
+(defun -hesokuri-push (source-id peer-repo)
+  (insert (format "Pushing %s to %s\n" source-id peer-repo))
+  (call-process "git" nil t t "push" peer-repo "master"))
 
-(defun hesokuri-do-clone (source-id local-path peer-repo)
+(defun -hesokuri-pull (source-id peer-repo)
+  (insert (format "Pulling %s from %s\n" source-id peer-repo))
+  (call-process "git" nil t t "pull" peer-repo "master"))
+
+(defun -hesokuri-clone (source-id local-path peer-repo)
   (when (file-exists-p local-path)
     (error "Cannot clone to a path that already exists: %s" local-path))
   (insert (format "Cloning %s from %s to %s\n"
                   source-id peer-repo local-path))
-  (eq 0 (call-process "git" nil t t "clone" peer-repo local-path)))
+  (call-process "git" nil t t "clone" peer-repo local-path))
+
+(defmacro -hesokuri-report (func-name &rest pass-args)
+  `(let* ((pass-args (list . ,pass-args))
+          (all-args (cons ,func-name pass-args)))
+     (if (eq 0 (apply ,func-name pass-args))
+         (prog1 t (push all-args succeeded))
+       (prog1 nil (push all-args failed)))))
 
 (defun hesokuri-kuri (peer-ip)
   "Kuris, or syncs, all sources shared between this machine and the one with the
@@ -139,17 +143,12 @@ IP address specified in the string PEER-IP."
             (cond
              ((not peer-source))
              ((not (file-exists-p local-path))
-              (let ((args `(,source-id ,local-path ,peer-repo)))
-                (if (apply 'hesokuri-do-clone args)
-                    (push (cons :clone args) succeeded)
-                  (push (cons :clone args) failed))))
+              (-hesokuri-report '-hesokuri-clone
+                                source-id local-path peer-repo))
              (t
               (cd local-path)
-              (dolist (what '(:push :pull))
-                (let ((args `(,what ,source-id ,peer-repo)))
-                  (if (apply 'hesokuri-do-kuri args)
-                      (push args succeeded)
-                    (push args failed))))))))
+              (dolist (what '(-hesokuri-push -hesokuri-pull))
+                (-hesokuri-report what source-id peer-repo))))))
         (when succeeded
           (insert "\nThe following operations succeeded:\n")
           (dolist (s succeeded)
