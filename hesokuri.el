@@ -33,7 +33,7 @@ hypothetical user with two Mac OS machines and a Linux machine:
   (\"/home/jdoe/.emacs.d\"
    4ce77b30233d))
  (hesokuri
-  (\"/Users/matvore/hesokuri\"
+  (\"/Users/jdoe/hesokuri\"
    3c075562313f
    12f390d51bfd)
   (\"/home/jdoe/hesokuri\"
