@@ -1,7 +1,7 @@
 (ns hesokuri.core
+  (:use [clojure.java.shell :only [sh]])
+  (:use [clojure.string :only [trim split]])
   (:gen-class))
-
-(use '[clojure.java.shell :only [sh]])
 
 (def sources
   "Defines the hesokuri sources. This is the user-configurable settings that
@@ -23,6 +23,37 @@ form:
 (def sources-config-file
   "Where to read the hesokuri sources configuration from."
   (str (.get (System/getenv) "HOME") "/.hesokuri_sources"))
+
+(defn -vector-from-enum [enum]
+  (loop [v []]
+    (if (.hasMoreElements enum)
+      (recur (conj v (.nextElement enum)))
+      v)))
+
+(defn identities
+  "Returns a vector of the possible identities this system may have on the
+network, which includes its hostname and the IP address of all network
+interfaces. Each identity is a string."
+  []
+  (conj
+  (let [interfaces (-vector-from-enum
+                    (java.net.NetworkInterface/getNetworkInterfaces))
+        address-of (fn [addr]
+                     (first (split (.getHostAddress (.getAddress addr)) #"%")))]
+    (loop [res [] i (seq interfaces)]
+      (cond
+       (not i) res
+       (nil? (first i)) (recur res (next i))
+       :else
+       (recur (into res
+         (loop [subres [] addrs (seq (.getInterfaceAddresses (first i)))]
+           (cond
+            (not addrs) subres
+            (nil? (first addrs)) (recur subres (next addrs))
+            :else (recur (conj subres (address-of  (first addrs)))
+                         (next addrs)))))
+              (rest i)))))
+  (trim (:out (sh "hostname")))))
 
 (defn refresh-sources []
   (dosync
