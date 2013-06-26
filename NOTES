@@ -1,0 +1,24 @@
+Let's use hostnames rather than MAC addresses. Hostnames can be configured by
+the user so are more flexible. Try to avoid reinventing the wheel in regards to
+discoverability of clients, etc.
+
+Clojure seems like a good platform/language - it is a powerful language and has
+all the library support that Java has. Supporting things like notifications and
+running as a service will have to happen with non-JVM libraries and tools, but
+the core can be JVM-based. Python is more popular than Clojure, but basically
+has the same limitations when it comes to platform-specific richness, and is
+less powerful language-wise.
+
+Keep a database of what peers have each version of local branches. When one goes
+out of date, immediately push changes, even if the client seems to not be
+responding. If the peer is not responding and they have out of date branches,
+try a ping every few minutes. If a peer is not responding but we know it has our
+latest branches, do not bother it.
+
+Listen for file changes in the git repo to know when a peer has pushed changes
+to me. Then, if the branch is "inactive" locally, try to merge it in
+automatically. If the merge results in conflicts, abort the merge and leave the
+remote branch. If the merge is successful, delete the peer-generated branch.
+
+A branch is inactive if it is not checked out (includes all branches in bare
+repos) OR it is checked out and there are no local changes.
