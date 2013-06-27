@@ -22,3 +22,14 @@ remote branch. If the merge is successful, delete the peer-generated branch.
 
 A branch is inactive if it is not checked out (includes all branches in bare
 repos) OR it is checked out and there are no local changes.
+
+When pushing to a remote branch that has the current machine's host name
+prepended to it, always force the push, which causes non-fast-forwards to
+overwrite the exiting branch.
+
+When pushing to a branch that doesn't have the current machine's host name,
+never force. This means only fast-forwards to non-checked-out branches will
+work.
+
+Primarily, consider it the system's responsibility to push their own changes to
+peers. (later we can add polling for some redundancy, if it seems necessary).

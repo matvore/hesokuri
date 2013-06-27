@@ -20,15 +20,37 @@ form:
 }"
   (ref {}))
 
+(def peer-hostnames
+  "A set of the hostnames of the peers. Updated with sources."
+  (ref #{}))
+
+(def local-identity
+  "The hostname or IP of this system as known by the peers on the current
+network."
+  (ref "localhost"))
+
+; Represents a git branch on some system. origin is omitted when it is the
+; canonical version of the branch. location is omitted when it is located on the
+; local system.
+(defrecord git-branch [location origin root-name])
+
+(def pushed-hashes
+  "Indicates the last pushed hash of branches on peer systems. Is a map of
+git-branch records to sha-hash strings."
+  (ref {}))
+
+(def local-hashes
+  "Indicates the hash of each branch stored locally. Is a map of git-branch
+records to sha-hash strings. The 'location' property of each git-branch is
+omitted."
+  (ref {}))
+
 (def sources-config-file
   "Where to read the hesokuri sources configuration from."
   (str (.get (System/getenv) "HOME") "/.hesokuri_sources"))
 
 (defn -vector-from-enum [enum]
-  (loop [v []]
-    (if (.hasMoreElements enum)
-      (recur (conj v (.nextElement enum)))
-      v)))
+  (vec (java.util.Collections/list enum)))
 
 (defn identities
   "Returns a vector of the possible identities this system may have on the
@@ -55,9 +77,27 @@ interfaces. Each identity is a string."
               (rest i)))))
   (trim (:out (sh "hostname")))))
 
-(defn refresh-sources []
+(defn -local-identity
+  "Returns the identity of this system. It deduces it from the (identities)
+vector and the peer-hostnames var."
+  []
+  (loop [candidates (seq (identities))]
+    (cond
+     (not identities) nil
+     (@peer-hostnames (first candidates)) (first candidates)
+     :else (recur (next candidates)))))
+
+(defn refresh-sources
+  "Updates sources and peer-hostnames based on the user's sources config file."
+  []
   (dosync
-   (alter sources (fn [_] (read-string (slurp sources-config-file))))))
+   (alter sources
+          (fn [_] (read-string (slurp sources-config-file))))
+   (alter peer-hostnames
+          (fn [_] (set (apply concat (map keys (vals @sources))))))
+   (alter local-identity
+          (fn [_] (-local-identity)))
+   (list @sources @peer-hostnames @local-identity)))
 
 (defn -main
   "I don't do a whole lot ... yet."
