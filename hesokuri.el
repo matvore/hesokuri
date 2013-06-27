@@ -152,8 +152,8 @@ IP address specified in the string PEER-IP."
               (or (-hesokuri-report '-hesokuri-push source-id
                                     peer-repo "master")
                   (-hesokuri-report '-hesokuri-push source-id
-                                    peer-repo remote-track-name)
-              (-hesokuri-report '-hesokuri-pull source-id peer-repo))))))
+                                    peer-repo remote-track-name))
+              (-hesokuri-report '-hesokuri-pull source-id peer-repo)))))
         (when succeeded
           (insert "\nThe following operations succeeded:\n")
           (dolist (s succeeded)
