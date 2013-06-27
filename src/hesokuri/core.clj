@@ -30,7 +30,7 @@ network."
   (ref "localhost"))
 
 ; Represents a git branch on some system. origin is omitted when it is the
-; canonical version of the branch. location is omitted when it is located on the
+; canonical version of the branch. location is :me when it is located on the
 ; local system.
 (defrecord git-branch [location origin root-name])
 
@@ -91,12 +91,9 @@ vector and the peer-hostnames var."
   "Updates sources and peer-hostnames based on the user's sources config file."
   []
   (dosync
-   (alter sources
-          (fn [_] (read-string (slurp sources-config-file))))
-   (alter peer-hostnames
-          (fn [_] (set (apply concat (map keys (vals @sources))))))
-   (alter local-identity
-          (fn [_] (-local-identity)))
+   (ref-set sources (read-string (slurp sources-config-file)))
+   (ref-set peer-hostnames (set (apply concat (map keys (vals @sources)))))
+   (ref-set local-identity (-local-identity))
    (list @sources @peer-hostnames @local-identity)))
 
 (defn -main
