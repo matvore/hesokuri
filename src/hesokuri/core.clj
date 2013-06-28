@@ -83,9 +83,28 @@ vector and the peer-hostnames var."
   []
   (loop [candidates (seq (identities))]
     (cond
-     (not identities) nil
+     (not candidates) nil
      (@peer-hostnames (first candidates)) (first candidates)
      :else (recur (next candidates)))))
+
+(defrecord peer [name sources])
+
+(defn peer-fetch-all [peer source-name]
+  (dosync
+   (let [source ((ensure sources) source-name)]
+    (sh "git" "fetch" "--all" (format "ssh://%s%s" peer (source peer))
+        :dir (source (ensure local-identity)))))
+  peer)
+
+(def peers
+  "A dictionary of peer hostnames to peer record agents. This dictionary itself
+is an atom to allow easily adding peers to it."
+  (atom {}))
+
+(defn new-peer!
+  "Adds a new peer to the peers map."
+  [name]
+  (swap! peers #(conj % [name (peer. name {})])))
 
 (defn refresh-sources
   "Updates sources and peer-hostnames based on the user's sources config file."
