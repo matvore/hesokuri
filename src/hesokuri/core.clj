@@ -35,6 +35,15 @@ network."
   "Where to read the hesokuri sources configuration from."
   (str (.get (System/getenv) "HOME") "/.hesokuri/sources"))
 
+(defn peer-branch-name [branch]
+  (str (:branch branch) "_hesokr_" (:peer branch)))
+
+(defn parse-branch-name [name]
+  (let [s (split name #"_hesokr_" 2)]
+    (if (= (count s) 2)
+      {:branch (first s) :peer (second s)}
+      {:branch s})))
+
 (defn -vector-from-enum [enum]
   (vec (Collections/list enum)))
 
@@ -161,7 +170,7 @@ Elisp prototype. This simply pushes and pulls every repo with the given peer."
   (io!
    (let [peer-sources (sources-on-machine peer-name)
          me @local-identity
-         remote-track-name (str me "_hesokr_master")]
+         remote-track-name (peer-branch-name {:branch "master", :peer me})]
      (cond
       (not peer-sources)
       (println "Could not find any sources on " peer-name)
