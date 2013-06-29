@@ -99,24 +99,28 @@ vector and the peer-hostnames var."
    (ref-set local-identity (-local-identity))
    (list @sources @peer-hostnames @local-identity)))
 
+(defn sh-print!
+  [& args]
+  (io!
+   (let [result (apply sh args)]
+     (.print *err* (:err result))
+     (.print *out* (:out result))
+     (:exit result))))
+
 (defn -push! [local-path peer-repo local-branch remote-branch & other-flags]
   (let [args (concat (list "git" "push") other-flags
                      (list peer-repo (str local-branch ":" remote-branch)
                            :dir local-path))]
     (io!
      (println (join " " args))
-     (let [res (apply sh args)]
-       (print (:out res) (:err res))
-       (:exit res)))))
+     (apply sh-print! args))))
 
 (defn -pull! [peer-repo local-path]
   (io!
    ; TODO: Do a git fetch and process the branches more intelligently.
    ; TODO: Pull to a different branch if the current one has merge conflicts.
    (println "Pulling " peer-repo " to " local-path)
-   (let [res (sh "git" "pull" peer-repo "master" :dir local-path)]
-     (print (:out res) (:err res))
-     (:exit res))))
+   (sh-print! "git" "pull" peer-repo "master" :dir local-path)))
 
 (defn -clone! [peer-repo local-path]
   (io!
@@ -250,14 +254,6 @@ returns a map of branch names to sha1 hashes."
       (= from-hash (trim (:out (sh "git" "merge-base"
                                    from-hash to-hash :dir source-dir))))))
 
-(defn sh-print!
-  [& args]
-  (io!
-   (let [result (apply sh args)]
-     (.print *err* (:err result))
-     (.print *out* (:out result))
-     (:exit result))))
-
 ; TODO: When we get data pushed to us, detect it by monitoring filesystem
 ; activity in .git. Then invoke the 'advance' logic below.
 (defn advance!
@@ -305,7 +301,10 @@ returns a map of branch names to sha1 hashes."
    (doseq [branch (keys (branch-hashes! source-dir))]
      (when (and (not= (:branch canonical-branch-name) (:branch branch))
                 (not (nil? (:peer branch))))
-       (sh-print! "git" "branch" "-d" (str branch) :dir source-dir)))))
+       (let [res (sh "git" "branch" "-d" (str branch) :dir source-dir)]
+         (when (= 0 (:exit res))
+           (.print *out* (:out res))
+           (.print *err* (:err res))))))))
 
 (defn kuri!
   "A very stupid implementation of the syncing process, ported directly from the
