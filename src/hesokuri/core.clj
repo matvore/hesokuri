@@ -1,6 +1,6 @@
 (ns hesokuri.core
   (:use [clojure.java.shell :only [sh]])
-  (:use [clojure.string :only [trim split]])
+  (:use [clojure.string :only [join split trim]])
   (:import [java.io File]
            [java.util Date Collections])
   (:gen-class))
@@ -114,12 +114,13 @@ by peer-name."
        (recur (next all-sources) (inc source-index)
               res-sources)))))
 
-(defn -push! [local-path peer-repo remote-branch]
-  (io!
-   (println "Pushing " local-path " to " peer-repo)
-   (let [res (sh "git" "push" peer-repo (str "master:" remote-branch) :dir local-path)]
-     (print (:out res) (:err res))
-     (:exit res))))
+(defn -push! [local-path peer-repo local-branch remote-branch]
+  (let [args (list "git" "push" peer-repo (str local-branch ":" remote-branch) :dir local-path)]
+    (io!
+     (println (join " " args))
+     (let [res (apply sh args)]
+       (print (:out res) (:err res))
+       (:exit res)))))
 
 (defn -pull! [peer-repo local-path]
   (io!
@@ -213,7 +214,8 @@ Elisp prototype. This simply pushes and pulls every repo with the given peer."
 
                (= :push-straight (first ops))
                (let [results (report results "push"
-                                     -push! local-path peer-repo "master")]
+                                     -push! local-path peer-repo
+                                     "master" "master")]
                  (if (= :succeeded (results :last))
                    (recur (next ops) results)
                    (recur (cons :push (next ops)) results)))
@@ -221,7 +223,8 @@ Elisp prototype. This simply pushes and pulls every repo with the given peer."
                (= :push (first ops))
                (recur (next ops)
                       (report results "push"
-                              -push! local-path peer-repo remote-track-name))
+                              -push! local-path peer-repo
+                              "master" remote-track-name))
 
                :else
                (recur (next ops)
