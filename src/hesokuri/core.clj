@@ -102,6 +102,29 @@ by peer-name."
        :else
        (recur (next all-sources) res-sources)))))
 
+(defn -push! [local-path peer-repo remote-branch]
+  (io!
+   (println "Pushing " local-path " to " peer-repo)
+   (let [res (sh "git" "push" peer-repo (str "master:" remote-branch) :dir local-path)]
+     (print (:out res) (:err res))
+     (:exit res))))
+
+(defn -pull! [peer-repo local-path]
+  (io!
+   ; TODO: Do a git fetch and process the branches more intelligently.
+   ; TODO: Pull to a different branch if the current one has merge conflicts.
+   (println "Pulling " peer-repo " to " local-path)
+   (let [res (sh "git" "pull" peer-repo "master" :dir local-path)]
+     (print (:out res) (:err res))
+     (:exit res))))
+
+(defn -clone! [peer-repo local-path]
+  (io!
+   (println "Cloning " peer-repo " to " local-path)
+   (let [res (sh "git" "clone" peer-repo local-path)]
+     (print (:out res) (:err res))
+     (:exit res))))
+
 (defn kuri
   "A very stupid implementation of the syncing process, ported directly from the
 Elisp prototype. This simply pushes and pulls every repo with the given peer."
