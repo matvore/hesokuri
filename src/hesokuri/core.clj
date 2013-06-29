@@ -160,7 +160,7 @@ returns a map of branch names to sha1 hashes."
                  hash (trim (slurp file))]
              (recur (next files)
                     (if (= (count hash) 40)
-                      (conj branches [(.getName file) hash])
+                      (conj branches [(parse-branch-name (.getName file)) hash])
                       branches))))))))
 
 (defn kuri!
