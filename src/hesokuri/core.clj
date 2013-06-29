@@ -87,13 +87,18 @@ vector and the peer-hostnames var."
      (@peer-hostnames (first candidates)) (first candidates)
      :else (recur (next candidates)))))
 
-(defrecord peer [name sources])
+(defrecord peer [name source-state])
+
+(defn peer-fetch-all-cmd [pier source-name]
+  (dosync
+   (let [source ((ensure sources) source-name)
+         peer-name (:name pier)]
+     (list "git" "fetch" "--all"
+           (format "ssh://%s%s" peer-name (source peer-name))
+           :dir (source (ensure local-identity))))))
 
 (defn peer-fetch-all [peer source-name]
-  (dosync
-   (let [source ((ensure sources) source-name)]
-    (sh "git" "fetch" "--all" (format "ssh://%s%s" peer (source peer))
-        :dir (source (ensure local-identity)))))
+  (apply sh (peer-fetch-all-cmd peer source-name))
   peer)
 
 (def peers
