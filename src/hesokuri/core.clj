@@ -31,7 +31,7 @@ network."
 
 (def sources-config-file
   "Where to read the hesokuri sources configuration from."
-  (str (.get (System/getenv) "HOME") "/.hesokuri_sources"))
+  (str (.get (System/getenv) "HOME") "/.hesokuri/sources"))
 
 (defn -vector-from-enum [enum]
   (vec (java.util.Collections/list enum)))
