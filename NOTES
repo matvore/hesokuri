@@ -12,12 +12,11 @@ When we get data pushed to us, detect it by monitoring filesystem activity in
 .git. After it is detected, see if there is something actionable to do:
 * If the working area is clean (no untracked files, no changed files, no staged
   changes) and (CURRENT_BRANCH)_hesokr_(PEER_NAME) is a fast-forward, move the
-  branch to point to it, and make HEAD point to it also. Do this in two steps in
-  case moving HEAD fails.
+  branch to point to it, and make HEAD point to it also.
 * For non-checked-out branch FOO_BRANCH, if (FOO_BRANCH)_hesokr_(PEER_NAME) is a
   fast-forward of FOO_BRANCH, move the branch head of FOO_BRANCH to point to it.
-* For any two branches FOO and BAR, if BAR is a fast-forward of FOO, and either
-  both are canonical or both are from the same peer, delete the FOO branch.
+* For any two branches FOO and BAR, if BAR is a fast-forward of FOO, and BAR is
+  a canonical branch or FOO is a non-canonical branch, delete the FOO branch.
 
 --------------------------------------------------------------------------------
 Let's use hostnames rather than MAC addresses. Hostnames can be configured by
