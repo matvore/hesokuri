@@ -37,8 +37,16 @@ network."
 
 (defrecord BranchName [branch peer]
   Object
-  (toString [this]
-    (str branch "_hesokr_" peer)))
+  (toString [_]
+    (if peer
+      (str branch "_hesokr_" peer)
+      (str branch))))
+
+(def canonical-branch-name
+  "This is the name of the only branch that is aggressively synced between
+  clients. This branch has the property that it cannot be deleted, and automatic
+  updates must always be a fast-forward."
+  (BranchName. "hesokuri" nil))
 
 (defn parse-branch-name [name]
   (let [s (split name #"_hesokr_" 2)]
@@ -125,22 +133,32 @@ vector and the peer-hostnames var."
           [append-to (conj (append-to results) report-item)]
           [:last append-to])))
 
+(defmacro lint-and
+  "Performs a short-circuited logical int-based and. If the first expression is
+  0, then the next expression is not evaluated. Returns the last expression
+  evaluated."
+  [x y]
+  (let [x-res (gensym)]
+    `(let [~x-res ~x]
+       (if (= 0 ~x-res) ~x-res ~y))))
+
 (defn push-for-one
   "Push a branch as necessary to keep a peer up-to-date. The branch parameter
 should be an instance of Branch. pusher is a version of -push! with the first
 two arguments curried."
   [me pusher branch peer]
-  (cond
-   (= (:peer branch) peer) 0
+  (letfn [(force-push []
+            (pusher branch (BranchName. (:branch branch) me) "-f"))]
+    (cond
+     (every? #(not= (:peer branch) %) [nil me peer])
+     (pusher (str branch) (str branch))
 
-   (not (:peer branch))
-   (let [branch (:branch branch)]
-     (if (= 0 (pusher branch branch))
-       0
-       (pusher branch (BranchName. branch me) "-f")))
+     (= canonical-branch-name branch)
+     (lint-and (pusher branch branch) (force-push))
 
-   :else
-   (pusher (str branch) (str branch))))
+     (and (not= canonical-branch-name branch)
+          (not (:peer branch)))
+     (force-push))))
 
 (defn common-sources
   "Returns a list of all items in the sources vector that are on all of the
