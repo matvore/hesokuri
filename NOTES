@@ -23,18 +23,6 @@ All data is transferred between peers through git pushes. When pushing:
 This makes polling for changes between peers a little hard. We can decide later
 whether to introduce a separate pinging protocol, or do pure git fetches.
 
-When we get data pushed to us, detect it by monitoring filesystem activity in
-.git. After it is detected, see if there is something actionable to do:
-* If hesokuri is not checked out, and some branch hesokuri_hesokr_* is a
-  fast-forward of hesokuri, then point hesokuri to it.
-* If hesokuri is checked out, but the working area is clean (no untracked files,
-  no unstaged or staged changes), and hesokuri_hesokr_* is a fast-forward of
-  hesokuri, then point hesokuri to it.
-* For any two branches F and B, where F is a fast-forward of B, and B has a name
-  (BRANCH)_hesokr_*, and BRANCH is not hesokuri, delete branch B.
-* For some branch B in the form hesokuri_hesokr_(PEER), where hesokuri is a
-  fast-forward of it, delete B.
-
 --------------------------------------------------------------------------------
 
 Old design:
