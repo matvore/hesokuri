@@ -35,14 +35,14 @@ network."
   "Where to read the hesokuri sources configuration from."
   (str (.get (System/getenv) "HOME") "/.hesokuri/sources"))
 
-(defn peer-branch-name [branch]
-  (str (:branch branch) "_hesokr_" (:peer branch)))
+(defrecord BranchName [branch peer]
+  Object
+  (toString [this]
+    (str branch "_hesokr_" peer)))
 
 (defn parse-branch-name [name]
   (let [s (split name #"_hesokr_" 2)]
-    (if (= (count s) 2)
-      {:branch (first s) :peer (second s)}
-      {:branch (first s)})))
+    (BranchName. (first s) (second s))))
 
 (defn -vector-from-enum [enum]
   (vec (Collections/list enum)))
@@ -127,19 +127,20 @@ vector and the peer-hostnames var."
 
 (defn push-for-one
   "Push a branch as necessary to keep a peer up-to-date. The branch parameter
-should be a branch object as returned by parse-branch-name. pusher is a version
-of -push! with the first two arguments curried."
+should be an instance of Branch. pusher is a version of -push! with the first
+two arguments curried."
   [me pusher branch peer]
   (cond
    (= (:peer branch) peer) 0
 
    (not (:peer branch))
-   (if (= 0 (pusher (:branch branch) (:branch branch)))
-     0
-     (pusher (:branch branch) (peer-branch-name (conj branch [:peer me])) "-f"))
+   (let [branch (:branch branch)]
+     (if (= 0 (pusher branch branch))
+       0
+       (pusher branch (BranchName. branch me) "-f")))
 
    :else
-   (pusher (peer-branch-name branch) (peer-branch-name branch))))
+   (pusher (str branch) (str branch))))
 
 (defn common-sources
   "Returns a list of all items in the sources vector that are on all of the
@@ -160,16 +161,13 @@ given peers."
   "Push all sources and branches necessary to keep one peer up-to-date."
   [peer-name]
   (io!
-   (let [me @local-identity
-         sources (common-sources peer-name @local-identity)]
-     (loop [sources (seq sources)]
-       (let [source (first sources)
-             branch-hashes (branch-hashes! (source me))
+   (let [me @local-identity]
+     (doseq [source (common-sources peer-name me)]
+       (let [my-branches (keys (branch-hashes! (source me)))
              peer-repo (format "ssh://%s%s" peer-name (source peer-name))
              pusher (fn [& args] (apply -push! (source me) peer-repo args))]
-         (doseq [branch (keys branch-hashes)]
-           (push-for-one me pusher branch peer-name))
-         (recur (next sources)))))))
+         (doseq [branch my-branches]
+           (push-for-one me pusher branch peer-name)))))))
 
 (defn branch-hashes!
   "Gets all of the branches of the local repo at the given string path. It
@@ -196,7 +194,7 @@ Elisp prototype. This simply pushes and pulls every repo with the given peer."
   (io!
    (let [me @local-identity
          sources (and me (seq (common-sources peer-name me)))
-         remote-track-name (peer-branch-name {:branch "master", :peer me})]
+         remote-track-name (str (BranchName. "master" me))]
      (cond
       (not me)
       (println "Local identity not set - cannot kuri")
