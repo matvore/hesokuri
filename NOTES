@@ -13,7 +13,7 @@ limitations of deletion being unsupported and only fast-forward updates
 allowed.
 
 All data is transferred between peers through git pushes. When pushing:
-* third-party peer branchs - which is any branch named *_hesokr_(HOST) where
+* third-party peer branches - which is any branch named *_hesokr_(HOST) where
   HOST is not me or the push destination peer, try to push to the same branch
   name, but if it fails, ignore it.
 * hesokuri - try to push to the same branch name, but if it fails, force push to
