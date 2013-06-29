@@ -115,7 +115,8 @@ by peer-name."
               res-sources)))))
 
 (defn -push! [local-path peer-repo local-branch remote-branch]
-  (let [args (list "git" "push" peer-repo (str local-branch ":" remote-branch) :dir local-path)]
+  (let [args (list "git" "push" peer-repo
+                   (str local-branch ":" remote-branch) :dir local-path)]
     (io!
      (println (join " " args))
      (let [res (apply sh args)]
