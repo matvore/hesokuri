@@ -114,9 +114,10 @@ by peer-name."
        (recur (next all-sources) (inc source-index)
               res-sources)))))
 
-(defn -push! [local-path peer-repo local-branch remote-branch]
-  (let [args (list "git" "push" peer-repo
-                   (str local-branch ":" remote-branch) :dir local-path)]
+(defn -push! [local-path peer-repo local-branch remote-branch & other-flags]
+  (let [args (concat (list "git" "push") other-flags
+                     (list peer-repo (str local-branch ":" remote-branch)
+                           :dir local-path))]
     (io!
      (println (join " " args))
      (let [res (apply sh args)]
@@ -146,6 +147,27 @@ by peer-name."
     (conj results
           [append-to (conj (append-to results) report-item)]
           [:last append-to])))
+
+(defn push-for-one
+  "Push a branch as necessary to keep a peer up-to-date. The branch parameter
+should be a branch object as returned by parse-branch-name. pusher is a version
+of -push! with the first two arguments curried."
+  [me pusher branch peer]
+  (cond
+   (= (:peer branch) peer) 0
+
+   (not (:peer branch))
+   (if (= 0 (pusher (:branch branch) (:branch branch)))
+     0
+     (pusher (:branch branch) (peer-branch-name (conj branch [:peer me])) "-f"))
+
+   :else
+   (pusher (peer-branch-name branch) (peer-branch-name branch))))
+
+(defn push-for-peer!
+  "Push all sources and branches necessary to keep one peer up-to-date."
+  []
+  "TODO")
 
 (defn branch-hashes!
   "Gets all of the branches of the local repo at the given string path. It
