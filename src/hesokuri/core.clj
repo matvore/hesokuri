@@ -42,7 +42,7 @@ network."
   (let [s (split name #"_hesokr_" 2)]
     (if (= (count s) 2)
       {:branch (first s) :peer (second s)}
-      {:branch s})))
+      {:branch (first s)})))
 
 (defn -vector-from-enum [enum]
   (vec (Collections/list enum)))
@@ -141,10 +141,35 @@ of -push! with the first two arguments curried."
    :else
    (pusher (peer-branch-name branch) (peer-branch-name branch))))
 
+(defn common-sources
+  "Returns a list of all items in the sources vector that are on all of the
+given peers."
+  [& peer-names]
+  (loop [sources (seq (dosync (ensure sources)))
+         results []]
+    (cond
+     (not sources) results
+
+     (every? #((first sources) %) peer-names)
+     (recur (next sources) (conj results (first sources)))
+
+     :else
+     (recur (next sources) results))))
+
 (defn push-for-peer!
   "Push all sources and branches necessary to keep one peer up-to-date."
-  []
-  "TODO")
+  [peer-name]
+  (io!
+   (let [me @local-identity
+         sources (common-sources peer-name @local-identity)]
+     (loop [sources (seq sources)]
+       (let [source (first sources)
+             branch-hashes (branch-hashes! (source me))
+             peer-repo (format "ssh://%s%s" peer-name (source peer-name))
+             pusher (fn [& args] (apply -push! (source me) peer-repo args))]
+         (doseq [branch (keys branch-hashes)]
+           (push-for-one me pusher branch peer-name))
+         (recur (next sources)))))))
 
 (defn branch-hashes!
   "Gets all of the branches of the local repo at the given string path. It
@@ -164,28 +189,13 @@ returns a map of branch names to sha1 hashes."
                       (conj branches [(parse-branch-name (.getName file)) hash])
                       branches))))))))
 
-(defn common-sources
-  "Returns a list of all items in the sources vector that are on all of the
-given peers."
-  [& peer-names]
-  (loop [sources (seq (dosync (ensure sources)))
-         results []]
-    (cond
-     (not sources) results
-
-     (every? #((first sources) %) peer-names)
-     (recur (next sources) (conj results (first sources)))
-
-     :else
-     (recur (next sources) results))))
-
 (defn kuri!
   "A very stupid implementation of the syncing process, ported directly from the
 Elisp prototype. This simply pushes and pulls every repo with the given peer."
   [peer-name]
   (io!
    (let [me @local-identity
-         sources (seq (common-sources peer-name me))
+         sources (and me (seq (common-sources peer-name me)))
          remote-track-name (peer-branch-name {:branch "master", :peer me})]
      (cond
       (not me)
