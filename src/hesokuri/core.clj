@@ -91,29 +91,6 @@ vector and the peer-hostnames var."
    (ref-set local-identity (-local-identity))
    (list @sources @peer-hostnames @local-identity)))
 
-(defn sources-on-machine
-  "Returns a map of sources on the machine identified with the given MAC
-address. Map is in the form of:
- {source-index-1 \"path-string1\", source-index-2 \"path-string2\", ...}
-Each path string indicates the location of the source on the machine specified
-by peer-name."
-  [peer-name]
-  (loop [all-sources (seq @sources)
-         source-index 0
-         res-sources {}]
-    (letfn [(this-source-path [] ((first all-sources) peer-name))]
-      (cond
-       (not all-sources)
-       res-sources
-
-       (this-source-path)
-       (recur (next all-sources) (inc source-index)
-              (conj res-sources [source-index (this-source-path)]))
-
-       :else
-       (recur (next all-sources) (inc source-index)
-              res-sources)))))
-
 (defn -push! [local-path peer-repo local-branch remote-branch & other-flags]
   (let [args (concat (list "git" "push") other-flags
                      (list peer-repo (str local-branch ":" remote-branch)
@@ -187,42 +164,52 @@ returns a map of branch names to sha1 hashes."
                       (conj branches [(parse-branch-name (.getName file)) hash])
                       branches))))))))
 
+(defn common-sources
+  "Returns a list of all items in the sources vector that are on all of the
+given peers."
+  [& peer-names]
+  (loop [sources (seq (dosync (ensure sources)))
+         results []]
+    (cond
+     (not sources) results
+
+     (every? #((first sources) %) peer-names)
+     (recur (next sources) (conj results (first sources)))
+
+     :else
+     (recur (next sources) results))))
+
 (defn kuri!
   "A very stupid implementation of the syncing process, ported directly from the
 Elisp prototype. This simply pushes and pulls every repo with the given peer."
   [peer-name]
   (io!
-   (let [peer-sources (sources-on-machine peer-name)
-         me @local-identity
+   (let [me @local-identity
+         sources (seq (common-sources peer-name me))
          remote-track-name (peer-branch-name {:branch "master", :peer me})]
      (cond
-      (not peer-sources)
-      (println "Could not find any sources on " peer-name)
-
       (not me)
       (println "Local identity not set - cannot kuri")
+
+      (not sources)
+      (println "Could not find any sources on both " peer-name " and " me)
 
       :else
       (println "\n\nkuri operation at " (str (Date.))
                " with peer: " peer-name))
      (let [results
-       (loop [local-sources (seq (sources-on-machine me))
+       (loop [sources sources
               results {:succeeded [] :failed []}]
-         (if (not local-sources) results
-         (let [local-source (first local-sources)
-               local-path (second local-source)
+         (if (not sources) results
+         (let [source (first sources)
+               local-path (source me)
                local-path-file (File. local-path)
-               peer-path (peer-sources (first local-source))
+               peer-path (source peer-name)
                peer-repo (str "ssh://" peer-name peer-path)]
            (cond
-            (not peer-path)
-            (do (println "not on peer")
-            (recur (next local-sources) results))
-
             (not (.exists local-path-file))
-            (do (println "not on me")
-            (recur (next local-sources)
-                   (report results "clone" -clone! peer-repo local-path)))
+            (recur (next sources)
+                   (report results "clone" -clone! peer-repo local-path))
 
             (not (.isDirectory local-path-file))
             (throw (RuntimeException.
@@ -252,7 +239,7 @@ Elisp prototype. This simply pushes and pulls every repo with the given peer."
                :else
                (recur (next ops)
                       (report results "pull" -pull! peer-repo local-path))))]
-              (recur (next local-sources) results))))))]
+              (recur (next sources) results))))))]
        (when (seq (:succeeded results))
          (println "\nThe following operations succeeded:")
          (doseq [s (:succeeded results)] (println s)))
