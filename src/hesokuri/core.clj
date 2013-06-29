@@ -187,14 +187,23 @@ given peers."
          (doseq [branch my-branches]
            (push-for-one me pusher branch peer-name)))))))
 
+(defn git-dir!
+  "Returns the .git directory of a repository as a java.io.File object, given
+  its parent directory. If it is a bare repository, returns the source-dir
+  parameter as-is."
+  [source-dir]
+  (io!
+   (let [source-dir-git (File. source-dir ".git")]
+     (if (.isDirectory source-dir-git)
+       source-dir-git source-dir))))
+
 (defn branch-hashes!
   "Gets all of the branches of the local repo at the given string path. It
 returns a map of branch names to sha1 hashes."
   [local-path]
   (io!
-   (let [local-path-git (File. (str local-path "/.git"))
-         git-dir (if (.exists local-path-git) local-path-git local-path)
-         heads-dir (File. (str git-dir "/refs/heads"))]
+   (let [git-dir (git-dir! local-path)
+         heads-dir (File. git-dir "refs/heads")]
      (loop [files (seq (.listFiles heads-dir))
             branches {}]
        (if (not files) branches
