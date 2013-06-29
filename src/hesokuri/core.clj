@@ -1,6 +1,8 @@
 (ns hesokuri.core
   (:use [clojure.java.shell :only [sh]])
   (:use [clojure.string :only [trim split]])
+  (:import [java.io File]
+           [java.util Date Collections])
   (:gen-class))
 
 (def sources
@@ -34,7 +36,7 @@ network."
   (str (.get (System/getenv) "HOME") "/.hesokuri/sources"))
 
 (defn -vector-from-enum [enum]
-  (vec (java.util.Collections/list enum)))
+  (vec (Collections/list enum)))
 
 (defn identities
   "Returns a vector of the possible identities this system may have on the
@@ -134,6 +136,24 @@ by peer-name."
           [append-to (conj (append-to results) report-item)]
           [:last append-to])))
 
+(defn branch-hashes!
+  "Gets all of the branches of the local repo at the given string path. It
+returns a map of branch names to sha1 hashes."
+  [local-path]
+  (io!
+   (let [local-path-git (File. (str local-path "/.git"))
+         git-dir (if (.exists local-path-git) local-path-git local-path)
+         heads-dir (File. (str git-dir "/refs/heads"))]
+     (loop [files (seq (.listFiles heads-dir))
+            branches {}]
+       (if (not files) branches
+           (let [file (first files)
+                 hash (trim (slurp file))]
+             (recur (next files)
+                    (if (= (count hash) 40)
+                      (conj branches [(.getName file) hash])
+                      branches))))))))
+
 (defn kuri!
   "A very stupid implementation of the syncing process, ported directly from the
 Elisp prototype. This simply pushes and pulls every repo with the given peer."
@@ -150,7 +170,7 @@ Elisp prototype. This simply pushes and pulls every repo with the given peer."
       (println "Local identity not set - cannot kuri")
 
       :else
-      (println "\n\nkuri operation at " (str (java.util.Date.))
+      (println "\n\nkuri operation at " (str (Date.))
                " with peer: " peer-name))
      (let [results
        (loop [local-sources (seq (sources-on-machine me))
@@ -158,7 +178,7 @@ Elisp prototype. This simply pushes and pulls every repo with the given peer."
          (if (not local-sources) results
          (let [local-source (first local-sources)
                local-path (second local-source)
-               local-path-file (java.io.File. local-path)
+               local-path-file (File. local-path)
                peer-path (peer-sources (first local-source))
                peer-repo (str "ssh://" peer-name peer-path)]
            (cond
