@@ -8,17 +8,17 @@
 hesokuri needs to discover sources on the network and how to push and pull
 them. This can be read from a configuration file. It is a map in the following
 form:
-{
-  \"source-name-1\" {
-    \"host-1\" \"/foo/bar/path1\"
-    \"host-2\" \"/foo/bar/path2\"
-  }
-  \"source-name-2\" {
-    \"host-1\" \"/foo/bar/path3\"
-    \"host-3\" \"/foo/bar/path4\"
-  }
-}"
-  (ref {}))
+ [
+   {
+     \"host-1\" \"/foo/bar/path1\"
+     \"host-2\" \"/foo/bar/path2\"
+   }
+   {
+     \"host-1\" \"/foo/bar/path3\"
+     \"host-3\" \"/foo/bar/path4\"
+   }
+ ]"
+  (ref []))
 
 (def peer-hostnames
   "A set of the hostnames of the peers. Updated with sources."
@@ -76,31 +76,32 @@ vector and the peer-hostnames var."
   []
   (dosync
    (ref-set sources (read-string (slurp sources-config-file)))
-   (ref-set peer-hostnames (set (apply concat (map keys (vals @sources)))))
+   (ref-set peer-hostnames (set (apply concat (map keys @sources))))
    (ref-set local-identity (-local-identity))
    (list @sources @peer-hostnames @local-identity)))
 
 (defn sources-on-machine
   "Returns a map of sources on the machine identified with the given MAC
 address. Map is in the form of:
- {\"source-id1\" \"path-string1\", \"source-id2\" \"path-string2\", ...}
+ {source-index-1 \"path-string1\", source-index-2 \"path-string2\", ...}
 Each path string indicates the location of the source on the machine specified
 by peer-name."
   [peer-name]
   (loop [all-sources (seq @sources)
+         source-index 0
          res-sources {}]
-    (letfn [(this-source [] (first (first all-sources)))
-            (this-source-path [] ((second (first all-sources)) peer-name))]
+    (letfn [(this-source-path [] ((first all-sources) peer-name))]
       (cond
        (not all-sources)
        res-sources
 
        (this-source-path)
-       (recur (next all-sources)
-              (conj res-sources [(this-source) (this-source-path)]))
+       (recur (next all-sources) (inc source-index)
+              (conj res-sources [source-index (this-source-path)]))
 
        :else
-       (recur (next all-sources) res-sources)))))
+       (recur (next all-sources) (inc source-index)
+              res-sources)))))
 
 (defn -push! [local-path peer-repo remote-branch]
   (io!
@@ -156,10 +157,9 @@ Elisp prototype. This simply pushes and pulls every repo with the given peer."
               results {:succeeded [] :failed []}]
          (if (not local-sources) results
          (let [local-source (first local-sources)
-               source-id (first local-source)
                local-path (second local-source)
                local-path-file (java.io.File. local-path)
-               peer-path (peer-sources source-id)
+               peer-path (peer-sources (first local-source))
                peer-repo (str "ssh://" peer-name peer-path)]
            (cond
             (not peer-path)
