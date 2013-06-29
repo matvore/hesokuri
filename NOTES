@@ -1,12 +1,48 @@
-Simplified design:
+(note that design notes appear in reverse-chronological order, each note
+separated by a line of ---)
+
+The "old design" below the --- is broken for how branch deletion works. If I
+create a new branch and start commiting to it, the old branch gets deleted
+automatically unless someone else immediately starts committing. The essence of
+the problem is that trying to mirror the same set of branches on several peers
+means we have to either disallow deletion and all changes except
+fast-forwarding, or we have to keep timestamps for each branch and do our own
+conflict resolution. Because neither of those two options are palatable, we'll
+just only sync a single branch called "hesokr" among all peers, which has the
+limitations of deletion being unsupported and only fast-forward updates
+allowed.
+
+All data is transferred between peers through git pushes. When pushing:
+* third-party peer branchs - which is any branch named *_hesokr_(HOST) where
+  HOST is not me or the push destination peer, try to push to the same branch
+  name, but if it fails, ignore it.
+* hesokuri - try to push to the same branch name, but if it fails, force push to
+  hesokuri_hesokr_(MY_HOSTNAME).
+* local branch - which is any branch that is not hesokuri and not named in the
+  form of *_hesokr_*, force push to (BRANCH_NAME)_hesokr_(MY_HOSTNAME)
+This makes polling for changes between peers a little hard. We can decide later
+whether to introduce a separate pinging protocol, or do pure git fetches.
+
+When we get data pushed to us, detect it by monitoring filesystem activity in
+.git. After it is detected, see if there is something actionable to do:
+* If hesokuri is not checked out, and some branch hesokuri_hesokr_* is a
+  fast-forward of hesokuri, then point hesokuri to it.
+* If hesokuri is checked out, but the working area is clean (no untracked files,
+  no unstaged or staged changes), and hesokuri_hesokr_* is a fast-forward of
+  hesokuri, then point hesokuri to it.
+* For any two branches F and B, where F is a fast-forward of B, and B has a name
+  (BRANCH)_hesokr_*, and BRANCH is not hesokuri, delete branch B.
+* For some branch B in the form hesokuri_hesokr_(PEER), where hesokuri is a
+  fast-forward of it, delete B.
+
+--------------------------------------------------------------------------------
+
+Old design:
 All data is transferred between peers through git pushes. When pushing:
 * third-party peer branches - try to push to the same branch name, but if it
   fails, ignore it.
 * canonical branch - try to push to the canonical name. If it fails, do a forced
   push to (BRANCH_NAME)_hesokr_(MY_HOSTNAME)
-This makes polling for changes between peers a little harder. We can decide
-later whether to introduce a separate pinging protocol, or do pure git fetches.
-This will be necessary to share tags.
 
 When we get data pushed to us, detect it by monitoring filesystem activity in
 .git. After it is detected, see if there is something actionable to do:
