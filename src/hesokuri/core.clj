@@ -153,8 +153,16 @@ vector and the peer-hostnames var."
 
 (defn push-for-one
   "Push a branch as necessary to keep a peer up-to-date. The branch parameter
-should be an instance of Branch. pusher is a version of -push! with the first
-two arguments curried."
+  should be an instance of Branch. pusher is a version of -push! with the first
+  two arguments curried.
+  When pushing:
+  * third-party peer branches - which is any branch named *_hesokr_(HOST) where
+    HOST is not me or the push destination peer, try to push to the same branch
+    name, but if it fails, ignore it.
+  * hesokuri - try to push to the same branch name, but if it fails, force push to
+    hesokuri_hesokr_(MY_HOSTNAME).
+  * local branch - which is any branch that is not hesokuri and not named in the
+    form of *_hesokr_*, force push to (BRANCH_NAME)_hesokr_(MY_HOSTNAME)"
   [me pusher branch peer]
   (letfn [(force-push []
             (pusher branch (BranchName. (:branch branch) me) "-f"))]
