@@ -73,11 +73,6 @@ Returns NIL if there was an error."
                  found-count (buffer-string)))
         (car arp-out-macs)))))
 
-(defun hesokuri-source-ids ()
-  "Returns a list of all the known source IDs configured. The IDs are read from
-the hesokuri-sources special variable."
-  (mapcar 'car hesokuri-sources))
-
 (defun hesokuri-sources-on-machine (mac)
   "Returns a list of sources on the machine identified with the given MAC
 address. List is in the form of:
@@ -92,7 +87,7 @@ by MAC."
 
 (defun -hesokuri-push (source-id peer-repo remote-branch)
   (insert (format "Pushing %s to %s\n" source-id peer-repo))
-  (call-process "git" nil t t "push" peer-repo 
+  (call-process "git" nil t t "push" peer-repo
                 (concat "master:" remote-branch)))
 
 (defun -hesokuri-pull (source-id peer-repo)
