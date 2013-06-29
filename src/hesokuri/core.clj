@@ -29,22 +29,6 @@ form:
 network."
   (ref "localhost"))
 
-; Represents a git branch on some system. origin is omitted when it is the
-; canonical version of the branch. location is :me when it is located on the
-; local system.
-(defrecord git-branch [location origin root-name])
-
-(def pushed-hashes
-  "Indicates the last pushed hash of branches on peer systems. Is a map of
-git-branch records to sha-hash strings."
-  (ref {}))
-
-(def local-hashes
-  "Indicates the hash of each branch stored locally. Is a map of git-branch
-records to sha-hash strings. The 'location' property of each git-branch is
-omitted."
-  (ref {}))
-
 (def sources-config-file
   "Where to read the hesokuri sources configuration from."
   (str (.get (System/getenv) "HOME") "/.hesokuri_sources"))
@@ -87,30 +71,6 @@ vector and the peer-hostnames var."
      (@peer-hostnames (first candidates)) (first candidates)
      :else (recur (next candidates)))))
 
-(defrecord peer [name source-state])
-
-(defn peer-fetch-all-cmd [pier source-name]
-  (dosync
-   (let [source ((ensure sources) source-name)
-         peer-name (:name pier)]
-     (list "git" "fetch" "--all"
-           (format "ssh://%s%s" peer-name (source peer-name))
-           :dir (source (ensure local-identity))))))
-
-(defn peer-fetch-all [peer source-name]
-  (apply sh (peer-fetch-all-cmd peer source-name))
-  peer)
-
-(def peers
-  "A dictionary of peer hostnames to peer record agents. This dictionary itself
-is an atom to allow easily adding peers to it."
-  (atom {}))
-
-(defn new-peer!
-  "Adds a new peer to the peers map."
-  [name]
-  (swap! peers #(conj % [name (peer. name {})])))
-
 (defn refresh-sources
   "Updates sources and peer-hostnames based on the user's sources config file."
   []
@@ -119,6 +79,34 @@ is an atom to allow easily adding peers to it."
    (ref-set peer-hostnames (set (apply concat (map keys (vals @sources)))))
    (ref-set local-identity (-local-identity))
    (list @sources @peer-hostnames @local-identity)))
+
+(defn sources-on-machine
+  "Returns a map of sources on the machine identified with the given MAC
+address. Map is in the form of:
+ {\"source-id1\" \"path-string1\", \"source-id2\" \"path-string2\", ...}
+Each path string indicates the location of the source on the machine specified
+by peer-name."
+  [peer-name]
+  (loop [all-sources (seq @sources)
+         res-sources {}]
+    (letfn [(this-source [] (first (first all-sources)))
+            (this-source-path [] ((second (first all-sources)) peer-name))]
+      (cond
+       (not all-sources)
+       res-sources
+
+       (this-source-path)
+       (recur (next all-sources)
+              (conj res-sources [(this-source) (this-source-path)]))
+
+       :else
+       (recur (next all-sources) res-sources)))))
+
+(defn kuri
+  "A very stupid implementation of the syncing process, ported directly from the
+Elisp prototype. This simply pushes and pulls every repo with the given peer."
+  [peer-hostname]
+  "TODO")
 
 (defn -main
   "I don't do a whole lot ... yet."
