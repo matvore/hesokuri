@@ -27,7 +27,7 @@ form:
 (def local-identity
   "The hostname or IP of this system as known by the peers on the current
 network."
-  (ref "localhost"))
+  (ref nil))
 
 (def sources-config-file
   "Where to read the hesokuri sources configuration from."
@@ -125,11 +125,85 @@ by peer-name."
      (print (:out res) (:err res))
      (:exit res))))
 
-(defn kuri
+(defn report [results func-name func & args]
+  ; TODO: make this a macro, I think
+  (let [append-to (if (= 0 (apply func args)) :succeeded :failed)
+        report-item (cons func-name (seq args))]
+    (conj results
+          [append-to (conj (append-to results) report-item)]
+          [:last append-to])))
+
+(defn kuri!
   "A very stupid implementation of the syncing process, ported directly from the
 Elisp prototype. This simply pushes and pulls every repo with the given peer."
-  [peer-hostname]
-  "TODO")
+  [peer-name]
+  (io!
+   (let [peer-sources (sources-on-machine peer-name)
+         me @local-identity
+         remote-track-name (str me "_hesokr_master")]
+     (cond
+      (not peer-sources)
+      (println "Could not find any sources on " peer-name)
+
+      (not me)
+      (println "Local identity not set - cannot kuri")
+
+      :else
+      (println "\n\nkuri operation at " (str (java.util.Date.))
+               " with peer: " peer-name))
+     (let [results
+       (loop [local-sources (seq (sources-on-machine me))
+              results {:succeeded [] :failed []}]
+         (if (not local-sources) results
+         (let [local-source (first local-sources)
+               source-id (first local-source)
+               local-path (second local-source)
+               local-path-file (java.io.File. local-path)
+               peer-path (peer-sources source-id)
+               peer-repo (str "ssh://" peer-name peer-path)]
+           (cond
+            (not peer-path)
+            (do (println "not on peer")
+            (recur (next local-sources) results))
+
+            (not (.exists local-path-file))
+            (do (println "not on me")
+            (recur (next local-sources)
+                   (report results "clone" -clone! peer-repo local-path)))
+
+            (not (.isDirectory local-path-file))
+            (throw (RuntimeException.
+                    (str "path for repo is occupied by a non-directory file: "
+                         local-path)))
+
+            :else
+            (let [results (loop
+              [ops [:push-straight :pull] results results]
+              (cond
+               (not ops) results
+
+               (= :push-straight (first ops))
+               (let [results (report results "push"
+                                     -push! local-path peer-repo "master")]
+                 (if (= :succeeded (results :last))
+                   (recur (next ops) results)
+                   (recur (cons :push (next ops)) results)))
+
+               (= :push (first ops))
+               (recur (next ops)
+                      (report results "push"
+                              -push! local-path peer-repo remote-track-name))
+
+               :else
+               (recur (next ops)
+                      (report results "pull" -pull! peer-repo local-path))))]
+              (recur (next local-sources) results))))))]
+       (when (seq (:succeeded results))
+         (println "\nThe following operations succeeded:")
+         (doseq [s (:succeeded results)] (println s)))
+       (when (seq (:failed results))
+         (println "\nThe following operations failed:")
+         (doseq [f (:failed results)] (println f)))))))
 
 (defn -main
   "I don't do a whole lot ... yet."
