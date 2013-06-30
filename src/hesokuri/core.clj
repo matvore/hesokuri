@@ -1,8 +1,8 @@
 (ns hesokuri.core
-  (:use [clojure.java.shell :only [sh]])
-  (:use [clojure.string :only [join split trim]])
-  (:use hesokuri.util)
-  (:use hesokuri.source)
+  (:use [clojure.java.shell :only [sh]]
+        [clojure.string :only [join split trim]]
+        hesokuri.util
+        hesokuri.source)
   (:import [java.io File]
            [java.util Date])
   (:gen-class))

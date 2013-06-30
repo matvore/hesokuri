@@ -1,9 +1,9 @@
 (ns hesokuri.source
   "Implementation of the source agent."
-  (:use [clojure.java.shell :only [sh]])
-  (:use [clojure.string :only [trim]])
-  (:use hesokuri.core)
-  (:use hesokuri.util)
+  (:use [clojure.java.shell :only [sh]]
+        [clojure.string :only [trim]]
+        hesokuri.core
+        hesokuri.util)
   (:import [java.io File]))
 
 (defrecord SourceAgent [source-dir branch-hashes

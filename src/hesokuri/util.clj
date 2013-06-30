@@ -1,6 +1,6 @@
 (ns hesokuri.util
-  (:use [clojure.java.shell :only [sh]])
-  (:use [clojure.string :only [trim]]))
+  (:use [clojure.java.shell :only [sh]]
+        [clojure.string :only [trim]]))
 
 (defn vector-from-enum [enum]
   (vec (java.util.Collections/list enum)))
