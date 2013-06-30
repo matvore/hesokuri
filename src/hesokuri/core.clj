@@ -1,8 +1,10 @@
 (ns hesokuri.core
   (:use [clojure.java.shell :only [sh]])
   (:use [clojure.string :only [join split trim]])
+  (:use hesokuri.util)
+  (:use hesokuri.source)
   (:import [java.io File]
-           [java.util Date Collections])
+           [java.util Date])
   (:gen-class))
 
 (def sources
@@ -42,16 +44,6 @@ network."
       (str branch "_hesokr_" peer)
       (str branch))))
 
-; Uniquely identifies a branch and peer on the local system. This is used to
-; keep track of state of what we have pushed successfully given a peer and a
-; branch.
-(defrecord BranchChannel [source #^BranchName branch-name peer])
-
-(def branch-channels
-  "A map of branches on the local system and peers to the last hash that was
-  successfully pushed."
-  (atom {}))
-
 (def canonical-branch-name
   "This is the name of the only branch that is aggressively synced between
   clients. This branch has the property that it cannot be deleted, and automatic
@@ -62,16 +54,13 @@ network."
   (let [s (split name #"_hesokr_" 2)]
     (BranchName. (first s) (second s))))
 
-(defn -vector-from-enum [enum]
-  (vec (Collections/list enum)))
-
 (defn identities
   "Returns a vector of the possible identities this system may have on the
 network, which includes its hostname and the IP address of all network
 interfaces. Each identity is a string."
   []
   (conj
-  (let [interfaces (-vector-from-enum
+  (let [interfaces (vector-from-enum
                     (java.net.NetworkInterface/getNetworkInterfaces))
         address-of (fn [addr]
                      (first (split (.getHostAddress (.getAddress addr)) #"%")))]
@@ -100,14 +89,6 @@ vector and the peer-hostnames var."
      (@peer-hostnames (first candidates)) (first candidates)
      :else (recur (next candidates)))))
 
-(defn sh-print!
-  [& args]
-  (io!
-   (let [result (apply sh args)]
-     (.print *err* (:err result))
-     (.print *out* (:out result))
-     (:exit result))))
-
 (defn refresh-sources!
   "Updates sources and peer-hostnames based on the user's sources config file.
   Also creates empty repositories for any that are specified to exist on this
@@ -122,7 +103,7 @@ vector and the peer-hostnames var."
     (doseq [source my-sources
             :let [source-dir (File. (source local-identity))]
             :when (not (.exists source-dir))]
-      (io! (sh-print! "git" "init" (str source-dir))))))
+      (io! (sh-print "git" "init" (str source-dir))))))
 
 (defn -push! [local-path peer-repo local-branch remote-branch & other-flags]
   (let [args (concat (list "git" "push") other-flags
@@ -130,14 +111,14 @@ vector and the peer-hostnames var."
                            :dir local-path))]
     (io!
      (println (join " " args))
-     (apply sh-print! args))))
+     (apply sh-print args))))
 
 (defn -pull! [peer-repo local-path]
   (io!
    ; TODO: Do a git fetch and process the branches more intelligently.
    ; TODO: Pull to a different branch if the current one has merge conflicts.
    (println "Pulling " peer-repo " to " local-path)
-   (sh-print! "git" "pull" peer-repo "master" :dir local-path)))
+   (sh-print "git" "pull" peer-repo "master" :dir local-path)))
 
 (defn -clone! [peer-repo local-path]
   (io!
@@ -153,24 +134,6 @@ vector and the peer-hostnames var."
     (conj results
           [append-to (conj (append-to results) report-item)]
           [:last append-to])))
-
-(defmacro lint-and
-  "Performs a short-circuited logical int-based and. If the first expression is
-  0, then the next expression is not evaluated. Returns the last expression
-  evaluated."
-  [x y]
-  (let [x-res (gensym)]
-    `(let [~x-res ~x]
-       (if (= 0 ~x-res) ~x-res ~y))))
-
-(defmacro lint-or
-  "Performs a short-circuited logical int-based or. If the first expression is
-  non-zero, then the next expression is not evaluated. Returns the last
-  expression evaluated."
-  [x y]
-  (let [x-res (gensym)]
-    `(let [~x-res ~x]
-       (if (not= 0 ~x-res) ~x-res ~y))))
 
 (defn push-for-one
   "Push a branch as necessary to keep a peer up-to-date. The branch parameter
@@ -212,116 +175,6 @@ given peers."
 
      :else
      (recur (next sources) results))))
-
-(defn push-for-peer!
-  "Push all sources and branches necessary to keep one peer up-to-date."
-  [peer-name]
-  (io!
-   (let [me @local-identity]
-     (doseq [source (common-sources peer-name me)]
-       (let [my-branches (keys (branch-hashes! (source me)))
-             peer-repo (format "ssh://%s%s" peer-name (source peer-name))
-             pusher (fn [& args] (apply -push! (source me) peer-repo args))]
-         (doseq [branch my-branches]
-           (push-for-one me pusher branch peer-name)))))))
-
-(defn git-dir!
-  "Returns the .git directory of a repository as a java.io.File object, given
-  its parent directory. If it is a bare repository, returns the source-dir
-  parameter as-is."
-  [source-dir]
-  (io!
-   (let [source-dir-git (File. source-dir ".git")]
-     (if (.isDirectory source-dir-git)
-       source-dir-git source-dir))))
-
-(defn branch-hashes!
-  "Gets all of the branches of the local repo at the given string path. It
-returns a map of branch names to sha1 hashes."
-  [local-path]
-  (io!
-   (let [git-dir (git-dir! local-path)
-         heads-dir (File. git-dir "refs/heads")]
-     (loop [files (seq (.listFiles heads-dir))
-            branches {}]
-       (if (not files) branches
-           (let [file (first files)
-                 hash (trim (slurp file))]
-             (recur (next files)
-                    (if (= (count hash) 40)
-                      (conj branches [(parse-branch-name (.getName file)) hash])
-                      branches))))))))
-
-(defn working-area-clean!
-  "Returns true iff there are no untracked files, unstaged changes, or
-  uncommitted changes."
-  [source-dir]
-  (io!
-   (let [git-dir (git-dir! source-dir)]
-     (or (= git-dir source-dir)
-         (let [status (sh "git" "status" "--porcelain" :dir source-dir)]
-           (and (= 0 (:exit status))
-                (= "" (:out status))))))))
-
-(defn is-ff!
-  "Returns true iff the second hash is a fast-forward of the first hash. When
-  the hashes are the same, returns when-equal."
-  [source-dir from-hash to-hash when-equal]
-  (if (= from-hash to-hash) when-equal
-      (= from-hash (trim (:out (sh "git" "merge-base"
-                                   from-hash to-hash :dir source-dir))))))
-
-; TODO: When we get data pushed to us, detect it by monitoring filesystem
-; activity in .git. Then invoke the 'advance' logic below.
-(defn advance!
-  "Checks for local branches that meet the following criteria, and performs
-  the given operation, 'advancing' when appropriate.
-  a)If hesokuri is not checked out, or it is checked out but the working area is
-    clean, and some branch hesokuri_hesokr_* is a fast-forward of hesokuri, then
-    rename the hesokuri_hesokr_* branch to hesokuri to it, and remove the
-    existing hesokuri branch.
-  b)For any two branches F and B, where F is a fast-forward of B, and B has a
-    name (BRANCH)_hesokr_*, and BRANCH is not hesokuri, delete branch B."
-  [source-dir]
-  (io!
-   ; (a)
-   (let [canonical-checked-out
-         (= (trim (slurp (File. (git-dir! source-dir) "HEAD")))
-            (str "ref: refs/heads/" canonical-branch-name))]
-     (when (or (not canonical-checked-out) (working-area-clean! source-dir))
-       (loop [all-branches (branch-hashes! source-dir)
-              branches (seq all-branches)]
-         (let [canonical-branch (all-branches canonical-branch-name)
-               branch (first (first branches))]
-           (cond
-            (not branches) nil
-
-            (or (not= (:branch canonical-branch-name)
-                      (:branch branch))
-                (= canonical-branch-name branch)
-                (and canonical-branch
-                     (not (is-ff! source-dir canonical-branch
-                                  (second (first branches)) true))))
-            (recur all-branches (next branches))
-
-            :else
-            (let [branch (str branch)]
-              (if canonical-checked-out
-                (lint-or (sh-print! "git" "reset" "--hard" branch
-                                    :dir source-dir)
-                         (sh-print! "git" "branch" "-d" branch :dir source-dir))
-                (sh-print! "git" "branch" "-M" branch
-                           (str canonical-branch-name) :dir source-dir))
-              (let [new-branches (branch-hashes! source-dir)]
-                (recur new-branches (seq new-branches)))))))))
-   ; (b)
-   (doseq [branch (keys (branch-hashes! source-dir))]
-     (when (and (not= (:branch canonical-branch-name) (:branch branch))
-                (not (nil? (:peer branch))))
-       (let [res (sh "git" "branch" "-d" (str branch) :dir source-dir)]
-         (when (= 0 (:exit res))
-           (.print *out* (:out res))
-           (.print *err* (:err res))))))))
 
 (defn kuri!
   "A very stupid implementation of the syncing process, ported directly from the
