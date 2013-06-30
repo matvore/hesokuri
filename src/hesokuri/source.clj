@@ -6,8 +6,8 @@
   (:use hesokuri.util)
   (:import [java.io File]))
 
-(defrecord Agent [source-dir branch-hashes
-                  canonical-checked-out working-area-clean])
+(defrecord SourceAgent [source-dir branch-hashes
+                        canonical-checked-out working-area-clean])
 
 (def agents
   "A map of source-dirs to the corresponding agent."
@@ -40,11 +40,11 @@
     (loop [files (seq (.listFiles heads-dir))
            branches {}]
       (if (not files)
-        (Agent. source-dir
-                branches
-                (= (trim (slurp (File. git-dir "HEAD")))
-                   (str "ref: refs/heads/" canonical-branch-name))
-                (-working-area-clean source-dir))
+        (SourceAgent. source-dir
+                      branches
+                      (= (trim (slurp (File. git-dir "HEAD")))
+                         (str "ref: refs/heads/" canonical-branch-name))
+                      (-working-area-clean source-dir))
         (let [file (first files)
               hash (trim (slurp file))]
           (recur (next files)
