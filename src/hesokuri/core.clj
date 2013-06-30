@@ -113,17 +113,16 @@ vector and the peer-hostnames var."
   Also creates empty repositories for any that are specified to exist on this
   system but for which the directory does not exist."
   []
-  (let [[sources local-identity]
+  (let [[my-sources local-identity]
          (dosync
           (ref-set sources (read-string (slurp sources-config-file)))
           (ref-set peer-hostnames (set (apply concat (map keys @sources))))
           (ref-set local-identity (-local-identity))
-          (list @sources @local-identity))]
-    (doseq [source (common-sources local-identity)
+          (list (common-sources @local-identity) @local-identity))]
+    (doseq [source my-sources
             :let [source-dir (File. (source local-identity))]
             :when (not (.exists source-dir))]
-      (io! (sh-print! "git" "init" (str source-dir))))
-    sources))
+      (io! (sh-print! "git" "init" (str source-dir))))))
 
 (defn -push! [local-path peer-repo local-branch remote-branch & other-flags]
   (let [args (concat (list "git" "push") other-flags
