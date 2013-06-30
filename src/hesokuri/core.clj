@@ -42,6 +42,16 @@ network."
       (str branch "_hesokr_" peer)
       (str branch))))
 
+; Uniquely identifies a branch and peer on the local system. This is used to
+; keep track of state of what we have pushed successfully given a peer and a
+; branch.
+(defrecord BranchChannel [source #^BranchName branch-name peer])
+
+(def branch-channels
+  "A map of branches on the local system and peers to the last hash that was
+  successfully pushed."
+  (atom {}))
+
 (def canonical-branch-name
   "This is the name of the only branch that is aggressively synced between
   clients. This branch has the property that it cannot be deleted, and automatic
@@ -90,15 +100,6 @@ vector and the peer-hostnames var."
      (@peer-hostnames (first candidates)) (first candidates)
      :else (recur (next candidates)))))
 
-(defn refresh-sources
-  "Updates sources and peer-hostnames based on the user's sources config file."
-  []
-  (dosync
-   (ref-set sources (read-string (slurp sources-config-file)))
-   (ref-set peer-hostnames (set (apply concat (map keys @sources))))
-   (ref-set local-identity (-local-identity))
-   (list @sources @peer-hostnames @local-identity)))
-
 (defn sh-print!
   [& args]
   (io!
@@ -106,6 +107,23 @@ vector and the peer-hostnames var."
      (.print *err* (:err result))
      (.print *out* (:out result))
      (:exit result))))
+
+(defn refresh-sources!
+  "Updates sources and peer-hostnames based on the user's sources config file.
+  Also creates empty repositories for any that are specified to exist on this
+  system but for which the directory does not exist."
+  []
+  (let [[sources local-identity]
+         (dosync
+          (ref-set sources (read-string (slurp sources-config-file)))
+          (ref-set peer-hostnames (set (apply concat (map keys @sources))))
+          (ref-set local-identity (-local-identity))
+          (list @sources @local-identity))]
+    (doseq [source (common-sources local-identity)
+            :let [source-dir (File. (source local-identity))]
+            :when (not (.exists source-dir))]
+      (io! (sh-print! "git" "init" (str source-dir))))
+    sources))
 
 (defn -push! [local-path peer-repo local-branch remote-branch & other-flags]
   (let [args (concat (list "git" "push") other-flags
