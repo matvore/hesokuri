@@ -9,7 +9,7 @@
 (defn git-init
   "Initializes the repository if it doesn't exist yet."
   [{:keys [source-dir] :as agent}]
-  (sh-print "git" "init" source-dir)
+  (sh-print-when #(not= 0 (:exit %)) "git" "init" source-dir)
   agent)
 
 (defn -refresh

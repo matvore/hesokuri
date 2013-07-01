@@ -88,8 +88,8 @@ vector and the peer-hostnames var."
             (into {} (for [source @sources
                            :let [source-dir (source @local-identity)]
                            :when source-dir]
-                       [source-dir {:source-dir source-dir}]))))
-  (doseq [source-agent @source-agents]
+                       [source-dir (agent {:source-dir source-dir})]))))
+  (doseq [[_ source-agent] @source-agents]
     (send source-agent git-init)))
 
 (defn common-sources
