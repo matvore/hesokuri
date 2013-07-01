@@ -54,3 +54,13 @@
   Object
   (toString [_]
     (str "ssh://" host path)))
+
+(defn start-heartbeat
+  "Gives functionality to run a repeated task at regular intervals, and stop
+  when some condition is met."
+  [action interval-millis is-valid?]
+  (-> (fn [] (while (is-valid?)
+               (action)
+               (Thread/sleep interval-millis)))
+      Thread.
+      .start))

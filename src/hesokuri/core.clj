@@ -40,8 +40,6 @@ network."
   "Where to read the hesokuri sources configuration from."
   (str (.get (System/getenv) "HOME") "/.hesokuri/sources"))
 
-
-
 (defn identities
   "Returns a vector of the possible identities this system may have on the
 network, which includes its hostname and the IP address of all network
