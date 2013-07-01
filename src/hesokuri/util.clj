@@ -29,11 +29,13 @@
   passed the result of sh, it prints out the stderr and stdout of the process to
   this process' stderr and stdout."
   [print-when & args]
-  (println (join " " args))
   (let [result (apply sh args)]
     (when (print-when result)
+      (.println *out* (join " " args))
       (.print *err* (:err result))
-      (.print *out* (:out result)))
+      (.print *out* (:out result))
+      (.flush *err*)
+      (.flush *out*))
     (:exit result)))
 
 (defn sh-print
