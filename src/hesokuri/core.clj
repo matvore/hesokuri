@@ -119,7 +119,8 @@ given peers."
            (fn []
              (doseq [source shared-sources]
                (send (source-agents (source local-identity))
-                     push-for-peer local-identity)))))))
+                     push-for-peer local-identity
+                     (->PeerRepo peer-hostname (source peer-hostname)))))))))
 
 (defn kuri!
   "A very stupid implementation of the syncing process, ported directly from the

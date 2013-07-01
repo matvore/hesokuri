@@ -31,11 +31,9 @@
   [print-when & args]
   (let [result (apply sh args)]
     (when (print-when result)
-      (.println *out* (join " " args))
-      (.print *err* (:err result))
-      (.print *out* (:out result))
-      (.flush *err*)
-      (.flush *out*))
+      (println (join " " args))
+      (.write *err* (:err result))
+      (print (:out result)))
     (:exit result)))
 
 (defn sh-print
@@ -64,7 +62,8 @@
                  (action)
                  (Thread/sleep interval-millis)))
         Thread.
-        .start)))
+        .start))
+  self)
 
 (defn stop-heartbeats
   "Stops all heartbeats begun on the given atom with start-heartbeat."
