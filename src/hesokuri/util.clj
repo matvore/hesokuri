@@ -67,3 +67,28 @@
   [self]
   (swap! self (fn [_] (Object.)))
   self)
+
+(defmacro letmap
+  "A macro that behaves like let, creating temporary bindings for variables, and
+  also creates a map containing the bindings. An abbreviated form is supplied
+  which simply evaluates to the map, which is useful for creating maps where
+  some entries are used to calculate other entries. For instance, the
+  abbreviated form:
+    (letmap [a 10, b (* a 20)])
+  evaluates to:
+    {:a 10, :b 20}
+
+  In the full form, the symbol immediately after the macro name is the name of
+  the map that can be used in the let body:
+    (letmap m [a 10, b (* a 20)]
+      (into m [[:c m]]))
+  evaluates to:
+    {:a 10, :b 200, :c {:a 10, :b 200}}"
+  ([map-name bindings & body]
+     `(let ~bindings
+        (let [~map-name
+              ~(into {} (for [b (take-nth 2 bindings)] [(keyword b) b]))]
+          ~@body)))
+  ([bindings]
+     (let [map-name (gensym)]
+       `(letmap ~map-name ~bindings ~map-name))))

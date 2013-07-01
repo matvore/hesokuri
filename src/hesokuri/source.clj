@@ -15,38 +15,36 @@
 (defn -refresh
   "Updates all values of the source object based on the value of source-dir,
   which remains the same."
-  [{:keys [source-dir]}]
-  (let [source-dir-git (File. source-dir ".git")
-        git-dir
-        (if (.isDirectory source-dir-git)
-          source-dir-git source-dir)
+  [self]
+  (letmap
+   [source-dir (self :source-dir)
 
-        branches
-        (for [head-ref-file (seq (.listFiles (File. git-dir "refs/heads")))
+    ;; The .git directory of a repository as a java.io.File object, given its
+    ;; parent directory. If it is a bare repository, is equal to :source-dir
+    git-dir
+    (let [source-dir-git (File. source-dir ".git")]
+      (if (.isDirectory source-dir-git)
+        source-dir-git source-dir))
+
+    ;; Map of branch names to their hashes. The branch names should be created
+    ;; by hesokuri.branch-name/->BranchName
+    branches
+    (into
+     {} (for [head-ref-file (seq (.listFiles (File. git-dir "refs/heads")))
               :let [hash (trim (slurp head-ref-file))]]
-          [(parse-branch-name (.getName head-ref-file)) hash])]
-    {:source-dir source-dir
+          [(parse-branch-name (.getName head-ref-file)) hash]))
 
-     ;; The .git directory of a repository as a java.io.File object, given
-     ;; its parent directory. If it is a bare repository, is equal to
-     ;; :source-dir
-     :git-dir git-dir
+    ;; true iff there are no untracked files, unstaged changes, or
+    ;; uncommitted changes.
+    working-area-clean
+    (or (= git-dir source-dir)
+        (let [status (sh "git" "status" "--porcelain" :dir source-dir)]
+          (and (= 0 (:exit status))
+               (= "" (:out status)))))
 
-     ;; Map of branch names to their hashes. The branch names should be created
-     ;; by hesokuri.branch-name/->BranchName
-     :branches (into {} branches)
-
-     ;; true iff there are no untracked files, unstaged changes, or
-     ;; uncommitted changes.
-     :working-area-clean
-     (or (= git-dir source-dir)
-         (let [status (sh "git" "status" "--porcelain" :dir source-dir)]
-           (and (= 0 (:exit status))
-                (= "" (:out status)))))
-
-     :canonical-checked-out
-     (= (trim (slurp (File. git-dir "HEAD")))
-        (str "ref: refs/heads/" canonical-branch-name))}))
+    canonical-checked-out
+    (= (trim (slurp (File. git-dir "HEAD")))
+       (str "ref: refs/heads/" canonical-branch-name))]))
 
 (defn -advance-a
   [{all-branches :branches
