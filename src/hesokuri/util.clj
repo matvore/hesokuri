@@ -47,3 +47,8 @@
   (if (= from-hash to-hash) when-equal
       (= from-hash (trim (:out (sh "git" "merge-base"
                                    from-hash to-hash :dir source-dir))))))
+
+(defrecord PeerRepo [host path]
+  Object
+  (toString [_]
+    (str "ssh://" host path)))

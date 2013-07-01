@@ -1,5 +1,5 @@
 (ns hesokuri.source
-  "Implementation of the source agent."
+  "Implementation of the source object."
   (:use [clojure.java.shell :only [sh]]
         [clojure.string :only [trim]]
         hesokuri.branch-name
@@ -8,12 +8,12 @@
 
 (defn git-init
   "Initializes the repository if it doesn't exist yet."
-  [{:keys [source-dir] :as agent}]
+  [{:keys [source-dir] :as self}]
   (sh-print-when #(not= 0 (:exit %)) "git" "init" source-dir)
-  agent)
+  self)
 
 (defn -refresh
-  "Updates all values of the source agent based on the value of source-dir,
+  "Updates all values of the source object based on the value of source-dir,
   which remains the same."
   [{:keys [source-dir]}]
   (let [source-dir-git (File. source-dir ".git")
@@ -51,15 +51,15 @@
 (defn -advance-a
   [{all-branches :branches
     :keys [source-dir canonical-checked-out working-area-clean]
-    :as agent}]
+    :as self}]
   (if (and canonical-checked-out (not working-area-clean))
-    agent
-    (loop [agent agent
+    self
+    (loop [self self
            branches (seq all-branches)]
       (let [canonical-branch (all-branches canonical-branch-name)
             branch (first (first branches))]
         (cond
-         (not branches) (-advance-b agent)
+         (not branches) (-advance-b self)
 
          (or (not= (:branch canonical-branch-name)
                    (:branch branch))
@@ -67,7 +67,7 @@
              (and canonical-branch
                   (not (is-ff! source-dir canonical-branch
                                (second (first branches)) true))))
-         (recur agent (next branches))
+         (recur self (next branches))
 
          :else
          (let [branch (str branch)]
@@ -77,10 +77,10 @@
                       (sh-print "git" "branch" "-d" branch :dir source-dir))
              (sh-print "git" "branch" "-M" branch
                        (str canonical-branch-name) :dir source-dir))
-           (-> agent -refresh -advance-a)))))))
+           (recur (-refresh self) (seq all-branches))))))))
 
 (defn -advance-b
-  [{:keys [branches source-dir] :as agent}]
+  [{:keys [branches source-dir] :as self}]
   (doseq [branch (keys branches)
           :when
           (and (not= (:branch canonical-branch-name)
@@ -88,7 +88,7 @@
                (not (nil? (:peer branch))))]
     (sh-print-when #(= (:exit %) 0)
                    "git" "branch" "-d" (str branch) :dir source-dir))
-  (-refresh agent))
+  (-refresh self))
 
 ; TODO: When we get data pushed to us, detect it by monitoring filesystem
 ; activity in .git. Then invoke the 'advance' logic below.
@@ -115,19 +115,18 @@
     to hesokuri_hesokr_(MY_HOSTNAME).
   * local branch - which is any branch that is not hesokuri and not named in the
     form of *_hesokr_*, force push to (BRANCH_NAME)_hesokr_(MY_HOSTNAME)"
-  [{:keys [source-dir] :as agent} branch local-id peer-name peer-path]
-  (let [peer-repo (format "ssh://%s%s" peer-name peer-path)
-        push
-        (fn [] (sh-print "git" "push" peer-repo
+  [{:keys [source-dir] :as self} branch local-id peer-repo]
+  (let [push
+        (fn [] (sh-print "git" "push" (str peer-repo)
                          (str branch ":" branch)
                          :dir source-dir))
         force-push
-        (fn [] (sh-print "git" "push" "-f" peer-repo
+        (fn [] (sh-print "git" "push" "-f" (str peer-repo)
                          (str branch ":"
                               (->BranchName (:branch branch) local-id))
                          :dir source-dir))]
     (cond
-     (every? #(not= (:peer branch) %) [nil local-id peer-name])
+     (every? #(not= (:peer branch) %) [nil local-id (:host peer-repo)])
      (push)
 
      (= canonical-branch-name branch)
@@ -136,18 +135,18 @@
      (and (not= canonical-branch-name branch)
           (not (:peer branch)))
      (force-push)))
-  agent)
+  self)
 
 (defn -push-for-peer
-  [{:keys [branches] :as agent} & args]
+  [{:keys [branches] :as self} & args]
   (loop [branches (keys branches)
-         agent agent]
+         self self]
     (if branches
       (recur (next branches)
-             (apply -push-for-one agent (first branches) args))
-      agent)))
+             (apply -push-for-one self (first branches) args))
+      self)))
 
 (defn push-for-peer
   "Push all branches necessary to keep one peer up-to-date."
-  [agent local-id peer-name peer-path]
-  (-> agent git-init -refresh (-push-for-peer local-id peer-name peer-path)))
+  [self local-id peer-repo]
+  (-> self git-init -refresh (-push-for-peer local-id peer-repo)))
