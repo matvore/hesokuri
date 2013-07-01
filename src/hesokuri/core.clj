@@ -48,28 +48,15 @@ network."
 
 (defn identities
   "Returns a vector of the possible identities this system may have on the
-network, which includes its hostname and the IP address of all network
-interfaces. Each identity is a string."
+  network, which includes its hostname and the IP address of all network
+  interfaces. Each identity is a string."
   []
-  (conj
-  (let [interfaces (vector-from-enum
-                    (java.net.NetworkInterface/getNetworkInterfaces))
-        address-of (fn [addr]
-                     (first (split (.getHostAddress (.getAddress addr)) #"%")))]
-    (loop [res [] i (seq interfaces)]
-      (cond
-       (not i) res
-       (nil? (first i)) (recur res (next i))
-       :else
-       (recur (into res
-         (loop [subres [] addrs (seq (.getInterfaceAddresses (first i)))]
-           (cond
-            (not addrs) subres
-            (nil? (first addrs)) (recur subres (next addrs))
-            :else (recur (conj subres (address-of  (first addrs)))
-                         (next addrs)))))
-              (rest i)))))
-  (trim (:out (sh "hostname")))))
+  (-> "hostname" sh :out trim list vec
+      (into (for [i (-> (java.net.NetworkInterface/getNetworkInterfaces)
+                        java.util.Collections/list)
+                  addr (and i (.getInterfaceAddresses i))
+                  :when addr]
+              (-> addr .getAddress .getHostAddress (split #"%") first)))))
 
 (defn -local-identity
   "Returns the identity of this system. It deduces it from the (identities)

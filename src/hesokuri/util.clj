@@ -2,9 +2,6 @@
   (:use [clojure.java.shell :only [sh]]
         [clojure.string :only [trim join]]))
 
-(defn vector-from-enum [enum]
-  (vec (java.util.Collections/list enum)))
-
 (defmacro lint-and
   "Performs a short-circuited logical int-based and. If the first expression is
   0, then the next expression is not evaluated. Returns the last expression
