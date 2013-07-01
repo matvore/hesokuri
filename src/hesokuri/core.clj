@@ -1,8 +1,7 @@
 (ns hesokuri.core
   (:use [clojure.java.shell :only [sh]]
         [clojure.string :only [join split trim]]
-        hesokuri.util
-        hesokuri.source)
+        hesokuri.util hesokuri.source hesokuri.branch-name)
   (:import [java.io File]
            [java.util Date])
   (:gen-class))
@@ -24,6 +23,10 @@ form:
  ]"
   (ref []))
 
+(def source-agents
+  "A map of source-dirs to the corresponding agent."
+  (ref {}))
+
 (def peer-hostnames
   "A set of the hostnames of the peers. Updated with sources."
   (ref #{}))
@@ -37,22 +40,7 @@ network."
   "Where to read the hesokuri sources configuration from."
   (str (.get (System/getenv) "HOME") "/.hesokuri/sources"))
 
-(defrecord BranchName [branch peer]
-  Object
-  (toString [_]
-    (if peer
-      (str branch "_hesokr_" peer)
-      (str branch))))
 
-(def canonical-branch-name
-  "This is the name of the only branch that is aggressively synced between
-  clients. This branch has the property that it cannot be deleted, and automatic
-  updates must always be a fast-forward."
-  (BranchName. "hesokuri" nil))
-
-(defn parse-branch-name [name]
-  (let [s (split name #"_hesokr_" 2)]
-    (BranchName. (first s) (second s))))
 
 (defn identities
   "Returns a vector of the possible identities this system may have on the
@@ -89,77 +77,20 @@ vector and the peer-hostnames var."
      (@peer-hostnames (first candidates)) (first candidates)
      :else (recur (next candidates)))))
 
-(defn refresh-sources!
-  "Updates sources and peer-hostnames based on the user's sources config file.
-  Also creates empty repositories for any that are specified to exist on this
-  system but for which the directory does not exist."
+(defn refresh-sources
+  "Updates sources and peer-hostnames based on the user's sources config file."
   []
-  (let [[my-sources local-identity]
-         (dosync
-          (ref-set sources (read-string (slurp sources-config-file)))
-          (ref-set peer-hostnames (set (apply concat (map keys @sources))))
-          (ref-set local-identity (-local-identity))
-          (list (common-sources @local-identity) @local-identity))]
-    (doseq [source my-sources
-            :let [source-dir (File. (source local-identity))]
-            :when (not (.exists source-dir))]
-      (io! (sh-print "git" "init" (str source-dir))))))
-
-(defn -push! [local-path peer-repo local-branch remote-branch & other-flags]
-  (let [args (concat (list "git" "push") other-flags
-                     (list peer-repo (str local-branch ":" remote-branch)
-                           :dir local-path))]
-    (io!
-     (println (join " " args))
-     (apply sh-print args))))
-
-(defn -pull! [peer-repo local-path]
-  (io!
-   ; TODO: Do a git fetch and process the branches more intelligently.
-   ; TODO: Pull to a different branch if the current one has merge conflicts.
-   (println "Pulling " peer-repo " to " local-path)
-   (sh-print "git" "pull" peer-repo "master" :dir local-path)))
-
-(defn -clone! [peer-repo local-path]
-  (io!
-   (println "Cloning " peer-repo " to " local-path)
-   (let [res (sh "git" "clone" peer-repo local-path)]
-     (print (:out res) (:err res))
-     (:exit res))))
-
-(defn report [results func-name func & args]
-  ; TODO: make this a macro, I think
-  (let [append-to (if (= 0 (apply func args)) :succeeded :failed)
-        report-item (cons func-name (seq args))]
-    (conj results
-          [append-to (conj (append-to results) report-item)]
-          [:last append-to])))
-
-(defn push-for-one
-  "Push a branch as necessary to keep a peer up-to-date. The branch parameter
-  should be an instance of Branch. pusher is a version of -push! with the first
-  two arguments curried.
-  When pushing:
-  * third-party peer branches - which is any branch named *_hesokr_(HOST) where
-    HOST is not me or the push destination peer, try to push to the same branch
-    name, but if it fails, ignore it.
-  * hesokuri - try to push to the same branch name, but if it fails, force push to
-    hesokuri_hesokr_(MY_HOSTNAME).
-  * local branch - which is any branch that is not hesokuri and not named in the
-    form of *_hesokr_*, force push to (BRANCH_NAME)_hesokr_(MY_HOSTNAME)"
-  [me pusher branch peer]
-  (letfn [(force-push []
-            (pusher branch (BranchName. (:branch branch) me) "-f"))]
-    (cond
-     (every? #(not= (:peer branch) %) [nil me peer])
-     (pusher (str branch) (str branch))
-
-     (= canonical-branch-name branch)
-     (lint-and (pusher branch branch) (force-push))
-
-     (and (not= canonical-branch-name branch)
-          (not (:peer branch)))
-     (force-push))))
+  (dosync
+   (ref-set sources (read-string (slurp sources-config-file)))
+   (ref-set peer-hostnames (set (apply concat (map keys @sources))))
+   (ref-set local-identity (-local-identity))
+   (ref-set source-agents
+            (into {} (for [source @sources
+                           :let [source-dir (source @local-identity)]
+                           :when source-dir]
+                       [source-dir {:source-dir source-dir}]))))
+  (doseq [source-agent @source-agents]
+    (send source-agent git-init)))
 
 (defn common-sources
   "Returns a list of all items in the sources vector that are on all of the
@@ -180,69 +111,53 @@ given peers."
   "A very stupid implementation of the syncing process, ported directly from the
 Elisp prototype. This simply pushes and pulls every repo with the given peer."
   [peer-name]
-  (io!
-   (let [me @local-identity
-         sources (and me (seq (common-sources peer-name me)))
-         remote-track-name (str (BranchName. "master" me))]
-     (cond
-      (not me)
-      (println "Local identity not set - cannot kuri")
+  (let [me @local-identity
+        sources (and me (seq (common-sources peer-name me)))
+        remote-track-name (str (->BranchName "master" me))]
+    (cond
+     (not me)
+     (println "Local identity not set - cannot kuri")
 
-      (not sources)
-      (println "Could not find any sources on both " peer-name " and " me)
+     (not sources)
+     (println "Could not find any sources on both " peer-name " and " me)
 
-      :else
-      (println "\n\nkuri operation at " (str (Date.))
-               " with peer: " peer-name))
-     (let [results
-       (loop [sources sources
-              results {:succeeded [] :failed []}]
-         (if (not sources) results
-         (let [source (first sources)
-               local-path (source me)
-               local-path-file (File. local-path)
-               peer-path (source peer-name)
-               peer-repo (str "ssh://" peer-name peer-path)]
-           (cond
-            (not (.exists local-path-file))
-            (recur (next sources)
-                   (report results "clone" -clone! peer-repo local-path))
+     :else
+     (println "\n\nkuri operation at " (str (Date.))
+              " with peer: " peer-name))
+    (doseq [source sources
+            :let [source (first sources)
+                  local-path (source me)
+                  local-path-file (File. local-path)
+                  peer-path (source peer-name)
+                  peer-repo (str "ssh://" peer-name peer-path)]]
+      (cond
+       (not (.exists local-path-file))
+       (sh-print "git" "clone" peer-repo local-path)
 
-            (not (.isDirectory local-path-file))
-            (throw (RuntimeException.
-                    (str "path for repo is occupied by a non-directory file: "
-                         local-path)))
+       (not (.isDirectory local-path-file))
+       (throw (RuntimeException.
+               (str "path for repo is occupied by a non-directory file: "
+                    local-path)))
 
-            :else
-            (let [results (loop
-              [ops [:push-straight :pull] results results]
-              (cond
-               (not ops) results
+       :else
+       (loop [ops [:push-straight :pull]]
+         (cond
+          (= :push-straight (first ops))
+          (if (not= 0 (sh-print "git" "push" peer-repo
+                                  "master" :dir local-path))
+            (recur (cons :push (next ops)))
+            (recur (next ops)))
 
-               (= :push-straight (first ops))
-               (let [results (report results "push"
-                                     -push! local-path peer-repo
-                                     "master" "master")]
-                 (if (= :succeeded (results :last))
-                   (recur (next ops) results)
-                   (recur (cons :push (next ops)) results)))
+          (= :push (first ops))
+          (do
+            (sh-print "git" "push" peer-repo
+                      (str "master:" remote-track-name) :dir local-path)
+            (recur (next ops)))
 
-               (= :push (first ops))
-               (recur (next ops)
-                      (report results "push"
-                              -push! local-path peer-repo
-                              "master" remote-track-name))
-
-               :else
-               (recur (next ops)
-                      (report results "pull" -pull! peer-repo local-path))))]
-              (recur (next sources) results))))))]
-       (when (seq (:succeeded results))
-         (println "\nThe following operations succeeded:")
-         (doseq [s (:succeeded results)] (println s)))
-       (when (seq (:failed results))
-         (println "\nThe following operations failed:")
-         (doseq [f (:failed results)] (println f)))))))
+          (= :pull (first ops))
+          (do
+            (sh-print "git" "pull" peer-repo "master" :dir local-path)
+            (recur (next ops)))))))))
 
 (defn -main
   "I don't do a whole lot ... yet."
