@@ -55,7 +55,7 @@
                (not (nil? (:peer branch))))]
     (sh-print-when #(= (:exit %) 0)
                    "git" "branch" "-d" (str branch) :dir source-dir))
-  (-refresh self))
+  self)
 
 (defn -advance-a
   [{all-branches :branches
