@@ -23,6 +23,12 @@ form:
  ]"
   (ref []))
 
+(def push-to-peers
+  "An object that represents all the heartbeats used to push to a peer
+  automatically. Each peer has a separate heartbeat. The heartbeats are stopped
+  and replaces with new ones whenever the sources are reconfigured."
+  (agent (atom nil)))
+
 (def source-agents
   "A map of source-dirs to the corresponding agent."
   (ref {}))
@@ -38,7 +44,7 @@ network."
 
 (def sources-config-file
   "Where to read the hesokuri sources configuration from."
-  (str (.get (System/getenv) "HOME") "/.hesokuri/sources"))
+  (-> (System/getenv) (.get "HOME") (str "/.hesokuri/sources")))
 
 (defn identities
   "Returns a vector of the possible identities this system may have on the
@@ -75,21 +81,6 @@ vector and the peer-hostnames var."
      (@peer-hostnames (first candidates)) (first candidates)
      :else (recur (next candidates)))))
 
-(defn refresh-sources
-  "Updates sources and peer-hostnames based on the user's sources config file."
-  []
-  (dosync
-   (ref-set sources (read-string (slurp sources-config-file)))
-   (ref-set peer-hostnames (set (apply concat (map keys @sources))))
-   (ref-set local-identity (-local-identity))
-   (ref-set source-agents
-            (into {} (for [source @sources
-                           :let [source-dir (source @local-identity)]
-                           :when source-dir]
-                       [source-dir (agent {:source-dir source-dir})]))))
-  (doseq [[_ source-agent] @source-agents]
-    (send source-agent git-init)))
-
 (defn common-sources
   "Returns a list of all items in the sources vector that are on all of the
 given peers."
@@ -104,6 +95,31 @@ given peers."
 
      :else
      (recur (next sources) results))))
+
+(defn refresh-sources
+  "Updates sources and peer-hostnames based on the user's sources config file."
+  []
+  (dosync
+   (ref-set sources (read-string (slurp sources-config-file)))
+   (ref-set peer-hostnames (set (apply concat (map keys @sources))))
+   (ref-set local-identity (-local-identity))
+   (ref-set source-agents
+            (into {} (for [source @sources
+                           :let [source-dir (source @local-identity)]
+                           :when source-dir]
+                       [source-dir (agent {:source-dir source-dir})])))
+   (doseq [[_ source-agent] @source-agents]
+     (send source-agent git-init))
+   (send push-to-peers stop-heartbeats)
+   (doseq [peer-hostname @peer-hostnames
+           :let [shared-sources (common-sources @local-identity peer-hostname)
+                 local-identity @local-identity
+                 source-agents @source-agents]]
+     (send push-to-peers start-heartbeat 300000
+           (fn []
+             (doseq [source shared-sources]
+               (send (source-agents (source local-identity))
+                     push-for-peer local-identity)))))))
 
 (defn kuri!
   "A very stupid implementation of the syncing process, ported directly from the

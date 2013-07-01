@@ -56,11 +56,18 @@
     (str "ssh://" host path)))
 
 (defn start-heartbeat
-  "Gives functionality to run a repeated task at regular intervals, and stop
-  when some condition is met."
-  [action interval-millis is-valid?]
-  (-> (fn [] (while (is-valid?)
-               (action)
-               (Thread/sleep interval-millis)))
-      Thread.
-      .start))
+  "Gives functionality to run a repeated task at regular intervals, and stops
+  when stop-heartbeats is called. self should be an atom."
+  [self interval-millis action]
+  (let [orig-hb-group @self]
+    (-> (fn [] (while (= orig-hb-group @self)
+                 (action)
+                 (Thread/sleep interval-millis)))
+        Thread.
+        .start)))
+
+(defn stop-heartbeats
+  "Stops all heartbeats begun on the given atom with start-heartbeat."
+  [self]
+  (swap! self (fn [_] (Object.)))
+  self)
