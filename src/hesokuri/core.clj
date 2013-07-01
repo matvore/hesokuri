@@ -6,22 +6,9 @@
            [java.util Date])
   (:gen-class))
 
-(def sources
-  "Defines the hesokuri sources. This is the user-configurable settings that
-hesokuri needs to discover sources on the network and how to push and pull
-them. This can be read from a configuration file. It is a map in the following
-form:
- [
-   {
-     \"host-1\" \"/foo/bar/path1\"
-     \"host-2\" \"/foo/bar/path2\"
-   }
-   {
-     \"host-1\" \"/foo/bar/path3\"
-     \"host-3\" \"/foo/bar/path4\"
-   }
- ]"
-  (ref []))
+(def heso
+  (agent {:config-file
+          (-> (System/getenv) (.get "HOME") (str "/.hesokuri/sources"))}))
 
 (def push-to-peers
   "An object that represents all the heartbeats used to push to a peer
@@ -29,44 +16,14 @@ form:
   and replaces with new ones whenever the sources are reconfigured."
   (agent (atom nil)))
 
-(def source-agents
-  "A map of source-dirs to the corresponding agent."
-  (ref {}))
-
-(def peer-hostnames
-  "A set of the hostnames of the peers. Updated with sources."
-  (ref #{}))
-
-(def local-identity
-  "The hostname or IP of this system as known by the peers on the current
-network."
-  (ref nil))
-
-(def sources-config-file
-  "Where to read the hesokuri sources configuration from."
-  (-> (System/getenv) (.get "HOME") (str "/.hesokuri/sources")))
-
-(defn identities
-  "Returns a vector of the possible identities this system may have on the
-  network, which includes its hostname and the IP address of all network
-  interfaces. Each identity is a string."
+(defn ips
+  "Returns the IP addresses of all network interfaces as a vector of strings."
   []
-  (-> "hostname" sh :out trim list vec
-      (into (for [i (-> (java.net.NetworkInterface/getNetworkInterfaces)
-                        java.util.Collections/list)
-                  addr (and i (.getInterfaceAddresses i))
-                  :when addr]
-              (-> addr .getAddress .getHostAddress (split #"%") first)))))
-
-(defn -local-identity
-  "Returns the identity of this system. It deduces it from the (identities)
-vector and the peer-hostnames var."
-  []
-  (loop [candidates (seq (identities))]
-    (cond
-     (not candidates) nil
-     (@peer-hostnames (first candidates)) (first candidates)
-     :else (recur (next candidates)))))
+  (into [] (for [i (-> (java.net.NetworkInterface/getNetworkInterfaces)
+                       java.util.Collections/list)
+                 addr (and i (.getInterfaceAddresses i))
+                 :when addr]
+             (-> addr .getAddress .getHostAddress (split #"%") first))))
 
 (defn common-sources
   "Returns a list of all items in the sources vector that are on all of the
@@ -83,52 +40,74 @@ given peers."
      :else
      (recur (next sources) results))))
 
-(defn refresh-sources
-  "Updates sources and peer-hostnames based on the user's sources config file."
-  []
-  (dosync
-   (ref-set sources (read-string (slurp sources-config-file)))
-   (ref-set peer-hostnames (set (apply concat (map keys @sources))))
-   (ref-set local-identity (-local-identity))
-   (ref-set source-agents
-            (into {} (for [source @sources
-                           :let [source-dir (source @local-identity)]
-                           :when source-dir]
-                       [source-dir (agent {:source-dir source-dir})])))
-   (doseq [[_ source-agent] @source-agents]
+(defn refresh-heso
+  "Updates heso state based on the user's sources config file and the state of
+  the network."
+  [{:keys [config-file]}]
+  (letmap
+   self
+   [config-file config-file
+
+    ;; Defines the hesokuri sources. This is the user-configurable settings that
+    ;; hesokuri needs to discover sources on the network and how to push and
+    ;; pull them. In this function, this is read from the configuration file
+    ;; specified by :config-file on self. It is a map in the following form:
+    ;; [{"host-1" "/foo/bar/path1"
+    ;;   "host-2" "/foo/bar/path2"}
+    ;;  {"host-1" "/foo/bar/path3"
+    ;;   "host-3" "/foo/bar/path4"}]
+    sources (read-string (slurp config-file))
+
+    ;; A set of the hostnames of the peers. Updated with sources.
+    peer-hostnames (set (apply concat (map keys sources)))
+
+    ;; The hostname or IP of this system as known by the peers on the current
+    ;; network. Here it is deduced from the vector returned by (identities)
+    ;; and the peer-hostnames var.
+    local-identity
+    (or (first (for [ip (ips) :when (peer-hostnames ip)] ip))
+        (-> "hostname" sh :out trim))
+
+    ;; A map of source-dirs to the corresponding agent.
+    source-agents (into {} (for [source sources
+                                 :let [source-dir (source local-identity)]
+                                 :when source-dir]
+                             [source-dir (agent {:source-dir source-dir})]))]
+   (doseq [[_ source-agent] source-agents]
      (send source-agent git-init))
    (send push-to-peers stop-heartbeats)
-   (doseq [peer-hostname @peer-hostnames
-           :let [shared-sources (common-sources @local-identity peer-hostname)
-                 local-identity @local-identity
-                 source-agents @source-agents]]
+   (doseq [peer-hostname peer-hostnames
+           :when (not= peer-hostname local-identity)
+           :let [shared-sources (common-sources local-identity peer-hostname)]]
      (send push-to-peers start-heartbeat 300000
            (fn []
              (doseq [source shared-sources]
                (send (source-agents (source local-identity))
                      push-for-peer local-identity
-                     (->PeerRepo peer-hostname (source peer-hostname)))))))))
+                     (->PeerRepo peer-hostname (source peer-hostname)))))))
+   self))
 
-(defn kuri!
+(defn kuri-heso
   "A very stupid implementation of the syncing process, ported directly from the
-Elisp prototype. This simply pushes and pulls every repo with the given peer."
-  [peer-name]
-  (let [me @local-identity
-        sources (and me (seq (common-sources peer-name me)))
-        remote-track-name (str (->BranchName "master" me))]
+  Elisp prototype. This simply pushes and pulls every repo with the given peer."
+  [{:keys [local-identity] :as self}
+   peer-name]
+  (let [sources (and local-identity
+                     (seq (common-sources peer-name local-identity)))
+        remote-track-name (str (->BranchName "master" local-identity))]
     (cond
-     (not me)
+     (not local-identity)
      (println "Local identity not set - cannot kuri")
 
      (not sources)
-     (println "Could not find any sources on both " peer-name " and " me)
+     (println "Could not find any sources on both "
+              peer-name " and " local-identity)
 
      :else
      (println "\n\nkuri operation at " (str (Date.))
               " with peer: " peer-name))
     (doseq [source sources
-            :let [source (first sources)
-                  local-path (source me)
+            :let [local-path (source local-identity)
                   local-path-file (File. local-path)
                   peer-path (source peer-name)
                   peer-repo (str "ssh://" peer-name peer-path)]]
@@ -146,7 +125,7 @@ Elisp prototype. This simply pushes and pulls every repo with the given peer."
          (cond
           (= :push-straight (first ops))
           (if (not= 0 (sh-print "git" "push" peer-repo
-                                  "master" :dir local-path))
+                                "master" :dir local-path))
             (recur (cons :push (next ops)))
             (recur (next ops)))
 
@@ -159,7 +138,8 @@ Elisp prototype. This simply pushes and pulls every repo with the given peer."
           (= :pull (first ops))
           (do
             (sh-print "git" "pull" peer-repo "master" :dir local-path)
-            (recur (next ops)))))))))
+            (recur (next ops)))))))
+    self))
 
 (defn -main
   "I don't do a whole lot ... yet."
