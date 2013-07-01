@@ -46,6 +46,17 @@
     (= (trim (slurp (File. git-dir "HEAD")))
        (str "ref: refs/heads/" canonical-branch-name))]))
 
+(defn -advance-b
+  [{:keys [branches source-dir] :as self}]
+  (doseq [branch (keys branches)
+          :when
+          (and (not= (:branch canonical-branch-name)
+                     (:branch branch))
+               (not (nil? (:peer branch))))]
+    (sh-print-when #(= (:exit %) 0)
+                   "git" "branch" "-d" (str branch) :dir source-dir))
+  (-refresh self))
+
 (defn -advance-a
   [{all-branches :branches
     :keys [source-dir canonical-checked-out working-area-clean]
@@ -76,17 +87,6 @@
              (sh-print "git" "branch" "-M" branch
                        (str canonical-branch-name) :dir source-dir))
            (recur (-refresh self) (seq all-branches))))))))
-
-(defn -advance-b
-  [{:keys [branches source-dir] :as self}]
-  (doseq [branch (keys branches)
-          :when
-          (and (not= (:branch canonical-branch-name)
-                     (:branch branch))
-               (not (nil? (:peer branch))))]
-    (sh-print-when #(= (:exit %) 0)
-                   "git" "branch" "-d" (str branch) :dir source-dir))
-  (-refresh self))
 
 ; TODO: When we get data pushed to us, detect it by monitoring filesystem
 ; activity in .git. Then invoke the 'advance' logic below.
