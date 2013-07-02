@@ -32,7 +32,7 @@
   pinging again, which may time out for up to timeout-for-ping millis while
   waiting for a response."
   [self]
-  (assoc-in self [:last-file-ping-time 0]))
+  (assoc self :last-file-ping-time 0))
 
 (defn push
   "Performs a push. Branch name parameters can either be a string or something
@@ -58,9 +58,9 @@
          (= hash (pushed pushed-key)))
      self
 
-     (try (-> (:host peer-repo) InetAddress/getByName
-              (.isReachable timeout-for-ping) not)
-          (catch UnknownHostException _ true))
+     (-> :host peer-repo InetAddress/getByName
+         (.isReachable timeout-for-ping)
+         (try (catch UnknownHostException _ false)) not)
      (assoc self :last-fail-ping-time current-time)
 
      :else
