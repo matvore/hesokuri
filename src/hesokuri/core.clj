@@ -28,8 +28,8 @@
 (defn common-sources
   "Returns a list of all items in the sources vector that are on all of the
 given peers."
-  [& peer-names]
-  (loop [sources (seq (dosync (ensure sources)))
+  [sources & peer-names]
+  (loop [sources (seq sources)
          results []]
     (cond
      (not sources) results
@@ -78,7 +78,8 @@ given peers."
    (send push-to-peers stop-heartbeats)
    (doseq [peer-hostname peer-hostnames
            :when (not= peer-hostname local-identity)
-           :let [shared-sources (common-sources local-identity peer-hostname)]]
+           :let [shared-sources
+                 (common-sources sources local-identity peer-hostname)]]
      (send push-to-peers start-heartbeat 300000
            (fn []
              (doseq [source shared-sources]
@@ -90,10 +91,10 @@ given peers."
 (defn kuri-heso
   "A very stupid implementation of the syncing process, ported directly from the
   Elisp prototype. This simply pushes and pulls every repo with the given peer."
-  [{:keys [local-identity] :as self}
+  [{:keys [local-identity sources] :as self}
    peer-name]
   (let [sources (and local-identity
-                     (seq (common-sources peer-name local-identity)))
+                     (seq (common-sources sources peer-name local-identity)))
         remote-track-name (str (->BranchName "master" local-identity))]
     (cond
      (not local-identity)
