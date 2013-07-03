@@ -44,13 +44,13 @@
   branch-name - the local name of the branch
   hash - the hash to push (in general, this should be the hash pointed to by
       branch-name.
-  branches - a sequence of sequences in the form: [branch-name & push-args].
+  tries - a sequence of sequences in the form: [branch-name & push-args].
       'push-args' is a sequence of strings passed as arguments after 'git push'
       on the command line. 'branch-name' is the destination branch name to use."
   [{:keys [last-fail-ping-time pushed] :as self}
    local-path peer-repo
    branch-name hash
-   branches]
+   tries]
   (let [current-time (System/currentTimeMillis)
         pushed-key [local-path branch-name]]
     (cond
@@ -64,7 +64,7 @@
      (assoc self :last-fail-ping-time current-time)
 
      :else
-     (-> (for [[branch-name & push-args] branches
+     (-> (for [[branch-name & push-args] tries
                :let [latter-args [peer-repo (str hash ":" branch-name)
                                   :dir local-path]]
                :when (= 0 (apply sh-print "git" "push"
