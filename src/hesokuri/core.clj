@@ -6,11 +6,14 @@
         hesokuri.source
         hesokuri.util)
   (:import [java.io File]
-           [java.util Date])
+           [java.util Date]
+           [java.nio.file
+            StandardWatchEventKinds
+            WatchService])
   (:gen-class))
 
 (def heso
-  (agent {:push-to-peers (agent (atom nil))
+  (agent {:heartbeats (agent (atom nil))
 
           :config-file
           (-> (System/getenv) (.get "HOME") (str "/.hesokuri/sources"))}))
@@ -42,17 +45,18 @@ given peers."
 (defn refresh-heso
   "Updates heso state based on the user's sources config file and the state of
   the network."
-  [{:keys [config-file push-to-peers]}]
+  [{:keys [config-file heartbeats]}]
   (letmap
    self
    [:keep
     [config-file
 
-     ;; An object that represents all the heartbeats used to push to a peer
-     ;; automatically. Each peer has a separate heartbeat. The heartbeats
-     ;; are stopped and replaces with new ones whenever the sources are
+     ;; An object that represents all the heartbeats started by this object.
+     ;; Heartbeats are used to push to a peer automatically (one heartbeat per
+     ;; peer) and monitor filesystem changes (one heartbeat). The heartbeats
+     ;; are stopped and replaced with new ones whenever the sources are
      ;; reconfigured.
-     push-to-peers]
+     heartbeats]
 
     ;; Defines the hesokuri sources. This is the user-configurable settings that
     ;; hesokuri needs to discover sources on the network and how to push and
@@ -90,13 +94,18 @@ given peers."
                                    :peer-dirs source
                                    :peer-agents peer-agents
                                    :local-identity local-identity})]))]
-   (doseq [[_ source-agent] source-agents]
-     (send source-agent git-init))
-   (send push-to-peers stop-heartbeats)
+   (send heartbeats stop-heartbeats)
+   "TODO: terminate existing watch service"
+   (doseq [[source-dir source-agent] source-agents]
+     (send source-agent git-init)
+     "TODO: set up file watching")
+   (send heartbeats start-heartbeat 1
+         (fn []
+           "TODO: poll sources for changes in .git"))
    (doseq [peer-hostname peer-hostnames
            :let [shared-sources
                  (common-sources sources local-identity peer-hostname)]]
-     (send push-to-peers start-heartbeat 300000
+     (send heartbeats start-heartbeat 300000
            (fn []
              (doseq [source shared-sources]
                (send (source-agents (source local-identity))
