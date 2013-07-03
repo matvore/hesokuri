@@ -45,13 +45,14 @@ given peers."
   [{:keys [config-file push-to-peers]}]
   (letmap
    self
-   [config-file config-file
+   [:keep
+    [config-file
 
-    ;; An object that represents all the heartbeats used to push to a peer
-    ;; automatically. Each peer has a separate heartbeat. The heartbeats
-    ;; are stopped and replaces with new ones whenever the sources are
-    ;; reconfigured.
-    push-to-peers push-to-peers
+     ;; An object that represents all the heartbeats used to push to a peer
+     ;; automatically. Each peer has a separate heartbeat. The heartbeats
+     ;; are stopped and replaces with new ones whenever the sources are
+     ;; reconfigured.
+     push-to-peers]
 
     ;; Defines the hesokuri sources. This is the user-configurable settings that
     ;; hesokuri needs to discover sources on the network and how to push and
@@ -63,7 +64,7 @@ given peers."
     ;;   "host-3" "/foo/bar/path4"}]
     sources (read-string (slurp config-file))
 
-    all-hostnames (set (apply concat (map keys sources)))
+    :omit all-hostnames (set (apply concat (map keys sources)))
 
     ;; The hostname or IP of this system as known by the peers on the current
     ;; network. Here it is deduced from the vector returned by (identities)
@@ -73,17 +74,19 @@ given peers."
         (-> "hostname" sh :out trim))
 
     ;; A set of the hostnames of the peers.
-    peer-hostnames (disj all-hostnames local-identity)
+    :omit peer-hostnames (disj all-hostnames local-identity)
 
     ;; Map of peer hostnames to the corresponding peer agent.
-    peer-agents (into {} (for [hostname peer-hostnames]
-                           [hostname (agent new-peer)]))
+    peer-agents
+    (into {} (for [hostname peer-hostnames]
+               [hostname (agent new-peer)]))
 
     ;; A map of source-dirs to the corresponding agent.
-    source-agents (into {} (for [source sources
-                                 :let [source-dir (source local-identity)]
-                                 :when source-dir]
-                             [source-dir (agent {:source-dir source-dir})]))]
+    source-agents
+    (into {} (for [source sources
+                   :let [source-dir (source local-identity)]
+                   :when source-dir]
+               [source-dir (agent {:source-dir source-dir})]))]
    (doseq [[_ source-agent] source-agents]
      (send source-agent git-init))
    (send push-to-peers stop-heartbeats)

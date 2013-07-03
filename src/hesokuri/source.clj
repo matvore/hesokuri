@@ -22,7 +22,7 @@
 
     ;; The .git directory of a repository as a java.io.File object, given its
     ;; parent directory. If it is a bare repository, is equal to :source-dir
-    git-dir
+    :omit git-dir
     (let [source-dir-git (File. source-dir ".git")]
       (if (.isDirectory source-dir-git)
         source-dir-git source-dir))

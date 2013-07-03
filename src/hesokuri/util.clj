@@ -83,12 +83,47 @@
     (letmap m [a 10, b (* a 20)]
       (into m [[:c m]]))
   evaluates to:
-    {:a 10, :b 200, :c {:a 10, :b 200}}"
+    {:a 10, :b 200, :c {:a 10, :b 200}}
+
+  Bindings can be preceded by omit to create a let binding but to not put the
+  value in the map. This is useful for values that store intermediate results.
+    (letmap [:omit a 10, b (* a a)])
+  evaluates to:
+    {:b 100}
+
+  In place of a binding you can use the :keep modifier, which indicates that the
+  variable is already bound in this scope and you just want to add it to the map
+  with a key of the same name:
+  (defn new-foo [x y]
+   (letmap [:keep [x y], z (+ x y)]))
+  Then (new-foo 5 10) evaluates to: {:x 5, :y 10, :z 15}
+  Instead of a vector after :keep you can specify a single symbol, it which case
+  it would be treated as if it were a vector containing only that symbol."
   ([map-name bindings & body]
-     `(let ~bindings
-        (let [~map-name
-              ~(into {} (for [b (take-nth 2 bindings)] [(keyword b) b]))]
-          ~@body)))
+     (loop [bindings (seq bindings)
+            let-bindings []
+            map-expr {}]
+       (cond
+        (nil? bindings)
+        `(let ~let-bindings
+           (let [~map-name
+                 ~map-expr]
+             ~@body))
+
+        (= (first bindings) :omit)
+        (let [[id expr & next] (next bindings)]
+          (recur next (into let-bindings [id expr]) map-expr))
+
+        (= (first bindings) :keep)
+        (let [[ids & next] (next bindings)
+              ids (if (symbol? ids) [ids] ids)]
+          (recur next let-bindings
+                 (into map-expr (for [id ids] [(keyword id) id]))))
+
+        :else
+        (let [[id expr & next] bindings]
+          (recur next (into let-bindings [id expr])
+                 (assoc map-expr (keyword id) id))))))
   ([bindings]
      (let [map-name (gensym)]
        `(letmap ~map-name ~bindings ~map-name))))
