@@ -58,7 +58,7 @@
          (= hash (pushed pushed-key)))
      self
 
-     (-> :host peer-repo InetAddress/getByName
+     (-> peer-repo :host InetAddress/getByName
          (.isReachable timeout-for-ping)
          (try (catch UnknownHostException _ false)) not)
      (assoc self :last-fail-ping-time current-time)

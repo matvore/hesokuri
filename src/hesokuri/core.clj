@@ -75,7 +75,7 @@ given peers."
 
     ;; Map of peer hostnames to the corresponding peer agent.
     peer-agents (into {} (for [hostname peer-hostnames]
-                           [hostname new-peer]))
+                           [hostname (agent new-peer)]))
 
     ;; A map of source-dirs to the corresponding agent.
     source-agents (into {} (for [source sources
