@@ -1,9 +1,0 @@
-Have to manually run ping to populate arp table.
-
-Should automatically merge with PEERMACADDR-master if that peer is offline.
-- This is to cover the case where the peer pushed to us but didn't change
-  master because it was checked out.
-
-Does not support different user names per machine.
-
-Port to a platform more universal than an Emacs module (e.g. Python).
