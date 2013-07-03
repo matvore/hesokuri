@@ -77,7 +77,7 @@ given peers."
     :omit peer-hostnames (disj all-hostnames local-identity)
 
     ;; Map of peer hostnames to the corresponding peer agent.
-    peer-agents
+    :omit peer-agents
     (into {} (for [hostname peer-hostnames]
                [hostname (agent new-peer)]))
 
@@ -86,7 +86,10 @@ given peers."
     (into {} (for [source sources
                    :let [source-dir (source local-identity)]
                    :when source-dir]
-               [source-dir (agent {:source-dir source-dir})]))]
+               [source-dir (agent {:source-dir source-dir
+                                   :peer-dirs source
+                                   :peer-agents peer-agents
+                                   :local-identity local-identity})]))]
    (doseq [[_ source-agent] source-agents]
      (send source-agent git-init))
    (send push-to-peers stop-heartbeats)
@@ -97,8 +100,7 @@ given peers."
            (fn []
              (doseq [source shared-sources]
                (send (source-agents (source local-identity))
-                     push-for-peer (peer-agents peer-hostname) local-identity
-                     (->PeerRepo peer-hostname (source peer-hostname)))))))
+                     push-for-peer peer-hostname)))))
    self))
 
 (defn kuri-heso

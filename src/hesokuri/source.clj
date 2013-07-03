@@ -1,5 +1,11 @@
 (ns hesokuri.source
-  "Implementation of the source object."
+  "Implementation of the source object. A valid source object has the following
+  required fields:
+  source-dir - The location of this source on the local disk.
+  peer-dirs - a map from peer hostnames to the location of the source on that
+      peer.
+  peer-agents - a map of hostnames to the corresponding peer agent.
+  local-identity - the hostname or IP of this system."
   (:use [clojure.java.shell :only [sh]]
         [clojure.string :only [trim]]
         hesokuri.branch-name
@@ -16,9 +22,9 @@
 (defn -refresh
   "Updates all values of the source object based on the value of source-dir,
   which remains the same."
-  [self]
+  [{:keys [peer-dirs peer-agents local-identity source-dir] :as self}]
   (letmap
-   [source-dir (self :source-dir)
+   [:keep [peer-dirs peer-agents local-identity source-dir]
 
     ;; The .git directory of a repository as a java.io.File object, given its
     ;; parent directory. If it is a bare repository, is equal to :source-dir
@@ -102,10 +108,9 @@
      name (BRANCH)_hesokr_*, and BRANCH is not hesokuri, delete branch B."
   #(-> % git-init -refresh -advance-a))
 
-(defn -push-for-one
+(defn -send-args-to-push-branch
   "Push a branch as necessary to keep a peer up-to-date. The branch parameter
-  should be an instance of Branch. pusher is a version of -push! with the first
-  two arguments curried.
+  should be an instance of Branch.
   When pushing:
   * third-party peer branches - which is any branch named *_hesokr_(HOST) where
     HOST is not me or the push destination peer, try to push to the same branch
@@ -114,31 +119,32 @@
     to hesokuri_hesokr_(MY_HOSTNAME).
   * local branch - which is any branch that is not hesokuri and not named in the
     form of *_hesokr_*, force push to (BRANCH_NAME)_hesokr_(MY_HOSTNAME)"
-  [{:keys [source-dir branches] :as self} branch peer local-id peer-repo]
-  (send peer push source-dir peer-repo branch (branches branch)
-        (let [force-branch (fn [] (->BranchName (:branch branch) local-id))]
-          (cond
-           (every? #(not= (:peer branch) %) [nil local-id (:host peer-repo)])
-           [[branch]]
+  [{:keys [peer-agents local-identity source-dir branches peer-dirs] :as self}
+   peer-host branch]
+  [(peer-agents peer-host) push
+   source-dir (->PeerRepo peer-host (peer-dirs peer-host))
+   branch (branches branch)
+   (let [force-branch (fn [] (->BranchName (:branch branch) local-identity))]
+     (cond
+      (every? #(not= (:peer branch) %) [nil local-identity peer-host])
+      [[branch]]
 
-           (= canonical-branch-name branch)
-           [[branch] [(force-branch) "-f"]]
+      (= canonical-branch-name branch)
+      [[branch] [(force-branch) "-f"]]
 
-           (and (not= canonical-branch-name branch)
-                (not (:peer branch)))
-           [[(force-branch) "-f"]])))
-  self)
+      (and (not= canonical-branch-name branch)
+           (not (:peer branch)))
+      [[(force-branch) "-f"]]
+
+      :else []))])
 
 (defn -push-for-peer
-  [{:keys [branches] :as self} & args]
-  (loop [branches (keys branches)
-         self self]
-    (if branches
-      (recur (next branches)
-             (apply -push-for-one self (first branches) args))
-      self)))
+  [{:keys [branches] :as self} peer-host]
+  (doseq [branch (keys branches)]
+    (apply send (-send-args-to-push-branch self peer-host branch)))
+  self)
 
 (defn push-for-peer
   "Push all branches necessary to keep one peer up-to-date."
-  [self peer local-id peer-repo]
-  (-> self git-init -refresh (-push-for-peer peer local-id peer-repo)))
+  [self peer-host]
+  (-> self git-init -refresh (-push-for-peer peer-host)))
