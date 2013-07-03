@@ -10,14 +10,10 @@
   (:gen-class))
 
 (def heso
-  (agent {:config-file
-          (-> (System/getenv) (.get "HOME") (str "/.hesokuri/sources"))}))
+  (agent {:push-to-peers (agent (atom nil))
 
-(def push-to-peers
-  "An object that represents all the heartbeats used to push to a peer
-  automatically. Each peer has a separate heartbeat. The heartbeats are stopped
-  and replaces with new ones whenever the sources are reconfigured."
-  (agent (atom nil)))
+          :config-file
+          (-> (System/getenv) (.get "HOME") (str "/.hesokuri/sources"))}))
 
 (defn ips
   "Returns the IP addresses of all network interfaces as a vector of strings."
@@ -46,10 +42,16 @@ given peers."
 (defn refresh-heso
   "Updates heso state based on the user's sources config file and the state of
   the network."
-  [{:keys [config-file]}]
+  [{:keys [config-file push-to-peers]}]
   (letmap
    self
    [config-file config-file
+
+    ;; An object that represents all the heartbeats used to push to a peer
+    ;; automatically. Each peer has a separate heartbeat. The heartbeats
+    ;; are stopped and replaces with new ones whenever the sources are
+    ;; reconfigured.
+    push-to-peers push-to-peers
 
     ;; Defines the hesokuri sources. This is the user-configurable settings that
     ;; hesokuri needs to discover sources on the network and how to push and
