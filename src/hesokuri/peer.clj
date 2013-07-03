@@ -23,7 +23,7 @@
   "Number of milliseconds to wait before a ping response."
   10000)
 
-(defn new-peer
+(def new-peer
   "A new peer with default values for each entry."
   {:last-fail-ping-time 0 :pushed {}})
 
@@ -44,7 +44,7 @@
   branch-name - the local name of the branch
   hash - the hash to push (in general, this should be the hash pointed to by
       branch-name.
-  branches - a sequence of sequences in the form: [branch-name push-args].
+  branches - a sequence of sequences in the form: [branch-name & push-args].
       'push-args' is a sequence of strings passed as arguments after 'git push'
       on the command line. 'branch-name' is the destination branch name to use."
   [{:keys [last-fail-ping-time pushed] :as self}

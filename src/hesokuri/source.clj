@@ -3,6 +3,7 @@
   (:use [clojure.java.shell :only [sh]]
         [clojure.string :only [trim]]
         hesokuri.branch-name
+        hesokuri.peer
         hesokuri.util)
   (:import [java.io File]))
 
@@ -113,26 +114,19 @@
     to hesokuri_hesokr_(MY_HOSTNAME).
   * local branch - which is any branch that is not hesokuri and not named in the
     form of *_hesokr_*, force push to (BRANCH_NAME)_hesokr_(MY_HOSTNAME)"
-  [{:keys [source-dir] :as self} branch local-id peer-repo]
-  (let [push
-        (fn [] (sh-print "git" "push" (str peer-repo)
-                         (str branch ":" branch)
-                         :dir source-dir))
-        force-push
-        (fn [] (sh-print "git" "push" "-f" (str peer-repo)
-                         (str branch ":"
-                              (->BranchName (:branch branch) local-id))
-                         :dir source-dir))]
-    (cond
-     (every? #(not= (:peer branch) %) [nil local-id (:host peer-repo)])
-     (push)
+  [{:keys [source-dir branches] :as self} branch peer local-id peer-repo]
+  (send peer push source-dir peer-repo branch (branches branch)
+        (let [force-branch (fn [] (->BranchName (:branch branch) local-id))]
+          (cond
+           (every? #(not= (:peer branch) %) [nil local-id (:host peer-repo)])
+           [[branch]]
 
-     (= canonical-branch-name branch)
-     (lint-and (push) (force-push))
+           (= canonical-branch-name branch)
+           [[branch] [(force-branch) "-f"]]
 
-     (and (not= canonical-branch-name branch)
-          (not (:peer branch)))
-     (force-push)))
+           (and (not= canonical-branch-name branch)
+                (not (:peer branch)))
+           [[(force-branch) "-f"]])))
   self)
 
 (defn -push-for-peer
@@ -146,5 +140,5 @@
 
 (defn push-for-peer
   "Push all branches necessary to keep one peer up-to-date."
-  [self local-id peer-repo]
-  (-> self git-init -refresh (-push-for-peer local-id peer-repo)))
+  [self peer local-id peer-repo]
+  (-> self git-init -refresh (-push-for-peer peer local-id peer-repo)))

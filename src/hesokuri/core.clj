@@ -1,7 +1,10 @@
 (ns hesokuri.core
   (:use [clojure.java.shell :only [sh]]
         [clojure.string :only [join split trim]]
-        hesokuri.util hesokuri.source hesokuri.branch-name)
+        hesokuri.branch-name
+        hesokuri.peer
+        hesokuri.source
+        hesokuri.util)
   (:import [java.io File]
            [java.util Date])
   (:gen-class))
@@ -58,15 +61,21 @@ given peers."
     ;;   "host-3" "/foo/bar/path4"}]
     sources (read-string (slurp config-file))
 
-    ;; A set of the hostnames of the peers. Updated with sources.
-    peer-hostnames (set (apply concat (map keys sources)))
+    all-hostnames (set (apply concat (map keys sources)))
 
     ;; The hostname or IP of this system as known by the peers on the current
     ;; network. Here it is deduced from the vector returned by (identities)
     ;; and the peer-hostnames var.
     local-identity
-    (or (first (for [ip (ips) :when (peer-hostnames ip)] ip))
+    (or (first (for [ip (ips) :when (all-hostnames ip)] ip))
         (-> "hostname" sh :out trim))
+
+    ;; A set of the hostnames of the peers.
+    peer-hostnames (disj all-hostnames local-identity)
+
+    ;; Map of peer hostnames to the corresponding peer agent.
+    peer-agents (into {} (for [hostname peer-hostnames]
+                           [hostname new-peer]))
 
     ;; A map of source-dirs to the corresponding agent.
     source-agents (into {} (for [source sources
@@ -77,14 +86,13 @@ given peers."
      (send source-agent git-init))
    (send push-to-peers stop-heartbeats)
    (doseq [peer-hostname peer-hostnames
-           :when (not= peer-hostname local-identity)
            :let [shared-sources
                  (common-sources sources local-identity peer-hostname)]]
      (send push-to-peers start-heartbeat 300000
            (fn []
              (doseq [source shared-sources]
                (send (source-agents (source local-identity))
-                     push-for-peer local-identity
+                     push-for-peer (peer-agents peer-hostname) local-identity
                      (->PeerRepo peer-hostname (source peer-hostname)))))))
    self))
 
