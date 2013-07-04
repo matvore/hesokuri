@@ -65,7 +65,8 @@
 
      :else
      (-> (for [[branch-name & push-args] tries
-               :let [latter-args [(str peer-repo) (str hash ":" branch-name)
+               :let [latter-args [(str peer-repo)
+                                  (str hash ":refs/heads/" branch-name)
                                   :dir local-path]]
                :when (= 0 (apply sh-print "git" "push"
                                  `(~@push-args ~@latter-args)))]
