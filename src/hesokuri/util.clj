@@ -30,9 +30,7 @@
   (let [result (apply sh args)]
     (when (print-when result)
       (log "execute: %s\nstderr:\n%sstdout:\n%s"
-           (join " " args)
-           (:err result)
-           (:out result)))
+           args (:err result) (:out result)))
     (:exit result)))
 
 (defn sh-print
