@@ -6,10 +6,7 @@
         hesokuri.source
         hesokuri.util)
   (:import [java.io File]
-           [java.util Date]
-           [java.nio.file
-            StandardWatchEventKinds
-            WatchService])
+           [java.util Date])
   (:gen-class))
 
 (def heso
@@ -45,7 +42,9 @@ given peers."
 (defn refresh-heso
   "Updates heso state based on the user's sources config file and the state of
   the network."
-  [{:keys [config-file heartbeats]}]
+  [{:keys [source-agents config-file heartbeats]}]
+  (doseq [[_ source-agent] source-agents]
+    (send source-agent stop-watching))
   (letmap
    self
    [:keep
@@ -95,13 +94,8 @@ given peers."
                                    :peer-agents peer-agents
                                    :local-identity local-identity})]))]
    (send heartbeats stop-heartbeats)
-   "TODO: terminate existing watch service"
-   (doseq [[source-dir source-agent] source-agents]
-     (send source-agent git-init)
-     "TODO: set up file watching")
-   (send heartbeats start-heartbeat 1
-         (fn []
-           "TODO: poll sources for changes in .git"))
+   (doseq [[_ source-agent] source-agents]
+     (send source-agent start-watching))
    (doseq [peer-hostname peer-hostnames
            :let [shared-sources
                  (common-sources sources local-identity peer-hostname)]]

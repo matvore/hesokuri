@@ -11,9 +11,14 @@
         hesokuri.branch-name
         hesokuri.peer
         hesokuri.util)
-  (:import [java.io File]))
+  (:import [java.io File]
+           [java.nio.file
+            ClosedWatchServiceException
+            FileSystems
+            Paths
+            StandardWatchEventKinds]))
 
-(defn git-init
+(defn -git-init
   "Initializes the repository if it doesn't exist yet."
   [{:keys [source-dir] :as self}]
   (sh-print-when #(not= 0 (:exit %)) "git" "init" source-dir)
@@ -28,7 +33,7 @@
 
     ;; The .git directory of a repository as a java.io.File object, given its
     ;; parent directory. If it is a bare repository, is equal to :source-dir
-    :omit git-dir
+    git-dir
     (let [source-dir-git (File. source-dir ".git")]
       (if (.isDirectory source-dir-git)
         source-dir-git source-dir))
@@ -106,7 +111,7 @@
      existing hesokuri branch.
   b) For any two branches F and B, where F is a fast-forward of B, and B has a
      name (BRANCH)_hesokr_*, and BRANCH is not hesokuri, delete branch B."
-  #(-> % git-init -refresh -advance-a))
+  #(-> % -git-init -refresh -advance-a))
 
 (defn -send-args-to-push-branch
   "Push a branch as necessary to keep a peer up-to-date. The branch parameter
@@ -147,4 +152,43 @@
 (defn push-for-peer
   "Push all branches necessary to keep one peer up-to-date."
   [self peer-host]
-  (-> self git-init -refresh (-push-for-peer peer-host)))
+  (-> self -git-init -refresh (-push-for-peer peer-host)))
+
+(defn push-for-all-peers
+  "Pushes all branches necessary to keep all peers up-to-date."
+  [{:keys [peer-agents] :as self}]
+  (loop [self self
+         peer-hosts (keys peer-agents)]
+    (cond
+     (nil? peer-hosts) self
+
+     :else (recur (push-for-peer self (first peer-hosts))
+                  (next peer-hosts)))))
+
+(defn stop-watching
+  "Stops watching the file system. If not watching, this is a no-op."
+  [{:keys [watcher] :as self}]
+  (when watcher (.close watcher))
+  (dissoc self :watcher))
+
+(defn start-watching
+  "Registers paths in this source's repo to be notified of changes so it can
+  automatically advance and push"
+  [self]
+  (let [watcher (.newWatchService (FileSystems/getDefault))
+        self (-> self stop-watching -git-init -refresh (assoc :watcher watcher))
+        self-agent *agent*
+        watch-dir (Paths/get (str (:git-dir self))
+                             (into-array ["refs" "heads"]))
+        watch-key (.register watch-dir watcher
+                             (into-array
+                              [StandardWatchEventKinds/ENTRY_CREATE
+                               StandardWatchEventKinds/ENTRY_DELETE]))
+        start
+        (fn []
+          (doseq [event (.pollEvents watch-key)]
+            (send self-agent advance)
+            (send self-agent push-for-all-peers))
+          (recur))]
+    (-> start Thread. .start)
+    self))
