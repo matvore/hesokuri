@@ -1,12 +1,10 @@
 (ns hesokuri.core
   (:use [clojure.java.shell :only [sh]]
-        [clojure.string :only [join split trim]]
+        [clojure.string :only [split trim]]
         hesokuri.branch-name
         hesokuri.peer
         hesokuri.source
         hesokuri.util)
-  (:import [java.io File]
-           [java.util Date])
   (:gen-class))
 
 (defonce heso
@@ -116,61 +114,6 @@ given peers."
                (send (source-agents (source local-identity))
                      push-for-peer peer-hostname)))))
    self))
-
-(defn kuri-heso
-  "A very stupid implementation of the syncing process, ported directly from the
-  Elisp prototype. This simply pushes and pulls every repo with the given peer.
-  TODO: delete when using refresh-heso alone is stable enough."
-  [{:keys [local-identity sources] :as self}
-   peer-name]
-  (let [sources (and local-identity
-                     (seq (common-sources sources peer-name local-identity)))
-        remote-track-name (str (->BranchName "master" local-identity))]
-    (cond
-     (not local-identity)
-     (println "Local identity not set - cannot kuri")
-
-     (not sources)
-     (println "Could not find any sources on both "
-              peer-name " and " local-identity)
-
-     :else
-     (println "\n\nkuri operation at " (str (Date.))
-              " with peer: " peer-name))
-    (doseq [source sources
-            :let [local-path (source local-identity)
-                  local-path-file (File. local-path)
-                  peer-path (source peer-name)
-                  peer-repo (str "ssh://" peer-name peer-path)]]
-      (cond
-       (not (.exists local-path-file))
-       (sh-print "git" "clone" peer-repo local-path)
-
-       (not (.isDirectory local-path-file))
-       (throw (RuntimeException.
-               (str "path for repo is occupied by a non-directory file: "
-                    local-path)))
-
-       :else
-       (loop [ops [:push-straight :pull]]
-         (cond
-          (= :push-straight (first ops))
-          (if (not= 0 (sh-print "git" "push" peer-repo
-                                "master" :dir local-path))
-            (recur (cons :push (next ops)))
-            (recur (next ops)))
-
-          (= :push (first ops))
-          (do
-            (sh-print "git" "push" peer-repo
-                      (str "master:" remote-track-name) :dir local-path)
-            (recur (next ops)))
-
-          (= :pull (first ops))
-          (do
-            (sh-print "git" "pull" peer-repo "master" :dir local-path)
-            (recur (next ops)))))))
-    self))
 
 (defn -main
   "Starts up hesokuri."
