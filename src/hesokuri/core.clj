@@ -104,6 +104,7 @@ given peers."
                                    :peer-agents peer-agents
                                    :local-identity local-identity})]))]
    (doseq [[_ source-agent] source-agents]
+     (send source-agent advance)
      (send source-agent start-watching))
    (doseq [peer-hostname peer-hostnames
            :let [shared-sources
