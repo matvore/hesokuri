@@ -190,6 +190,6 @@
     (.register watch-dir watcher
                (into-array
                 [StandardWatchEventKinds/ENTRY_CREATE
-                 StandardWatchEventKinds/ENTRY_DELETE]))
+                 StandardWatchEventKinds/ENTRY_MODIFY]))
     (-> start Thread. .start)
     self))
