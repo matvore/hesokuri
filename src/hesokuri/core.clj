@@ -24,7 +24,7 @@
 
 (defn common-sources
   "Returns a list of all items in the sources vector that are on all of the
-given peers."
+  given peers."
   [sources & peer-names]
   (loop [sources (seq sources)
          results []]
