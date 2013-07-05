@@ -108,7 +108,8 @@ given peers."
 
 (defn kuri-heso
   "A very stupid implementation of the syncing process, ported directly from the
-  Elisp prototype. This simply pushes and pulls every repo with the given peer."
+  Elisp prototype. This simply pushes and pulls every repo with the given peer.
+  TODO: delete when using refresh-heso alone is stable enough."
   [{:keys [local-identity sources] :as self}
    peer-name]
   (let [sources (and local-identity
@@ -161,8 +162,8 @@ given peers."
     self))
 
 (defn -main
-  "I don't do a whole lot ... yet."
+  "Starts up hesokuri."
   [& args]
   ;; work around dangerous default behaviour in Clojure
   (alter-var-root #'*read-eval* (constantly false))
-  (println "Hello, World!"))
+  (send heso refresh-heso))
