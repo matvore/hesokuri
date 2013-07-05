@@ -9,7 +9,7 @@
            [java.util Date])
   (:gen-class))
 
-(def heso
+(defonce heso
   (agent {:heartbeats (agent (atom nil))
 
           :config-file
