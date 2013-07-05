@@ -4,7 +4,8 @@
 
 (defn -log [self line]
   (.write self line)
-  (.write "\n")
+  (.write self "\n")
+  (.flush self)
   self)
 
 (defn log [fmt & args]
