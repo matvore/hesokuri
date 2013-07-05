@@ -100,8 +100,6 @@
                        (str canonical-branch-name) :dir source-dir))
            (recur (-refresh self) (seq all-branches))))))))
 
-; TODO: When we get data pushed to us, detect it by monitoring filesystem
-; activity in .git. Then invoke the 'advance' logic below.
 (def advance
   "Checks for local branches that meet the following criteria, and performs
   the given operation, 'advancing' when appropriate.
