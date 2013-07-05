@@ -3,7 +3,8 @@
 (defonce logger (agent *out*))
 
 (defn -log [self line]
-  (.println self line)
+  (.write self line)
+  (.write "\n")
   self)
 
 (defn log [fmt & args]
