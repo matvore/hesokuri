@@ -180,15 +180,16 @@
         self-agent *agent*
         watch-dir (Paths/get (str (:git-dir self))
                              (into-array ["refs" "heads"]))
-        watch-key (.register watch-dir watcher
-                             (into-array
-                              [StandardWatchEventKinds/ENTRY_CREATE
-                               StandardWatchEventKinds/ENTRY_DELETE]))
         start
         (fn []
-          (doseq [event (.pollEvents watch-key)]
-            (send self-agent advance)
-            (send self-agent push-for-all-peers))
-          (recur))]
+          (let [watch-key (.take watcher)]
+            (doseq [event (.pollEvents watch-key)]
+              (send self-agent advance)
+              (send self-agent push-for-all-peers))
+            (if (.reset watch-key) (recur) nil)))]
+    (.register watch-dir watcher
+               (into-array
+                [StandardWatchEventKinds/ENTRY_CREATE
+                 StandardWatchEventKinds/ENTRY_DELETE]))
     (-> start Thread. .start)
     self))

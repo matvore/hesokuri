@@ -39,12 +39,24 @@ given peers."
      :else
      (recur (next sources) results))))
 
+(defn -suspend-heso
+  [{:keys [source-agents heartbeats]}]
+  (doseq [[_ source-agent] source-agents]
+    (send source-agent stop-watching))
+  (send heartbeats stop-heartbeats)
+  nil)
+
+(defn suspend-heso
+  "Stops all background operations if there are any."
+  [{:keys [source-agents heartbeats] :as self}]
+  (-suspend-heso self)
+  self)
+
 (defn refresh-heso
   "Updates heso state based on the user's sources config file and the state of
   the network."
-  [{:keys [source-agents config-file heartbeats]}]
-  (doseq [[_ source-agent] source-agents]
-    (send source-agent stop-watching))
+  [{:keys [source-agents heartbeats config-file] :as old-self}]
+  (-suspend-heso old-self)
   (letmap
    self
    [:keep
@@ -93,7 +105,6 @@ given peers."
                                    :peer-dirs source
                                    :peer-agents peer-agents
                                    :local-identity local-identity})]))]
-   (send heartbeats stop-heartbeats)
    (doseq [[_ source-agent] source-agents]
      (send source-agent start-watching))
    (doseq [peer-hostname peer-hostnames
