@@ -1,6 +1,6 @@
 (ns hesokuri.util
   (:use [clojure.java.shell :only [sh]]
-        [clojure.string :only [trim join]]
+        [clojure.string :only [trim]]
         hesokuri.log))
 
 (defmacro lint-and
