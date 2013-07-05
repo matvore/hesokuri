@@ -13,7 +13,7 @@
       the given branch on the given source. If the current hash of the branch is
       the same as the entry in the map, a push will not be attempted."
   (:use hesokuri.util)
-  (:import (java.net InetAddress UnknownHostException)))
+  (:import (java.net ConnectException InetAddress UnknownHostException)))
 
 (def minimum-retry-interval
   "Minimum number of milliseconds to wait between tries."
@@ -60,7 +60,9 @@
 
      (-> peer-repo :host InetAddress/getByName
          (.isReachable timeout-for-ping)
-         (try (catch UnknownHostException _ false)) not)
+         (try (catch UnknownHostException _ false)
+              ;; ConnectException happens when "Host is down" which is expected.
+              (catch ConnectException _ false)) not)
      (assoc self :last-fail-ping-time current-time)
 
      :else
