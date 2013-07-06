@@ -1,7 +1,7 @@
 (ns hesokuri.util
   (:use [clojure.java.shell :only [sh]]
         [clojure.string :only [trim]]
-        hesokuri.log))
+        [clojure.tools.logging :only [info]]))
 
 (defmacro lint-and
   "Performs a short-circuited logical int-based and. If the first expression is
@@ -29,8 +29,8 @@
   [print-when & args]
   (let [result (apply sh args)]
     (when (print-when result)
-      (log "execute: %s\nstderr:\n%sstdout:\n%s"
-           args (:err result) (:out result)))
+      (info (format "execute: %s\nstderr:\n%sstdout:\n%s"
+                    args (:err result) (:out result))))
     (:exit result)))
 
 (defn sh-print

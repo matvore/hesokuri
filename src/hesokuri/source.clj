@@ -9,7 +9,6 @@
   (:use [clojure.java.shell :only [sh]]
         [clojure.string :only [trim]]
         hesokuri.branch-name
-        hesokuri.log
         hesokuri.peer
         hesokuri.util)
   (:import [java.io File]
