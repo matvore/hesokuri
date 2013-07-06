@@ -1,5 +1,3 @@
-making pointless edit for debugging
-
 (note that design notes appear in reverse-chronological order, each note
 separated by a line of ---)
 
@@ -40,10 +38,6 @@ When we get data pushed to us, detect it by monitoring filesystem activity in
   a canonical branch or FOO is a non-canonical branch, delete the FOO branch.
 
 --------------------------------------------------------------------------------
-Let's use hostnames rather than MAC addresses. Hostnames can be configured by
-the user so are more flexible. Try to avoid reinventing the wheel in regards to
-discoverability of clients, etc.
-
 Clojure seems like a good platform/language - it is a powerful language and has
 all the library support that Java has. Supporting things like notifications and
 running as a service will have to happen with non-JVM libraries and tools, but
