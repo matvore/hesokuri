@@ -99,7 +99,8 @@
                       (sh-print "git" "branch" "-d" branch :dir source-dir))
              (sh-print "git" "branch" "-M" branch
                        (str canonical-branch-name) :dir source-dir))
-           (recur (-refresh self) (seq all-branches))))))))
+           (let [self (-refresh self)]
+             (recur self (seq (:branches self))))))))))
 
 (def advance
   "Checks for local branches that meet the following criteria, and performs
