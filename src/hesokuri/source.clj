@@ -9,6 +9,7 @@
   (:use [clojure.java.shell :only [sh]]
         [clojure.string :only [trim]]
         hesokuri.branch-name
+        hesokuri.log
         hesokuri.peer
         hesokuri.util)
   (:import [java.io File]
@@ -181,7 +182,9 @@
         start
         (fn []
           (let [watch-key (.take watcher)]
+            (log "got a key for %s" (self :source-dir))
             (doseq [event (.pollEvents watch-key)]
+              (log "found a change in %s" (self :source-dir))
               (send self-agent advance)
               (send self-agent push-for-all-peers))
             (if (.reset watch-key) (recur) nil)))]
