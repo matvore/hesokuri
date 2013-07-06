@@ -11,7 +11,8 @@
   (agent {:heartbeats (agent (atom nil))
 
           :config-file
-          (-> (System/getenv) (.get "HOME") (str "/.hesokuri/sources"))}))
+          (or (-> (System/getenv) (.get "HESOCFG"))
+              (-> (System/getenv) (.get "HOME") (str "/.hesocfg")))}))
 
 (defn ips
   "Returns the IP addresses of all network interfaces as a vector of strings."
