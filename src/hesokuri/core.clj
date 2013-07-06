@@ -5,6 +5,7 @@
         hesokuri.peer
         hesokuri.source
         hesokuri.util)
+  (:require [noir.server :as server])
   (:gen-class))
 
 (defonce heso
@@ -13,6 +14,10 @@
           :config-file
           (or (-> (System/getenv) (.get "HESOCFG"))
               (-> (System/getenv) (.get "HOME") (str "/.hesocfg")))}))
+
+;; Port to serve the heso web UI.
+(defonce port
+  (Integer. (get (System/getenv) "HESOPORT" "8080")))
 
 (defn ips
   "Returns the IP addresses of all network interfaces as a vector of strings."
@@ -117,9 +122,12 @@
                      push-for-peer peer-hostname)))))
    self))
 
+(server/load-views-ns 'hesokuri.web)
+
 (defn -main
   "Starts up hesokuri."
   [& args]
   ;; work around dangerous default behaviour in Clojure
   (alter-var-root #'*read-eval* (constantly false))
-  (send heso refresh-heso))
+  (send heso refresh-heso)
+  (server/start port {:mode :dev, :ns 'hesokuri}))

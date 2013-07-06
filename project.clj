@@ -3,5 +3,6 @@
   :url "http://example.com/FIXME"
   :license {:name "TODO"
             :url "http://go/kitteh"}
-  :dependencies [[org.clojure/clojure "1.5.1"]]
+  :dependencies [[org.clojure/clojure "1.5.1"]
+                 [noir "1.3.0-beta3"]]
   :main hesokuri.core)
