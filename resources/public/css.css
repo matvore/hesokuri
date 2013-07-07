@@ -1,3 +1,14 @@
+div#nav-el {
+  border: 1px solid #000;
+  display: inline-block;
+  padding: 5pt;
+  margin: 2pt;
+}
+
+div#nav-el:hover {
+  back-color: #f88;
+}
+
 div#source-map {
   margin-top: 12pt;
   margin-bottom: 12pt;
@@ -5,9 +16,32 @@ div#source-map {
 
 h1 {
   font-size: 14pt;
+  margin-bottom: 2pt;
 }
 
 div#config-file {
   font-size: 12pt;
-  font-weight: bold;
+  font: bold;
+}
+
+div#branch-info {
+  margin-left: 5pt;
+}
+
+div#branch-heading {
+  font-size: 12pt;
+  border-bottom-width: 2pt;
+  border-bottom-style: solid;
+  border-bottom-color: #bbb;
+  margin: 3pt;
+  display: inline-block;
+}
+
+span#branch-hash {
+  font: italic;
+  font-size: 8pt;
+}
+
+table#pushed {
+  margin-bottom: 10pt;
 }

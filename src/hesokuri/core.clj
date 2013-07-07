@@ -56,6 +56,22 @@
   (-suspend-heso self)
   self)
 
+(defn heso-snapshot
+  "Returns a snapshot of heso state, converting agents into their raw values.
+  This is NOT useable as an agent action, but just a regular function."
+  [heso]
+  (-> heso
+      (assoc
+        :source-info
+        (into {} (for [[key agent] (heso :source-agents)]
+                   [key {:branches (@agent :branches)
+                         :errors (agent-errors agent)}]))
+        :peer-info
+        (into {} (for [[key agent] (heso :peer-agents)]
+                   [key (assoc @agent
+                          :errors (agent-errors agent))])))
+      (dissoc :heartbeats :source-agents :peer-agents)))
+
 (defn refresh-heso
   "Updates heso state based on the user's sources config file and the state of
   the network."
@@ -96,7 +112,7 @@
     :omit peer-hostnames (disj all-hostnames local-identity)
 
     ;; Map of peer hostnames to the corresponding peer agent.
-    :omit peer-agents
+    peer-agents
     (into {} (for [hostname peer-hostnames]
                [hostname (agent new-peer)]))
 
