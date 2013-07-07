@@ -3,7 +3,7 @@
   (:use hesokuri.core
         hiccup.page
         [hiccup.util :only [escape-html]]
-        [noir.core :only [defpage defpartial]]
+        [noir.core :only [defpage defpartial render]]
         [ring.util.codec :only [url-decode url-encode]]))
 
 (defpartial -navbar [heso & [url]]
@@ -50,10 +50,14 @@
      [:head [:title (str "errors for " type " " key)]]
      [:body
       (-navbar heso "")
-      [:form {:id "clear-form", :action "/errors/clear", :method "post"}
-       [:input {:type "text", :name "type", :value type, :hidden "true"}]
-       [:input {:type "text", :name "key", :value key, :hidden "true"}]
-       [:a {:href "javascript: document.forms['clear-form'].submit()"} "clear"]]
+      (if (zero? (count errors))
+        [:div#no-errors "no errors"]
+        [:form {:id "clear-form", :action "/errors/clear", :method "post"}
+         [:input {:type "text", :name "type", :value type, :hidden "true"}]
+         [:input {:type "text", :name "key", :value key, :hidden "true"}]
+         [:a
+          {:href "javascript: document.forms['clear-form'].submit()"}
+          "clear"]])
       [:pre
        (for [error errors
                :let [err-string-writer (java.io.StringWriter.)
@@ -63,6 +67,19 @@
            (.println string-printer (apply str (repeat 80 "-")))
            (.flush string-printer)
            [:div#stack-trace (escape-html (.toString err-string-writer))]))]])))
+
+(defpage [:post "/errors/clear"] {:keys [type key]}
+  (let [heso-key
+        (cond
+         (= type "source-info") :source-agents
+         (= type "peer-info") :peer-agents
+         :else (throw (IllegalArgumentException.
+                       (str "Unknown error type: " type))))
+        agent
+        (-> heso deref (get heso-key) (get key))]
+    (when (agent-errors agent)
+      (restart-agent agent @agent))
+    (render "/errors/:type/:key" type key)))
 
 (defpage "/sources" []
   (html5
