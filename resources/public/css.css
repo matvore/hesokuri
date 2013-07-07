@@ -1,3 +1,7 @@
+div#nav {
+  margin-bottom: 10pt;
+}
+
 div#nav-el {
   border: 1px solid #000;
   display: inline-block;
@@ -10,7 +14,7 @@ div#nav-el:hover {
 }
 
 div#source-info-wrapper {
-  display: inline-block;
+  margin-top: 10pt;
 }
 
 div#source-map {
@@ -50,19 +54,27 @@ table#pushed {
   margin-bottom: 10pt;
 }
 
-div#no-errors-wrapper {
-  margin-top: 10pt;
-  margin-left: 20pt;
-  font-size: 8pt;
-  font-style: oblique;
-  vertical-align: top;
+div#source-heading {
+  font-size: 14pt;
+  font-weight: bold;
   display: inline-block;
 }
 
-div#errors-wrapper {
-  margin-top: 10pt;
+div#no-errors {
+  margin-left: 20pt;
+  font-size: 8pt;
+  font-style: oblique;
+  vertical-align: bottom;
+  display: inline-block;
+}
+
+a#error-link {
+  color: #f00;
+}
+
+div#errors {
   margin-left: 20pt;
   display: inline-block;
-  vertical-align: top;
-  color: #800;
+  vertical-align: bottom;
+  display: inline-block;
 }
