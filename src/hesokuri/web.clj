@@ -2,7 +2,7 @@
   "Defines web pages that show and allow manipulation of hesokuri state."
   (:use hesokuri.core
         hiccup.page
-        [noir.core :only [defpage]]))
+        [noir.core :only [defpage defpartial]]))
 
 (defpage "/" []
   (html5
@@ -22,6 +22,13 @@
            (for [[host dir] source]
              (format "%s %s<br>" host dir))])])]))
 
+(defpartial -errors [errs]
+  (html5
+   (cond
+    (-> errs count zero?) [:div#no-errors-wrapper "no errors"]
+    :else
+    [:div#errors-wrapper "errors!"])))
+
 (defpage "/sources" []
   (html5
    (include-css "/css.css")
@@ -33,6 +40,7 @@
       [:div#nav-el "local-identity: " (heso :local-identity)]
       (for [[source-dir source] (heso :source-info)]
         [:div
+        [:div#source-info-wrapper
          [:h1 source-dir]
          (for [[branch hash] (source :branches)]
            [:div#branch-info
@@ -44,7 +52,8 @@
                    :let [pushed ((peer :pushed) [source-dir branch])]]
                [:tr
                 [:td peer-host]
-                [:td (if (= hash pushed) "ok" (or pushed "none"))]])]])])])))
+                [:td (if (= hash pushed) "ok" (or pushed "none"))]])]])]
+         (-errors (source :errors))])])))
 
 (defpage "/peers" []
   (html5

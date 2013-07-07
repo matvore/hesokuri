@@ -9,6 +9,10 @@ div#nav-el:hover {
   back-color: #f88;
 }
 
+div#source-info-wrapper {
+  display: inline-block;
+}
+
 div#source-map {
   margin-top: 12pt;
   margin-bottom: 12pt;
@@ -21,7 +25,7 @@ h1 {
 
 div#config-file {
   font-size: 12pt;
-  font: bold;
+  font-weight: bold;
 }
 
 div#branch-info {
@@ -38,10 +42,27 @@ div#branch-heading {
 }
 
 span#branch-hash {
-  font: italic;
+  font-style: oblique;
   font-size: 8pt;
 }
 
 table#pushed {
   margin-bottom: 10pt;
+}
+
+div#no-errors-wrapper {
+  margin-top: 10pt;
+  margin-left: 20pt;
+  font-size: 8pt;
+  font-style: oblique;
+  vertical-align: top;
+  display: inline-block;
+}
+
+div#errors-wrapper {
+  margin-top: 10pt;
+  margin-left: 20pt;
+  display: inline-block;
+  vertical-align: top;
+  color: #800;
 }
