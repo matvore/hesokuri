@@ -1,6 +1,7 @@
 (ns hesokuri.core
   (:use [clojure.java.shell :only [sh]]
         [clojure.string :only [split trim]]
+        [clojure.tools.logging :only [logf]]
         hesokuri.branch-name
         hesokuri.peer
         hesokuri.source
@@ -133,9 +134,16 @@
                  (common-sources sources local-identity peer-hostname)]]
      (send heartbeats start-heartbeat 300000
            (fn []
-             (doseq [source shared-sources]
-               (send (source-agents (source local-identity))
-                     push-for-peer peer-hostname)))))
+             (doseq [source shared-sources
+                     :let [source-dir (source local-identity)
+                           source-agent (source-agents source-dir)]]
+               (try
+                 (send source-agent push-for-peer peer-hostname)
+                 (catch Exception ex
+                   ;; For some reason, log needs *read-eval* enabled.
+                   (binding [*read-eval* true]
+                     (logf :error ex "Error when pushing %s to %s"
+                           source-dir peer-hostname))))))))
    self))
 
 (server/load-views-ns 'hesokuri.web)
