@@ -2,38 +2,64 @@
   (:use clojure.test
         hesokuri.util))
 
+(defmacro sh-print-tests
+  [with-printed & body]
+  (let [args (gensym)
+        func (gensym)
+        print-when (gensym)
+        result (gensym)
+        return (gensym)
+        stderr (gensym)
+        stdout (gensym)]
+  `(let [~result (atom {})
+
+        ~with-printed
+        (fn [~func ~args]
+          (swap! ~result #(dissoc % :printed :return))
+          (let [~return (apply ~func ~args)]
+            (swap! ~result #(assoc % :return ~return))))]
+     (binding [*sh* #(if (< %1 %2)
+                       {:exit 1 :err "err" :out "out"}
+                       {:exit 0
+                        :err (format "err: %d" (- %1 %2))
+                        :out (format "out: %d" (- %1 %2))})
+
+               *print-for-sh*
+               (fn [~args ~stderr ~stdout]
+                 (swap! ~result #(assoc % :printed {:args ~args
+                                                    :stderr ~stderr
+                                                    :stdout ~stdout})))]
+       ~@body))))
+
 (deftest test-sh-print-when
-  (let [result (atom {})
+  (sh-print-tests
+   with-printed
+   (are [args exp-return exp-stderr exp-stdout]
+        (= (with-printed sh-print-when args)
+           {:return exp-return
+            :printed {:args (rest args)
+                      :stderr exp-stderr
+                      :stdout exp-stdout}})
+        [(constantly true) 5 4] 0 "err: 1" "out: 1"
+        [(constantly true) 5 6] 1 "err" "out"
+        [#(= (:exit %) 0) 1 0] 0 "err: 1" "out: 1"
+        [#(= (:exit %) 1) 0 1] 1 "err" "out")
+   (are [args exp-return]
+        (= (with-printed sh-print-when args) {:return exp-return})
+        [(constantly false) 5 4] 0
+        [(constantly false) 5 6] 1
+        [#(= (:exit %) 0) 0 1] 1
+        [#(= (:exit %) 1) 1 0] 0)))
 
-        -sh-print-when
-        (fn [print-when & args]
-          (swap! result #(dissoc % :printed :return))
-          (let [return (apply sh-print-when print-when args)]
-            (swap! result #(assoc % :return return))))]
-    (binding [*sh* (fn [x y] (if (< x y)
-                               {:exit 1 :err "err" :out "out"}
-                               {:exit 0
-                                :err (format "err: %d" (- x y))
-                                :out (format "out: %d" (- x y))}))
+(deftest test-sh-print
+  (sh-print-tests
+   with-printed
+   (are [args exp-return exp-stderr exp-stdout]
+        (= (with-printed sh-print args)
+           {:return exp-return
+            :printed {:args args
+                      :stderr exp-stderr
+                      :stdout exp-stdout}})
+        [5 4] 0 "err: 1" "out: 1"
+        [5 6] 1 "err" "out")))
 
-              *print-for-sh*
-              (fn [args stderr stdout]
-                (swap! result
-                       #(assoc % :printed
-                               {:args args :stderr stderr :stdout stdout})))]
-      (are [args exp-return exp-stderr exp-stdout]
-           (= (apply -sh-print-when args)
-              {:return exp-return
-               :printed {:args (rest args)
-                         :stderr exp-stderr
-                         :stdout exp-stdout}})
-           [(constantly true) 5 4] 0 "err: 1" "out: 1"
-           [(constantly true) 5 6] 1 "err" "out"
-           [#(= (:exit %) 0) 1 0] 0 "err: 1" "out: 1"
-           [#(= (:exit %) 1) 0 1] 1 "err" "out")
-      (are [args exp-return]
-           (= (apply -sh-print-when args) {:return exp-return})
-           [(constantly false) 5 4] 0
-           [(constantly false) 5 6] 1
-           [#(= (:exit %) 0) 0 1] 1
-           [#(= (:exit %) 1) 1 0] 0))))
