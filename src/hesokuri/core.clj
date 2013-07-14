@@ -106,7 +106,8 @@
     ;; network. Here it is deduced from the vector returned by (identities)
     ;; and the peer-hostnames var.
     local-identity
-    (or (first (for [ip (ips) :when (all-hostnames ip)] ip))
+    (or (get (System/getenv) "HESOHOST")
+        (first (for [ip (ips) :when (all-hostnames ip)] ip))
         (-> "hostname" sh :out trim))
 
     ;; A set of the hostnames of the peers.
