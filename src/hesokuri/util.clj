@@ -3,24 +3,6 @@
         [clojure.string :only [trim]]
         [clojure.tools.logging :only [info]]))
 
-(defmacro lint-and
-  "Performs a short-circuited logical int-based and. If the first expression is
-  0, then the next expression is not evaluated. Returns the last expression
-  evaluated."
-  [x y]
-  (let [x-res (gensym)]
-    `(let [~x-res ~x]
-       (if (= 0 ~x-res) ~x-res ~y))))
-
-(defmacro lint-or
-  "Performs a short-circuited logical int-based or. If the first expression is
-  non-zero, then the next expression is not evaluated. Returns the last
-  expression evaluated."
-  [x y]
-  (let [x-res (gensym)]
-    `(let [~x-res ~x]
-       (if (not= 0 ~x-res) ~x-res ~y))))
-
 (defn sh-print-when
   "Runs the command-line given in args using clojure.java.shell/sh. Returns
   the exit code. If the 'print-when' argument (a function) returns truthy when

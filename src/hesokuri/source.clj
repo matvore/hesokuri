@@ -6,7 +6,7 @@
       peer.
   peer-agents - a map of hostnames to the corresponding peer agent.
   local-identity - the hostname or IP of this system."
-  (:use [clojure.java.shell :only [sh]]
+  (:use [clojure.java.shell :only [with-sh-dir sh]]
         [clojure.string :only [trim]]
         hesokuri.branch-name
         hesokuri.peer
@@ -92,12 +92,12 @@
 
          :else
          (let [branch (str branch)]
-           (if canonical-checked-out
-             (lint-or (sh-print "git" "reset" "--hard" branch
-                                 :dir source-dir)
-                      (sh-print "git" "branch" "-d" branch :dir source-dir))
-             (sh-print "git" "branch" "-M" branch
-                       (str canonical-branch-name) :dir source-dir))
+           (with-sh-dir source-dir
+             (if canonical-checked-out
+               (when (zero? (sh-print "git" "reset" "--hard" branch))
+                 (sh-print "git" "branch" "-d" branch))
+               (sh-print "git" "branch" "-M"
+                         branch (str canonical-branch-name))))
            (let [self (-refresh self)]
              (recur self (seq (:branches self))))))))))
 

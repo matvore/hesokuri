@@ -53,7 +53,7 @@
 
 (defn suspend-heso
   "Stops all background operations if there are any."
-  [{:keys [source-agents heartbeats] :as self}]
+  [self]
   (-suspend-heso self)
   self)
 
