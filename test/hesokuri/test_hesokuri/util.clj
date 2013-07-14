@@ -27,4 +27,13 @@
                :printed {:args (rest args)
                          :stderr exp-stderr
                          :stdout exp-stdout}})
-           [(constantly true) 5 4] 0 "err: 1" "out: 1"))))
+           [(constantly true) 5 4] 0 "err: 1" "out: 1"
+           [(constantly true) 5 6] 1 "err" "out"
+           [#(= (:exit %) 0) 1 0] 0 "err: 1" "out: 1"
+           [#(= (:exit %) 1) 0 1] 1 "err" "out")
+      (are [args exp-return]
+           (= (apply -sh-print-when args) {:return exp-return})
+           [(constantly false) 5 4] 0
+           [(constantly false) 5 6] 1
+           [#(= (:exit %) 0) 0 1] 1
+           [#(= (:exit %) 1) 1 0] 0))))
