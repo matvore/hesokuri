@@ -1,7 +1,13 @@
 (ns hesokuri.util
-  (:use [clojure.java.shell :only [sh]]
-        [clojure.string :only [trim]]
-        [clojure.tools.logging :only [info]]))
+  (:use [clojure.string :only [trim]]
+        clojure.tools.logging)
+  (:require clojure.java.shell))
+
+(defn ^:dynamic *print-for-sh*
+  [args stderr stdout]
+  (infof "execute: %s\nstderr:\n%sstdout:\n%s" args stderr stdout))
+
+(def ^:dynamic *sh* clojure.java.shell/sh)
 
 (defn sh-print-when
   "Runs the command-line given in args using clojure.java.shell/sh. Returns
@@ -9,10 +15,9 @@
   passed the result of sh, it prints out the stderr and stdout of the process to
   this process' stderr and stdout."
   [print-when & args]
-  (let [result (apply sh args)]
+  (let [result (apply *sh* args)]
     (when (print-when result)
-      (info (format "execute: %s\nstderr:\n%sstdout:\n%s"
-                    args (:err result) (:out result))))
+      (*print-for-sh* args (:err result) (:out result)))
     (:exit result)))
 
 (defn sh-print
@@ -24,8 +29,8 @@
   the hashes are the same, returns when-equal."
   [source-dir from-hash to-hash when-equal]
   (if (= from-hash to-hash) when-equal
-      (= from-hash (trim (:out (sh "git" "merge-base"
-                                   from-hash to-hash :dir source-dir))))))
+      (-> (*sh* "git" "merge-base" from-hash to-hash :dir source-dir)
+          :out trim (= from-hash))))
 
 (defrecord PeerRepo [host path]
   Object
