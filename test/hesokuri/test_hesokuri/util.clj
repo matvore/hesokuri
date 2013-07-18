@@ -80,3 +80,10 @@
            "d" "d" (constantly :same) :same
            "d" "e" nil false
            "e" "d" nil true))))
+
+(deftest test-peer-repo
+  (are [host path combined]
+       (= combined (str (->PeerRepo host path)))
+       "foo" "/bar" "ssh://foo/bar"
+       "" "" "ssh://"
+       "foo.bar" "/" "ssh://foo.bar/"))
