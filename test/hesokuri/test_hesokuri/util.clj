@@ -91,7 +91,7 @@
               (boolean (is-ff! :srcdir from-hash to-hash when-equal)))
            "a" "b" nil false
            "b" "a" nil false
-           "d" "d" (constantly :same) :same
+           "d" "d" true true
            "d" "e" nil false
            "e" "d" nil true))))
 
