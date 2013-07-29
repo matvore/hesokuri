@@ -24,13 +24,9 @@
         [clojure.string :only [trim]]
         hesokuri.branch-name
         hesokuri.peer
-        hesokuri.util)
-  (:import [java.io File]
-           [java.nio.file
-            ClosedWatchServiceException
-            FileSystems
-            Paths
-            StandardWatchEventKinds]))
+        hesokuri.util
+        hesokuri.watching)
+  (:import [java.io File]))
 
 (defn -git-init
   "Initializes the repository if it doesn't exist yet."
@@ -181,28 +177,17 @@
 (defn stop-watching
   "Stops watching the file system. If not watching, this is a no-op."
   [{:keys [watcher] :as self}]
-  (when watcher (.close watcher))
+  (when watcher ((watcher :stopper)))
   (dissoc self :watcher))
 
 (defn start-watching
   "Registers paths in this source's repo to be notified of changes so it can
   automatically advance and push"
   [self]
-  (let [watcher (.newWatchService (FileSystems/getDefault))
-        self (-> self stop-watching -git-init -refresh (assoc :watcher watcher))
-        self-agent *agent*
-        watch-dir (Paths/get (str (:git-dir self))
-                             (into-array ["refs" "heads"]))
-        start
-        (fn []
-          (let [watch-key (.take watcher)]
-            (doseq [event (.pollEvents watch-key)]
-              (send self-agent advance)
-              (send self-agent push-for-all-peers))
-            (if (.reset watch-key) (recur) nil)))]
-    (.register watch-dir watcher
-               (into-array
-                [StandardWatchEventKinds/ENTRY_CREATE
-                 StandardWatchEventKinds/ENTRY_MODIFY]))
-    (-> start Thread. .start)
-    self))
+  (let [self-agent *agent*
+        watcher (watcher-for-dir
+                 (File. (:git-dir self) "refs/heads")
+                 (fn [_]
+                   (send self-agent advance)
+                   (send self-agent push-for-all-peers)))]
+    (-> self stop-watching -git-init -refresh (assoc :watcher watcher))))
