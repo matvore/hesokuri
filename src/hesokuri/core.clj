@@ -87,6 +87,23 @@
                           :errors (agent-errors agent))])))
       (dissoc :heartbeats :source-agents :peer-agents)))
 
+(defn push-sources-for-peer
+  "Pushes all sources to the given peer."
+  [{:keys [peer-agents source-agents local-identity sources] :as heso}
+   peer-hostname]
+  (send (peer-agents peer-hostname) reset-fail-ping-time)
+  (doseq [source (common-sources sources local-identity peer-hostname)
+          :let [source-dir (source local-identity)
+                source-agent (source-agents source-dir)]]
+    (try
+      (send source-agent push-for-peer peer-hostname)
+      (catch Exception e
+        ;; For some reason, log needs *read-eval* enabled.
+        (binding [*read-eval* true]
+          (logf :error e "Error when pushing %s to %s"
+                source-dir peer-hostname)))))
+  heso)
+
 (defn refresh-heso
   "Updates heso state based on the user's sources config file and the state of
   the network."
@@ -144,21 +161,10 @@
    (doseq [[_ source-agent] source-agents]
      (send source-agent advance)
      (send source-agent start-watching))
-   (doseq [peer-hostname peer-hostnames
-           :let [shared-sources
-                 (common-sources sources local-identity peer-hostname)]]
+   (doseq [:let [heso-agent *agent*]
+           peer-hostname peer-hostnames]
      (send heartbeats start-heartbeat 300000
-           (fn []
-             (doseq [source shared-sources
-                     :let [source-dir (source local-identity)
-                           source-agent (source-agents source-dir)]]
-               (try
-                 (send source-agent push-for-peer peer-hostname)
-                 (catch Exception ex
-                   ;; For some reason, log needs *read-eval* enabled.
-                   (binding [*read-eval* true]
-                     (logf :error ex "Error when pushing %s to %s"
-                           source-dir peer-hostname))))))))
+           (fn [] (send heso-agent push-sources-for-peer peer-hostname))))
    self))
 
 (server/load-views-ns 'hesokuri.web)

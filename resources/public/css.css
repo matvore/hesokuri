@@ -29,7 +29,7 @@ div#nav-el:hover {
   back-color: #f88;
 }
 
-div#source-info-wrapper {
+div#source-info-wrapper, div#peer-info-wrapper {
   margin-top: 10pt;
 }
 
@@ -70,7 +70,7 @@ table#pushed {
   margin-bottom: 10pt;
 }
 
-div#source-heading {
+div#source-heading, div#peer-heading {
   font-size: 14pt;
   font-weight: bold;
   display: inline-block;
@@ -93,4 +93,14 @@ div#errors {
   display: inline-block;
   vertical-align: bottom;
   display: inline-block;
+}
+
+div#last-fail-ping-time {
+  margin-left: 5pt;
+}
+
+div#last-fail-ping-time a {
+  margin-top: 10pt;
+  font-size: 8pt;
+  font-style: oblique;
 }

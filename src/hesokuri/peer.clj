@@ -42,11 +42,11 @@
   {:last-fail-ping-time 0 :pushed {}})
 
 (defn reset-fail-ping-time
-  "Resets the :last-file-ping-time value so that the next push will always try
+  "Resets the :last-fail-ping-time value so that the next push will always try
   pinging again, which may time out for up to timeout-for-ping millis while
   waiting for a response."
   [self]
-  (assoc self :last-file-ping-time 0))
+  (assoc self :last-fail-ping-time 0))
 
 (defn push
   "Performs a push. Branch name parameters can either be a string or something

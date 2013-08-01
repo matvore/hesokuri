@@ -18,7 +18,10 @@
         hiccup.page
         [hiccup.util :only [escape-html]]
         [noir.core :only [defpage defpartial render]]
-        [ring.util.codec :only [url-decode url-encode]]))
+        [noir.response :only [redirect]]
+        [ring.util.codec :only [url-decode url-encode]])
+  (:import [java.text DateFormat]
+           [java.util Date]))
 
 (defpartial -navbar [heso & [url]]
   (let [link (fn [link-url title]
@@ -125,4 +128,23 @@
    [:head [:title "heso peers"]]
    (let [heso (heso-snapshot @heso)]
      [:body
-      (-navbar heso "/peers")])))
+      (-navbar heso "/peers")
+      (for [[peer-id peer] (heso :peer-info)]
+        [:div#peer-info-wrapper
+         [:div#peer-heading peer-id]
+         (-errors (str "/errors/peer-info/" (url-encode peer-id))
+                  (peer :errors))
+         (when (not (zero? (:last-fail-ping-time peer)))
+           [:div#last-fail-ping-time
+            "Last failed ping time: "
+            (.format (DateFormat/getTimeInstance DateFormat/MEDIUM)
+                     (Date. (:last-fail-ping-time peer)))
+            [:form {:id "push" :action "/peers/push" :method "post"}
+             [:input {:type "text", :name "peer-id",
+                      :value peer-id, :hidden true}]
+             [:a {:href "javascript: document.forms['push'].submit()"}
+              "push now"]]])])])))
+
+(defpage [:post "/peers/push"] {:keys [peer-id]}
+  (send heso push-sources-for-peer peer-id)
+  (redirect "/peers"))
