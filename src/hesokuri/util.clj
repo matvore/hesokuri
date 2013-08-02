@@ -128,3 +128,9 @@
   ([bindings]
      (let [map-name (gensym)]
        `(letmap ~map-name ~bindings ~map-name))))
+
+(defn getenv
+  "Gets the environment variable of the given name. Returns nil if the
+  environment variable of that name does not exist."
+  [variable-name]
+  (.get (System/getenv) variable-name))
