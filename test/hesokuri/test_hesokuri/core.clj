@@ -29,3 +29,22 @@
        {"HESOCFG" "foo"} "foo"
        {"HESOCFG" "foo", "HOME" "should be ignored"} "foo"
        {"HOME" "/home/fbar"} "/home/fbar/.hesocfg"))
+
+(deftest test-common-sources
+  (let [sources-eg
+        [{"peer1" "/peer1/foo"
+          "peer2" "/peer2/foo"}
+         {"peer2" "/peer1/bar"}
+         {"peer1" "/peer1/baz"
+          "peer3" "/peer3/baz"}
+         {"peer1" "/peer1/42"
+          "peer3" "/peer3/42"
+          "peer4" "/peer4/42"}]]
+    (are [sources peer-names source-indexes]
+         (is (= (map sources-eg source-indexes)
+                (apply common-sources sources peer-names)))
+         [] ["peer1"] []
+         [] ["peer1" "peer2"] []
+         sources-eg ["peer1" "peer2"] [0]
+         sources-eg ["peer2"] [0 1]
+         sources-eg ["peer1" "peer3"] [2 3])))
