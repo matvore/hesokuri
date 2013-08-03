@@ -49,16 +49,10 @@
   "Returns a list of all items in the sources vector that are on all of the
   given peers."
   [sources & peer-names]
-  (loop [sources (seq sources)
-         results []]
-    (cond
-     (not sources) results
-
-     (every? #((first sources) %) peer-names)
-     (recur (next sources) (conj results (first sources)))
-
-     :else
-     (recur (next sources) results))))
+  (into []
+        (for [source sources
+              :when (every? source peer-names)]
+          source)))
 
 (defn -suspend-heso
   [{:keys [source-agents heartbeats]}]
