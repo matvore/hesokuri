@@ -13,7 +13,7 @@
 ; limitations under the License.
 
 (ns hesokuri.test-hesokuri.temp
-  (:import [java.io File]))
+  (:import [java.io File FileWriter]))
 
 (defn create-temp-dir
   "Creates a temporary directory and returns a File pointing to its path."
@@ -23,4 +23,14 @@
         (throw (IllegalStateException. (str "Could not delete " path))))
     (or (.mkdir path)
         (throw (IllegalStateException. (str "Could not create temp dir " path))))
+    path))
+
+(defn temp-file-containing
+  "Creates a temporary file containing the given object (converted with str).
+  Returns a java.io.File object containing the path to the file."
+  [contents]
+  (let [path (File/createTempFile "hesokuri-tests" nil)
+        stream (FileWriter. path)]
+    (.write stream (str contents))
+    (.close stream)
     path))

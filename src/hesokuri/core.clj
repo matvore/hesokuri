@@ -67,22 +67,6 @@
   (suspend self)
   self)
 
-(defn heso-snapshot
-  "Returns a snapshot of heso state, converting agents into their raw values.
-  This is NOT useable as an agent action, but just a regular function."
-  [heso]
-  (-> heso
-      (assoc
-        :source-info
-        (into {} (for [[key agent] (heso :source-agents)]
-                   [key {:branches (@agent :branches)
-                         :errors (agent-errors agent)}]))
-        :peer-info
-        (into {} (for [[key agent] (heso :peer-agents)]
-                   [key (assoc @agent
-                          :errors (agent-errors agent))])))
-      (dissoc :heartbeats :source-agents :peer-agents)))
-
 (defn push-sources-for-peer
   "Pushes all sources to the given peer."
   [{:keys [peer-agents source-agents local-identity sources] :as self}
@@ -132,7 +116,7 @@
     ;; network. Here it is deduced from the vector returned by (identities)
     ;; and the peer-hostnames var.
     local-identity
-    (or (get (System/getenv) "HESOHOST")
+    (or (getenv "HESOHOST")
         (first (for [ip (ips) :when (all-hostnames ip)] ip))
         (-> "hostname" sh :out trim))
 
@@ -152,7 +136,23 @@
                [source-dir (agent {:source-dir source-dir
                                    :peer-dirs source
                                    :peer-agents peer-agents
-                                   :local-identity local-identity})]))]
+                                   :local-identity local-identity})]))
+
+    ;; Returns a snapshot of heso state, converting agents into their raw
+    ;; values. This is NOT an agent action, but just a regular function.
+    snapshot
+    (fn []
+      (letmap
+       [:keep [config-file sources local-identity]
+
+        source-info
+        (into {} (for [[key agent] source-agents]
+                   [key {:branches (@agent :branches)
+                         :errors (agent-errors agent)}]))
+        peer-info
+        (into {} (for [[key agent] peer-agents]
+                   [key (assoc @agent
+                          :errors (agent-errors agent))]))]))]
    (doseq [[_ source-agent] source-agents]
      (send source-agent advance)
      (send source-agent start-watching))

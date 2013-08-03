@@ -48,7 +48,7 @@
    (include-css "/css.css")
    [:head [:title "heso main"]]
    [:body
-    (let [heso (heso-snapshot @heso)]
+    (let [heso ((:snapshot @heso))]
       [:div
        (-navbar heso "/")
        [:h1 "config-file"]
@@ -60,7 +60,7 @@
              (format "%s %s<br>" host dir))])])]))
 
 (defpage "/errors/:type/:key" {:keys [type key]}
-  (let [heso (heso-snapshot @heso)
+  (let [heso ((:snapshot @heso))
         errors (get-in heso [(keyword type) key :errors])]
     (html5
      (include-css "/css.css")
@@ -102,7 +102,7 @@
   (html5
    (include-css "/css.css")
    [:head [:title "heso sources"]]
-   (let [heso (heso-snapshot @heso)]
+   (let [heso ((:snapshot @heso))]
      [:body
       (-navbar heso "/sources")
       (for [[source-dir source] (heso :source-info)]
@@ -126,7 +126,7 @@
   (html5
    (include-css "/css.css")
    [:head [:title "heso peers"]]
-   (let [heso (heso-snapshot @heso)]
+   (let [heso ((:snapshot @heso))]
      [:body
       (-navbar heso "/peers")
       (for [[peer-id peer] (heso :peer-info)]
