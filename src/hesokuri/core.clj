@@ -23,12 +23,14 @@
   (:require [noir.server :as server])
   (:gen-class))
 
+(defn- config-file []
+  (or (getenv "HESOCFG")
+      (str (getenv "HOME") "/.hesocfg")))
+
 (defn- make-initial-heso []
   (agent {:heartbeats (agent (atom nil))
 
-          :config-file
-          (or (getenv "HESOCFG")
-              (str (getenv "HOME") "/.hesocfg"))}))
+          :config-file (config-file)}))
 
 (defn- port []
   "Returns the port to serve the heso web UI."

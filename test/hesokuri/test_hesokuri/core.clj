@@ -17,18 +17,21 @@
         hesokuri.core
         hesokuri.util))
 
-(deftest test-make-initial-heso
-  (are [mock-env config-file]
+(deftest test-config-file
+  (are [mock-env expected-config-file]
        (with-redefs [getenv mock-env]
-         (let [heso-1 (deref (#'hesokuri.core/make-initial-heso))
-               heso-2 (deref (#'hesokuri.core/make-initial-heso))]
-           (is (not= (:heartbeats heso-1) (:heartbeats heso-2)))
-           (is (not= (deref (:heartbeats heso-1)) (deref (:heartbeats heso-2))))
-           (is (nil? (deref (deref (:heartbeats heso-1)))))
-           (is (= config-file (:config-file heso-1)))))
+         (is (= expected-config-file
+                (#'hesokuri.core/config-file))))
        {"HESOCFG" "foo"} "foo"
        {"HESOCFG" "foo", "HOME" "should be ignored"} "foo"
        {"HOME" "/home/fbar"} "/home/fbar/.hesocfg"))
+
+(deftest test-make-initial-heso
+  (let [heso-1 (deref (#'hesokuri.core/make-initial-heso))
+        heso-2 (deref (#'hesokuri.core/make-initial-heso))]
+    (is (not= (:heartbeats heso-1) (:heartbeats heso-2)))
+    (is (not= (deref (:heartbeats heso-1)) (deref (:heartbeats heso-2))))
+    (is (nil? (deref (deref (:heartbeats heso-1)))))))
 
 (deftest test-common-sources
   (let [sources-eg
