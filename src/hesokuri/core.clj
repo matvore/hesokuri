@@ -30,13 +30,11 @@
           (or (getenv "HESOCFG")
               (str (getenv "HOME") "/.hesocfg"))}))
 
-(defonce heso (make-initial-heso))
+(defn- port []
+  "Returns the port to serve the heso web UI."
+  (Integer. (or (getenv "HESOPORT") "8080")))
 
-;; Port to serve the heso web UI.
-(defonce port
-  (Integer. (get (System/getenv) "HESOPORT" "8080")))
-
-(defn ips
+(defn- ips
   "Returns the IP addresses of all network interfaces as a vector of strings."
   []
   (into [] (for [i (-> (java.net.NetworkInterface/getNetworkInterfaces)
@@ -45,7 +43,7 @@
                  :when addr]
              (-> addr .getAddress .getHostAddress (split #"%") first))))
 
-(defn common-sources
+(defn- common-sources
   "Returns a list of all items in the sources vector that are on all of the
   given peers."
   [sources & peer-names]
@@ -54,17 +52,19 @@
               :when (every? source peer-names)]
           source)))
 
-(defn -suspend-heso
+(defn- suspend
   [{:keys [source-agents heartbeats]}]
   (doseq [[_ source-agent] source-agents]
     (send source-agent stop-watching))
   (send heartbeats stop-heartbeats)
   nil)
 
+(defonce heso (make-initial-heso))
+
 (defn suspend-heso
   "Stops all background operations if there are any."
   [self]
-  (-suspend-heso self)
+  (suspend self)
   self)
 
 (defn heso-snapshot
@@ -85,7 +85,7 @@
 
 (defn push-sources-for-peer
   "Pushes all sources to the given peer."
-  [{:keys [peer-agents source-agents local-identity sources] :as heso}
+  [{:keys [peer-agents source-agents local-identity sources] :as self}
    peer-hostname]
   (send (peer-agents peer-hostname) reset-fail-ping-time)
   (doseq [source (common-sources sources local-identity peer-hostname)
@@ -98,13 +98,13 @@
         (binding [*read-eval* true]
           (logf :error e "Error when pushing %s to %s"
                 source-dir peer-hostname)))))
-  heso)
+  self)
 
 (defn refresh-heso
   "Updates heso state based on the user's sources config file and the state of
   the network."
   [{:keys [source-agents heartbeats config-file] :as old-self}]
-  (-suspend-heso old-self)
+  (suspend old-self)
   (letmap
    self
    [:keep
@@ -171,4 +171,4 @@
   ;; work around dangerous default behaviour in Clojure
   (alter-var-root #'*read-eval* (constantly false))
   (send heso refresh-heso)
-  (server/start port {:mode :dev, :ns 'hesokuri}))
+  (server/start (port) {:mode :dev, :ns 'hesokuri}))
