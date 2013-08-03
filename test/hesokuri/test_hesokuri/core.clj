@@ -29,9 +29,6 @@
     "peer3" "/peer3/42"
     "peer4" "/peer4/42"}])
 
-(defn disabled-send [& args]
-  (apply list "disabling send" args))
-
 (deftest test-config-file
   (are [mock-env expected-config-file]
        (with-redefs [getenv mock-env]
@@ -41,15 +38,14 @@
        {"HESOCFG" "foo", "HOME" "should be ignored"} "foo"
        {"HOME" "/home/fbar"} "/home/fbar/.hesocfg"))
 
-(deftest test-refresh-heso-make-heartbeats
+(deftest test-new-heso-make-heartbeats
   (let [initial-heartbeats
         (fn []
           (binding [*letmap-omitted-key* ::omitted]
             (with-redefs
               [getenv {"HESOHOST" "peer3"
-                       "HESOCFG" (str (temp-file-containing sources-eg))}
-               send disabled-send]
-              (get-in (refresh-heso :ignored) [::omitted :heartbeats]))))
+                       "HESOCFG" (str (temp-file-containing sources-eg))}]
+              (get-in (#'hesokuri.core/new-heso) [::omitted :heartbeats]))))
         beats-1 (initial-heartbeats)
         beats-2 (initial-heartbeats)]
     (is (not= beats-1 beats-2))
@@ -70,20 +66,19 @@
   (with-redefs
     [getenv {"HESOHOST" "peer3"
              "HESOCFG" (str (temp-file-containing sources-eg))}
-     new-peer {:new-peer nil}
-     send disabled-send]
-    (let [heso (refresh-heso {})]
-      (is (= {:peer-info {"peer1" {:errors nil, :new-peer nil},
-                          "peer2" {:errors nil, :new-peer nil},
-                          "peer4" {:errors nil, :new-peer nil}},
-              :source-info {"/peer3/baz" {:branches nil, :errors nil},
-                            "/peer3/42" {:branches nil, :errors nil}},
-              :config-file (getenv "HESOCFG"),
-              :sources [{"peer1" "/peer1/foo", "peer2" "/peer2/foo"}
-                        {"peer2" "/peer1/bar"}
-                        {"peer1" "/peer1/baz", "peer3" "/peer3/baz"}
-                        {"peer1" "/peer1/42",
-                         "peer3" "/peer3/42",
-                         "peer4" "/peer4/42"}],
-              :local-identity "peer3"}
-             ((heso :snapshot)))))))
+     new-peer {:new-peer nil}]
+    (is (= {:peer-info {"peer1" {:errors nil, :new-peer nil},
+                        "peer2" {:errors nil, :new-peer nil},
+                        "peer4" {:errors nil, :new-peer nil}},
+            :source-info {"/peer3/baz" {:branches nil, :errors nil},
+                          "/peer3/42" {:branches nil, :errors nil}},
+            :config-file (getenv "HESOCFG"),
+            :sources [{"peer1" "/peer1/foo", "peer2" "/peer2/foo"}
+                      {"peer2" "/peer1/bar"}
+                      {"peer1" "/peer1/baz", "peer3" "/peer3/baz"}
+                      {"peer1" "/peer1/42",
+                       "peer3" "/peer3/42",
+                       "peer4" "/peer4/42"}],
+            :active false,
+            :local-identity "peer3"}
+           (((#'hesokuri.core/new-heso) :snapshot))))))

@@ -146,5 +146,5 @@
               "push now"]]])])])))
 
 (defpage [:post "/peers/push"] {:keys [peer-id]}
-  (send heso push-sources-for-peer peer-id)
+  ((heso :push-sources-for-peer) peer-id)
   (redirect "/peers"))
