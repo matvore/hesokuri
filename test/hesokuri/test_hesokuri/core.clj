@@ -42,7 +42,7 @@
           "peer4" "/peer4/42"}]]
     (are [sources peer-names source-indexes]
          (is (= (map sources-eg source-indexes)
-                (apply common-sources sources peer-names)))
+                (apply #'hesokuri.core/common-sources sources peer-names)))
          [] ["peer1"] []
          [] ["peer1" "peer2"] []
          sources-eg ["peer1" "peer2"] [0]
