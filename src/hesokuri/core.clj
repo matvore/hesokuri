@@ -27,9 +27,6 @@
   (or (getenv "HESOCFG")
       (str (getenv "HOME") "/.hesocfg")))
 
-(defn- make-initial-heso []
-  (agent {:heartbeats (agent (atom nil))}))
-
 (defn- port []
   "Returns the port to serve the heso web UI."
   (Integer. (or (getenv "HESOPORT") "8080")))
@@ -52,20 +49,7 @@
               :when (every? source peer-names)]
           source)))
 
-(defn- suspend
-  [{:keys [source-agents heartbeats]}]
-  (doseq [[_ source-agent] source-agents]
-    (send source-agent stop-watching))
-  (send heartbeats stop-heartbeats)
-  nil)
-
-(defonce heso (make-initial-heso))
-
-(defn suspend-heso
-  "Stops all background operations if there are any."
-  [self]
-  (suspend self)
-  self)
+(defonce heso (agent {}))
 
 (defn push-sources-for-peer
   "Pushes all sources to the given peer."
@@ -87,8 +71,7 @@
 (defn refresh-heso
   "Updates heso state based on the user's sources config file and the state of
   the network."
-  [{:keys [heartbeats] :as old-self}]
-  (suspend old-self)
+  [_]
   (letmap
    self
    [;; An object that represents all the heartbeats started by this object.
@@ -96,7 +79,7 @@
     ;; peer) and monitor filesystem changes (one heartbeat). The heartbeats
     ;; are stopped and replaced with new ones whenever the sources are
     ;; reconfigured.
-    :keep heartbeats
+    :omit heartbeats (agent (atom nil))
 
     config-file (config-file)
 
@@ -152,7 +135,16 @@
         peer-info
         (into {} (for [[key agent] peer-agents]
                    [key (assoc @agent
-                          :errors (agent-errors agent))]))]))]
+                          :errors (agent-errors agent))]))]))
+
+    ;; Terminates the automatic operations of this object. For instance,
+    ;; stops watching file systems for changes and pinging peers in the
+    ;; background. After calling this, the heso object becomes inactive
+    ;; and can be discarded.
+    suspend
+    (fn [] (doseq [[_ source-agent] source-agents]
+             (send source-agent stop-watching))
+      (send heartbeats stop-heartbeats))]
    (doseq [[_ source-agent] source-agents]
      (send source-agent advance)
      (send source-agent start-watching))

@@ -29,6 +29,9 @@
     "peer3" "/peer3/42"
     "peer4" "/peer4/42"}])
 
+(defn disabled-send [& args]
+  (apply list "disabling send" args))
+
 (deftest test-config-file
   (are [mock-env expected-config-file]
        (with-redefs [getenv mock-env]
@@ -38,12 +41,20 @@
        {"HESOCFG" "foo", "HOME" "should be ignored"} "foo"
        {"HOME" "/home/fbar"} "/home/fbar/.hesocfg"))
 
-(deftest test-make-initial-heso
-  (let [heso-1 (deref (#'hesokuri.core/make-initial-heso))
-        heso-2 (deref (#'hesokuri.core/make-initial-heso))]
-    (is (not= (:heartbeats heso-1) (:heartbeats heso-2)))
-    (is (not= (deref (:heartbeats heso-1)) (deref (:heartbeats heso-2))))
-    (is (nil? (deref (deref (:heartbeats heso-1)))))))
+(deftest test-refresh-heso-make-heartbeats
+  (let [initial-heartbeats
+        (fn []
+          (binding [*letmap-omitted-key* ::omitted]
+            (with-redefs
+              [getenv {"HESOHOST" "peer3"
+                       "HESOCFG" (str (temp-file-containing sources-eg))}
+               send disabled-send]
+              (get-in (refresh-heso :ignored) [::omitted :heartbeats]))))
+        beats-1 (initial-heartbeats)
+        beats-2 (initial-heartbeats)]
+    (is (not= beats-1 beats-2))
+    (is (not= (deref beats-1) (deref beats-2)))
+    (is (nil? (deref (deref beats-1))))))
 
 (deftest test-common-sources
   (are [sources peer-names source-indexes]
@@ -60,7 +71,7 @@
     [getenv {"HESOHOST" "peer3"
              "HESOCFG" (str (temp-file-containing sources-eg))}
      new-peer {:new-peer nil}
-     send (fn [& rest] (apply list "disabling send" rest))]
+     send disabled-send]
     (let [heso (refresh-heso {})]
       (is (= {:peer-info {"peer1" {:errors nil, :new-peer nil},
                           "peer2" {:errors nil, :new-peer nil},
