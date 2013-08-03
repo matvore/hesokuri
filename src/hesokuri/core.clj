@@ -28,9 +28,7 @@
       (str (getenv "HOME") "/.hesocfg")))
 
 (defn- make-initial-heso []
-  (agent {:heartbeats (agent (atom nil))
-
-          :config-file (config-file)}))
+  (agent {:heartbeats (agent (atom nil))}))
 
 (defn- port []
   "Returns the port to serve the heso web UI."
@@ -105,19 +103,18 @@
 (defn refresh-heso
   "Updates heso state based on the user's sources config file and the state of
   the network."
-  [{:keys [source-agents heartbeats config-file] :as old-self}]
+  [{:keys [heartbeats] :as old-self}]
   (suspend old-self)
   (letmap
    self
-   [:keep
-    [config-file
+   [;; An object that represents all the heartbeats started by this object.
+    ;; Heartbeats are used to push to a peer automatically (one heartbeat per
+    ;; peer) and monitor filesystem changes (one heartbeat). The heartbeats
+    ;; are stopped and replaced with new ones whenever the sources are
+    ;; reconfigured.
+    :keep heartbeats
 
-     ;; An object that represents all the heartbeats started by this object.
-     ;; Heartbeats are used to push to a peer automatically (one heartbeat per
-     ;; peer) and monitor filesystem changes (one heartbeat). The heartbeats
-     ;; are stopped and replaced with new ones whenever the sources are
-     ;; reconfigured.
-     heartbeats]
+    config-file (config-file)
 
     ;; Defines the hesokuri sources. This is the user-configurable settings that
     ;; hesokuri needs to discover sources on the network and how to push and
