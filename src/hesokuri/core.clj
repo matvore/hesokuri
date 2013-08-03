@@ -103,7 +103,7 @@
 (defn refresh-heso
   "Updates heso state based on the user's sources config file and the state of
   the network."
-  [{:keys [source-agents heartbeats config-file] :as old-self}]
+  [{:keys [heartbeats] :as old-self}]
   (suspend old-self)
   (letmap
    self
