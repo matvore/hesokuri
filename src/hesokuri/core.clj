@@ -150,9 +150,9 @@
     (fn [] (send self
       (fn [active]
         (when active
-          ((doseq [[_ source-agent] source-agents]
-             (send source-agent stop-watching))
-           (send heartbeats stop-heartbeats)))
+          (doseq [[_ source-agent] source-agents]
+            (send source-agent stop-watching))
+          (send heartbeats stop-heartbeats))
         false))
       nil)
 
