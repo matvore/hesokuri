@@ -22,12 +22,10 @@
        (with-redefs [getenv mock-env]
          (let [heso-1 (deref (#'hesokuri.core/make-initial-heso))
                heso-2 (deref (#'hesokuri.core/make-initial-heso))]
-           (and
-            (not= (:heartbeats heso-1) (:heartbeats heso-2))
-            (not= (deref (:heartbeats heso-1)) (deref (:heartbeats heso-2)))
-            (nil? (deref (deref (:heartbeats heso-1))))
-            (= config-file (:config-file heso-1))
-            )))
+           (is (not= (:heartbeats heso-1) (:heartbeats heso-2)))
+           (is (not= (deref (:heartbeats heso-1)) (deref (:heartbeats heso-2))))
+           (is (nil? (deref (deref (:heartbeats heso-1)))))
+           (is (= config-file (:config-file heso-1)))))
        {"HESOCFG" "foo"} "foo"
        {"HESOCFG" "foo", "HOME" "should be ignored"} "foo"
        {"HOME" "/home/fbar"} "/home/fbar/.hesocfg"))
