@@ -105,6 +105,25 @@
                                    :peer-agents peer-agents
                                    :local-identity local-identity})]))
 
+    :omit restarter
+    (fn [agent-map]
+      (fn [key]
+        (let [agent (agent-map key)
+              error (agent-error agent)]
+        (when error
+          (restart-agent agent)
+          error))))
+
+    ;; Clears the errors on the peer identified by the given identity.
+    ;; Returns the exception on the error if it was cleared, or returns nil if
+    ;; there was no exception.
+    restart-peer (restarter peer-agents)
+
+    ;; Clears the errors on the source identified by the given identity.
+    ;; Returns the exception on the error if it was cleared, or returns nil if
+    ;; there was no exception.
+    restart-source (restarter source-agents)
+
     ;; Returns a snapshot of heso state, converting agents into their raw
     ;; values. This is NOT an agent action, but just a regular function.
     snapshot

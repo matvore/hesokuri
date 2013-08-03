@@ -48,7 +48,7 @@
    (include-css "/css.css")
    [:head [:title "heso main"]]
    [:body
-    (let [heso ((:snapshot @heso))]
+    (let [heso ((:snapshot heso))]
       [:div
        (-navbar heso "/")
        [:h1 "config-file"]
@@ -60,7 +60,7 @@
              (format "%s %s<br>" host dir))])])]))
 
 (defpage "/errors/:type/:key" {:keys [type key]}
-  (let [heso ((:snapshot @heso))
+  (let [heso ((:snapshot heso))
         errors (get-in heso [(keyword type) key :errors])]
     (html5
      (include-css "/css.css")
@@ -86,23 +86,18 @@
            [:div#stack-trace (escape-html (.toString err-string-writer))]))]])))
 
 (defpage [:post "/errors/clear"] {:keys [type key]}
-  (let [heso-key
-        (cond
-         (= type "source-info") :source-agents
-         (= type "peer-info") :peer-agents
-         :else (throw (IllegalArgumentException.
-                       (str "Unknown error type: " type))))
-        agent
-        (-> heso deref (get heso-key) (get key))]
-    (when (agent-errors agent)
-      (restart-agent agent @agent))
-    (render "/errors/:type/:key" type key)))
+  (-> (case type
+        "source-info" :restart-source
+        "peer-info" :restart-peer)
+      heso
+      key)
+  (redirect "/errors/:type/:key" type key))
 
 (defpage "/sources" []
   (html5
    (include-css "/css.css")
    [:head [:title "heso sources"]]
-   (let [heso ((:snapshot @heso))]
+   (let [heso ((:snapshot heso))]
      [:body
       (-navbar heso "/sources")
       (for [[source-dir source] (heso :source-info)]
@@ -126,7 +121,7 @@
   (html5
    (include-css "/css.css")
    [:head [:title "heso peers"]]
-   (let [heso ((:snapshot @heso))]
+   (let [heso ((:snapshot heso))]
      [:body
       (-navbar heso "/peers")
       (for [[peer-id peer] (heso :peer-info)]
