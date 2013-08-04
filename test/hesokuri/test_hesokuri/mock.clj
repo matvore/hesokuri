@@ -18,7 +18,8 @@
   (let [arg-sets (ref arg-sets)]
     (fn [& args]
       (dosync
-       (let [entry (seq (get @arg-sets args))]
+       (let [args (into [] args)
+             entry (seq (get @arg-sets args))]
          (if entry
            (do
              (alter arg-sets assoc args (next entry))
