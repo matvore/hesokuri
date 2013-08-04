@@ -18,6 +18,20 @@
   (:use hesokuri.util)
   (:import (java.net ConnectException InetAddress UnknownHostException)))
 
+(defn accessible
+  "Checks if the given host is accessible, waiting for the specified timeout for
+  a respose.
+  host - hostname or IP address of host to check
+  timeout - the number of millis to wait for a response"
+  [host timeout]
+  (-> host
+      InetAddress/getByName
+      (.isReachable timeout)
+      (try (catch UnknownHostException _ false)
+           ;; ConnectException happens when "Host is down" which is
+           ;; not "exceptional"
+           (catch ConnectException _ false))))
+
 (defn new-peer
   "Creates a new peer with default values for each entry."
   []
@@ -83,23 +97,16 @@
          ;; name to use."
          tries]
       (send self (fn [{:keys [pushed last-fail-ping-time] :as self}]
-        (let [current-time (System/currentTimeMillis)
+        (let [current-time (current-time-millis)
               pushed-key [local-path branch-name]]
           (cond
-           (or (< (- current-time (or last-fail-ping-time 0))
+           (or (< (- current-time (or last-fail-ping-time
+                                      (- minimum-retry-interval)))
                   minimum-retry-interval)
                (= hash (pushed pushed-key)))
            self
 
-           (-> peer-repo
-               :host
-               InetAddress/getByName
-               (.isReachable timeout-for-ping)
-               (try (catch UnknownHostException _ false)
-                    ;; ConnectException happens when "Host is down" which is
-                    ;; not "exceptional"
-                    (catch ConnectException _ false))
-               not)
+           (not (accessible (:host peer-repo) timeout-for-ping))
            (assoc self :last-fail-ping-time current-time)
 
            :else

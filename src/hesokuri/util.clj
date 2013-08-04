@@ -153,3 +153,8 @@
   environment variable of that name does not exist."
   [variable-name]
   (.get (System/getenv) variable-name))
+
+(defn current-time-millis
+  "Returns the value returned by System/currentTimeMillis"
+  []
+  (System/currentTimeMillis))
