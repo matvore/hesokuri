@@ -16,6 +16,7 @@
   (:use clojure.test
         hesokuri.core
         hesokuri.peer
+        hesokuri.test-hesokuri.mock
         hesokuri.test-hesokuri.temp
         hesokuri.util))
 
@@ -66,19 +67,23 @@
   (with-redefs
     [getenv {"HESOHOST" "peer3"
              "HESOCFG" (str (temp-file-containing sources-eg))}
-     new-peer {:new-peer nil}]
-    (is (= {:peer-info {"peer1" {:errors nil, :new-peer nil},
-                        "peer2" {:errors nil, :new-peer nil},
-                        "peer4" {:errors nil, :new-peer nil}},
-            :source-info {"/peer3/baz" {:branches nil, :errors nil},
-                          "/peer3/42" {:branches nil, :errors nil}},
-            :config-file (getenv "HESOCFG"),
-            :sources [{"peer1" "/peer1/foo", "peer2" "/peer2/foo"}
+     new-peer (mock {[] [{:snapshot (constantly :peer-1)}
+                         {:snapshot (constantly :peer-2)}
+                         {:snapshot (constantly :peer-4)}]})]
+    (is (= {:peer-info {"peer1" :peer-1
+                        "peer2" :peer-2
+                        "peer4" :peer-4}
+            :source-info {"/peer3/baz" {:branches nil, :errors nil}
+                          "/peer3/42" {:branches nil, :errors nil}}
+            :config-file (getenv "HESOCFG")
+            :sources [{"peer1" "/peer1/foo"
+                       "peer2" "/peer2/foo"}
                       {"peer2" "/peer1/bar"}
-                      {"peer1" "/peer1/baz", "peer3" "/peer3/baz"}
-                      {"peer1" "/peer1/42",
-                       "peer3" "/peer3/42",
-                       "peer4" "/peer4/42"}],
-            :active false,
+                      {"peer1" "/peer1/baz"
+                       "peer3" "/peer3/baz"}
+                      {"peer1" "/peer1/42"
+                       "peer3" "/peer3/42"
+                       "peer4" "/peer4/42"}]
+            :active false
             :local-identity "peer3"}
            (((#'hesokuri.core/new-heso) :snapshot))))))
