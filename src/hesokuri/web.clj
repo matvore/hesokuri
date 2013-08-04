@@ -124,20 +124,23 @@
    (let [heso ((:snapshot heso))]
      [:body
       (-navbar heso "/peers")
-      (for [[peer-id peer] (heso :peer-info)]
+      (for [[peer-id peer] (heso :peer-info)
+            :let [form-id (str "push-" peer-id)]]
         [:div#peer-info-wrapper
          [:div#peer-heading peer-id]
          (-errors (str "/errors/peer-info/" (url-encode peer-id))
                   (peer :errors))
-         (when (not (zero? (:last-fail-ping-time peer)))
+         (when (:last-fail-ping-time peer)
            [:div#last-fail-ping-time
             "Last failed ping time: "
             (.format (DateFormat/getTimeInstance DateFormat/MEDIUM)
                      (Date. (:last-fail-ping-time peer)))
-            [:form {:id "push" :action "/peers/push" :method "post"}
+            [:form {:id form-id :action "/peers/push" :method "post"}
              [:input {:type "text", :name "peer-id",
                       :value peer-id, :hidden true}]
-             [:a {:href "javascript: document.forms['push'].submit()"}
+             [:a {:href (str "javascript: document.forms['"
+                             form-id
+                             "'].submit()")}
               "push now"]]])])])))
 
 (defpage [:post "/peers/push"] {:keys [peer-id]}

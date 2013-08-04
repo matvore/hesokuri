@@ -90,10 +90,9 @@
     ;; A set of the hostnames of the peers.
     :omit peer-hostnames (disj all-hostnames local-identity)
 
-    ;; Map of peer hostnames to the corresponding peer agent.
-    :omit peer-agents
-    (into {} (for [hostname peer-hostnames]
-               [hostname (agent new-peer)]))
+    ;; Map of peer hostnames to the corresponding peer object.
+    :omit peers
+    (into {} (map (fn [p] [p (new-peer)]) peer-hostnames))
 
     ;; A map of source-dirs to the corresponding agent.
     :omit source-agents
@@ -102,27 +101,24 @@
                    :when source-dir]
                [source-dir (agent {:source-dir source-dir
                                    :peer-dirs source
-                                   :peer-agents peer-agents
+                                   :peers peers
                                    :local-identity local-identity})]))
-
-    :omit restarter
-    (fn [agent-map]
-      (fn [key]
-        (let [agent (agent-map key)
-              error (agent-error agent)]
-        (when error
-          (restart-agent agent)
-          error))))
 
     ;; Clears the errors on the peer identified by the given identity.
     ;; Returns the exception on the error if it was cleared, or returns nil if
     ;; there was no exception.
-    restart-peer (restarter peer-agents)
+    restart-peer (fn [peer-id] (((peers peer-id) :restart)))
 
     ;; Clears the errors on the source identified by the given identity.
     ;; Returns the exception on the error if it was cleared, or returns nil if
     ;; there was no exception.
-    restart-source (restarter source-agents)
+    restart-source
+    (fn [key]
+        (let [agent (source-agents key)
+              error (agent-error agent)]
+        (when error
+          (restart-agent agent)
+          error)))
 
     ;; Returns a snapshot of heso state, converting agents into their raw
     ;; values. This is NOT an agent action, but just a regular function.
@@ -137,9 +133,8 @@
                    [key {:branches (@agent :branches)
                          :errors (agent-errors agent)}]))
         peer-info
-        (into {} (for [[key agent] peer-agents]
-                   [key (assoc @agent
-                          :errors (agent-errors agent))]))]))
+        (into {} (for [[key peer] peers]
+                   [key ((peer :snapshot))]))]))
 
     ;; Terminates the automatic operations of this object. For instance,
     ;; stops watching file systems for changes and pinging peers in the
@@ -160,7 +155,7 @@
     ;; asynchronously, and this function returns nil.
     push-sources-for-peer
     (fn [peer-hostname]
-      (send (peer-agents peer-hostname) reset-fail-ping-time)
+      (((peers peer-hostname) :reset-last-fail-ping-time))
       (doseq [source (common-sources sources local-identity peer-hostname)
               :let [source-dir (source local-identity)
                     source-agent (source-agents source-dir)]]

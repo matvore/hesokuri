@@ -14,77 +14,110 @@
 
 (ns hesokuri.peer
   "Implementation of the peer object. It optimizes access to a peer by keeping
-  track of what has been successfully pushed to it and when it has last failed
-  to respond to a ping. All intervals are in milliseconds unless otherwise
-  specified.
-  A peer object is a map with the following keys:
-  :last-fail-ping-time
-      The value returned by System/currentTimeMillis when the last test for
-      responsiveness failed.
-  :pushed
-      A map of keys in the form [local-path-to-source branch-name] to sha1 hash
-      strings, which indicate what was most recently pushed to the peer from
-      the given branch on the given source. If the current hash of the branch is
-      the same as the entry in the map, a push will not be attempted."
+  track of what has been successfully pushed to it."
   (:use hesokuri.util)
   (:import (java.net ConnectException InetAddress UnknownHostException)))
 
-(def minimum-retry-interval
-  "Minimum number of milliseconds to wait between tries."
-  (* 5 60 1000))
+(defn new-peer
+  "Creates a new peer with default values for each entry."
+  []
+  (letmap
+   [:omit timeout-for-ping 10000
+    :omit minimum-retry-interval (* 4 60 1000)
 
-(def timeout-for-ping
-  "Number of milliseconds to wait before a ping response."
-  10000)
+    ;; The agent corresponding to this object. Contains the :last-fail-ping-time
+    ;; value and the :pushed map.
+    :omit self (agent {:pushed {}})
 
-(def new-peer
-  "A new peer with default values for each entry."
-  {:last-fail-ping-time 0 :pushed {}})
+    ;; Returns the current state of this peer.
+    snapshot
+    (fn []
+      (letmap
+       [:keep
+        [;; The number of milliseconds to wait before a ping response.
+         timeout-for-ping
 
-(defn reset-fail-ping-time
-  "Resets the :last-fail-ping-time value so that the next push will always try
-  pinging again, which may time out for up to timeout-for-ping millis while
-  waiting for a response."
-  [self]
-  (assoc self :last-fail-ping-time 0))
+         ;; Minimum number of milliseconds to wait between tries.
+         minimum-retry-interval]
 
-(defn push
-  "Performs a push. Branch name parameters can either be a string or something
-  that evaluates to the name of the branch when str is invoked.
+        ;; The last exception that occurred on the peer that wasn't cleared,
+        ;; or nil if there is no error.
+        error (agent-error self)
 
-  local-path - the path to the source to push from on the local machine
-  peer-repo - a hesokuri.util.PeerRepo object that indicates the peer and source
-      to push to.
-  branch-name - the local name of the branch
-  hash - the hash to push (in general, this should be the hash pointed to by
-      branch-name.
-  tries - a sequence of sequences in the form: [branch-name & push-args].
-      'push-args' is a sequence of strings passed as arguments after 'git push'
-      on the command line. 'branch-name' is the destination branch name to use."
-  [{:keys [last-fail-ping-time pushed] :as self}
-   local-path peer-repo
-   branch-name hash
-   tries]
-  (let [current-time (System/currentTimeMillis)
-        pushed-key [local-path branch-name]]
-    (cond
-     (or (< (- current-time last-fail-ping-time) minimum-retry-interval)
-         (= hash (pushed pushed-key)))
-     self
+        :omit self @self
 
-     (-> peer-repo :host InetAddress/getByName
-         (.isReachable timeout-for-ping)
-         (try (catch UnknownHostException _ false)
-              ;; ConnectException happens when "Host is down" which is expected.
-              (catch ConnectException _ false)) not)
-     (assoc self :last-fail-ping-time current-time)
+        ;; A map of keys in the form [local-path-to-source branch-name] to
+        ;; sha1 hash strings, which indicate what was most recently pushed to
+        ;; the peer from the given branch on the given source. If the current
+        ;; hash of the branch is the same as the entry in the map, a push will
+        ;; not be attempted.
+        pushed (self :pushed)
 
-     :else
-     (-> (for [[branch-name & push-args] tries
-               :let [latter-args [(str peer-repo)
-                                  (str hash ":refs/heads/" branch-name)
-                                  :dir local-path]]
-               :when (= 0 (apply sh-print "git" "push"
-                                 `(~@push-args ~@latter-args)))]
-           (assoc-in self [:pushed pushed-key] hash))
-         first (or self)))))
+        ;; The value returned by System/currentTimeMillis when the last test
+        ;; for responsiveness failed. nil if it has never failed before.
+        last-fail-ping-time (self :last-fail-ping-time)]))
+
+    ;; Removes the last-fail-ping-time value so the next push will definitely
+    ;; retry.
+    reset-last-fail-ping-time
+    (fn []
+      (send self #(dissoc % :last-fail-ping-time))
+      nil)
+
+    ;; Performs a push. Branch name parameters can either be a string or
+    ;; something that evaluates to the name of the branch when str is invoked.
+    push
+    (fn [;; the path to the source to push from on the local machine
+         local-path
+         ;; a hesokuri.util.PeerRepo object that indicates the peer and source
+         ;; to push to.
+         peer-repo
+         ;; the local name of the branch
+         branch-name
+         ;; the hash to push (in general, this should be the hash pointed to by
+         ;; branch-name).
+         hash
+         ;; a sequence of sequences in the form: [branch-name & push-args].
+         ;; 'push-args' is a sequence of strings passed as arguments after 'git
+         ;; push' on the command line. 'branch-name' is the destination branch
+         ;; name to use."
+         tries]
+      (send self (fn [{:keys [pushed last-fail-ping-time] :as self}]
+        (let [current-time (System/currentTimeMillis)
+              pushed-key [local-path branch-name]]
+          (cond
+           (or (< (- current-time (or last-fail-ping-time 0))
+                  minimum-retry-interval)
+               (= hash (pushed pushed-key)))
+           self
+
+           (-> peer-repo
+               :host
+               InetAddress/getByName
+               (.isReachable timeout-for-ping)
+               (try (catch UnknownHostException _ false)
+                    ;; ConnectException happens when "Host is down" which is
+                    ;; not "exceptional"
+                    (catch ConnectException _ false))
+               not)
+           (assoc self :last-fail-ping-time current-time)
+
+           :else
+           (-> (for [[branch-name & push-args] tries
+                     :let [latter-args [(str peer-repo)
+                                        (str hash ":refs/heads/" branch-name)
+                                        :dir local-path]]
+                     :when (= 0 (apply sh-print "git" "push"
+                                       `(~@push-args ~@latter-args)))]
+                 (assoc-in self [:pushed pushed-key] hash))
+               first
+               (or self)))))))
+
+    ;; Clears the error on the agent, and returns the Exception for it. If there
+    ;; is no error, this function returns nil.
+    restart
+    (fn []
+      (let [error (agent-error self)]
+        (when error
+          (restart-agent self)
+          error)))]))
