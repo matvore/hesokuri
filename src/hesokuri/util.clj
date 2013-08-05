@@ -158,3 +158,15 @@
   "Returns the value returned by System/currentTimeMillis"
   []
   (System/currentTimeMillis))
+
+(defn maybe
+  "Runs the given function with the given args and returns the same value. If
+  the function throws an exception, logs it and return nil."
+  [description func & args]
+  (try
+    (apply func args)
+    (catch Exception e
+      ;; For some reason, log needs *read-eval* enabled.
+      (binding [*read-eval* true]
+        (error e "Error when:" description))
+      nil)))
