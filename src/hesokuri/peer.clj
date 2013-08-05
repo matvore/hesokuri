@@ -68,7 +68,8 @@
         pushed (self :pushed)
 
         ;; The value returned by System/currentTimeMillis when the last test
-        ;; for responsiveness failed. nil if it has never failed before.
+        ;; for responsiveness failed. nil if it has never failed before, or if
+        ;; the last ping was successful.
         last-fail-ping-time (self :last-fail-ping-time)]))
 
     ;; Removes the last-fail-ping-time value so the next push will definitely
@@ -118,7 +119,8 @@
                                        `(~@push-args ~@latter-args)))]
                  (assoc-in self [:pushed pushed-key] hash))
                first
-               (or self)))))))
+               (or self)
+               (dissoc :last-fail-ping-time)))))))
 
     ;; Clears the error on the agent, and returns the Exception for it. If there
     ;; is no error, this function returns nil.

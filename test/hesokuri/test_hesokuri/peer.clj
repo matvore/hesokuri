@@ -18,36 +18,64 @@
         hesokuri.test-hesokuri.mock
         hesokuri.util))
 
-(def peer-repo-eg (->PeerRepo "repohost" "/repopath"))
+(def ^:dynamic peer-repo (->PeerRepo "repohost" "/repopath"))
 
-(deftest test-retrying-unresponsive-peer
+(def ^:dynamic peer)
+
+(defn new-test-peer []
   (binding [*letmap-omitted-key* ::omitted]
-    (let [peer (new-peer)
-          snapshot (fn [] ((peer :snapshot)))
-          peer-agent (-> peer ::omitted :self)
-          accessible-args [(:host peer-repo-eg) ((snapshot) :timeout-for-ping)]]
-      (with-redefs [accessible (mock {accessible-args [false]})
+    (new-peer)))
 
-                    current-time-millis
-                    (mock {[] [42 43 44 45]})]
-        (doseq [_ (range 4)]
-          ((peer :push)
-           "/local-path" peer-repo-eg "branch-name" "hash" [:try1]))
-        (await-for 3000 peer-agent)
-        (is (= 42 ((snapshot) :last-fail-ping-time))))
-      (with-redefs [accessible (mock {accessible-args [true]})
+(defn peer-agent [] (-> peer ::omitted :self))
 
-                    current-time-millis
-                    (mock {[] [(+ 46 ((snapshot) :minimum-retry-interval))]})
+(defn snapshot [& args]
+  (let [snapshot ((peer :snapshot))]
+    (if args (apply snapshot args) snapshot)))
 
-                    sh-print (constantly 0)]
-        ((peer :push)
-         "/local-path"
-         peer-repo-eg
-         "branch-name"
-         "hash"
-         [["push-branch" :push-arg]])
-        (await-for 3000 peer-agent)
-        (is (nil? (agent-error peer-agent)))
-        (is (= "hash"
-               (((snapshot) :pushed) ["/local-path" "branch-name"])))))))
+(defn push []
+  ((peer :push)
+   "/local-path"
+   peer-repo
+   "branch-name"
+   "hash"
+   [["push-branch" :push-arg]])
+  (await-for 3000 (peer-agent))
+  (is (nil? (agent-error (peer-agent)))))
+
+(defn accessible-args []
+  [(:host peer-repo) (snapshot :timeout-for-ping)])
+
+(defn push-but-fail-ping []
+  (binding [peer (new-test-peer)]
+    (with-redefs [accessible (mock {(accessible-args) [false]})
+                  current-time-millis (mock {[] [42 43 44 45]})]
+      (doseq [_ (range 4)] (push))
+      (is (= 42 (snapshot :last-fail-ping-time))))))
+
+(deftest retrying-unresponsive-peer
+  (binding [*letmap-omitted-key* ::omitted
+            peer (new-test-peer)]
+    (push-but-fail-ping)
+    (with-redefs [accessible (mock {(accessible-args) [true]})
+
+                  current-time-millis
+                  (mock {[] [(+ 46 (snapshot :minimum-retry-interval))]})
+
+                  sh-print (constantly 0)]
+      (push)
+      (is (= "hash"
+             ((snapshot :pushed) ["/local-path" "branch-name"])))
+      (is (nil? (snapshot :last-fail-ping-time))))))
+
+(deftest clear-fail-ping-even-when-failing-push
+  (binding [peer (new-test-peer)]
+    (push-but-fail-ping)
+    (with-redefs [accessible (mock {(accessible-args) [true]})
+
+                  current-time-millis
+                  (mock {[] [(+ 46 (snapshot :minimum-retry-interval))]})
+
+                  sh-print (constantly 1)]
+      (push)
+      (is (= {} (snapshot :pushed)))
+      (is (nil? (snapshot :last-fail-ping-time))))))
