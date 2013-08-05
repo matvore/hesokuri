@@ -15,7 +15,6 @@
 (ns hesokuri.core
   (:use [clojure.java.shell :only [sh]]
         [clojure.string :only [split trim]]
-        [clojure.tools.logging :only [logf]]
         hesokuri.branch-name
         hesokuri.peer
         hesokuri.source
@@ -159,13 +158,8 @@
       (doseq [source (common-sources sources local-identity peer-hostname)
               :let [source-dir (source local-identity)
                     source-agent (source-agents source-dir)]]
-        (try
-          (send source-agent push-for-peer peer-hostname)
-          (catch Exception e
-            ;; For some reason, log needs *read-eval* enabled.
-            (binding [*read-eval* true]
-              (logf :error e "Error when pushing %s to %s"
-                    source-dir peer-hostname)))))
+        (maybe (format "pushing %s to %s" source-dir peer-hostname)
+               send source-agent push-for-peer peer-hostname))
       nil)
 
     ;; Begins the automatic operations of this object asynchronously. This
