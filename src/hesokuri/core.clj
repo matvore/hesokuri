@@ -49,7 +49,7 @@
               :when (every? source peer-names)]
           source)))
 
-(defn- new-heso
+(defn new-heso
   "Creates a heso in the inactive state."
   []
   (letmap

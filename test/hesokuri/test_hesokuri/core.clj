@@ -46,7 +46,7 @@
             (with-redefs
               [getenv {"HESOHOST" "peer3"
                        "HESOCFG" (str (temp-file-containing sources-eg))}]
-              (get-in (#'hesokuri.core/new-heso) [::omitted :heartbeats]))))
+              (get-in (new-heso) [::omitted :heartbeats]))))
         beats-1 (initial-heartbeats)
         beats-2 (initial-heartbeats)]
     (is (not= beats-1 beats-2))
@@ -86,4 +86,4 @@
                        "peer4" "/peer4/42"}]
             :active false
             :local-identity "peer3"}
-           (((#'hesokuri.core/new-heso) :snapshot))))))
+           (((new-heso) :snapshot))))))
