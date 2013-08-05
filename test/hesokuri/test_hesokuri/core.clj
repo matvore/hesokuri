@@ -33,8 +33,7 @@
 (deftest test-config-file
   (are [mock-env expected-config-file]
        (with-redefs [getenv mock-env]
-         (is (= expected-config-file
-                (#'hesokuri.core/config-file))))
+         (is (= expected-config-file (config-file))))
        {"HESOCFG" "foo"} "foo"
        {"HESOCFG" "foo", "HOME" "should be ignored"} "foo"
        {"HOME" "/home/fbar"} "/home/fbar/.hesocfg"))

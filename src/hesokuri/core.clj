@@ -23,7 +23,7 @@
   (:require [noir.server :as server])
   (:gen-class))
 
-(defn- config-file []
+(defn config-file []
   (or (getenv "HESOCFG")
       (str (getenv "HOME") "/.hesocfg")))
 
