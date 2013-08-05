@@ -47,7 +47,7 @@
 
 (defn push-but-fail-ping []
   (binding [peer (new-test-peer)]
-    (with-redefs [accessible (mock {(accessible-args) [false]})
+    (with-redefs [hesokuri.peer/accessible (mock {(accessible-args) [false]})
                   current-time-millis (mock {[] [42 43 44 45]})]
       (doseq [_ (range 4)] (push))
       (is (= 42 (snapshot :last-fail-ping-time))))))
@@ -56,7 +56,7 @@
   (binding [*letmap-omitted-key* ::omitted
             peer (new-test-peer)]
     (push-but-fail-ping)
-    (with-redefs [accessible (mock {(accessible-args) [true]})
+    (with-redefs [hesokuri.peer/accessible (mock {(accessible-args) [true]})
 
                   current-time-millis
                   (mock {[] [(+ 46 (snapshot :minimum-retry-interval))]})
@@ -70,7 +70,7 @@
 (deftest clear-fail-ping-even-when-failing-push
   (binding [peer (new-test-peer)]
     (push-but-fail-ping)
-    (with-redefs [accessible (mock {(accessible-args) [true]})
+    (with-redefs [hesokuri.peer/accessible (mock {(accessible-args) [true]})
 
                   current-time-millis
                   (mock {[] [(+ 46 (snapshot :minimum-retry-interval))]})

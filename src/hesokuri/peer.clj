@@ -18,7 +18,7 @@
   (:use hesokuri.util)
   (:import (java.net ConnectException InetAddress UnknownHostException)))
 
-(defn accessible
+(defn- accessible
   "Checks if the given host is accessible, waiting for the specified timeout for
   a respose.
   host - hostname or IP address of host to check
