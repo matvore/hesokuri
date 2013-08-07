@@ -25,6 +25,28 @@
 
     config-file (config-file)
 
+    :omit dead-heso
+    (letmap
+     [:keep config-file
+      :omit noop (constantly nil)
+
+      sources []
+      local-identity "localhost"
+      restart-peer noop
+      restart-source noop
+
+      snapshot
+      (fn []
+        (letmap
+         [:keep [config-file sources local-identity]
+          active false
+          source-info {}
+          peer-info {}]))
+
+      stop noop
+      push-sources-for-peer noop
+      start noop])
+
     :omit on-change
     (fn [] (send self (fn [{:keys [heso] :as self}]
       (when heso (maybe "Stop heso" (heso :stop)))
@@ -33,9 +55,9 @@
         (when heso ((heso :start)))
         (assoc self :heso heso)))))
 
-    snapshot
-    (fn [] (let [self @self]
-      (if (self :heso) ((heso :snapshot)) {})))
+    ;; Returns the current heso object associated with this object. Returns a
+    ;; default heso object that does nothing if one is not available.
+    heso (fn [] (or (@self :heso) dead-heso))
 
     start
     (fn [] (send self (fn [{:keys [watcher] :as self}]

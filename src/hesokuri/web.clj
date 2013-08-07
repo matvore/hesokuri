@@ -14,14 +14,20 @@
 
 (ns hesokuri.web
   "Defines web pages that show and allow manipulation of hesokuri state."
-  (:use hesokuri.core
-        hiccup.page
+  (:use hiccup.page
         [hiccup.util :only [escape-html]]
         [noir.core :only [defpage defpartial render]]
         [noir.response :only [redirect]]
         [ring.util.codec :only [url-decode url-encode]])
   (:import [java.text DateFormat]
            [java.util Date]))
+
+(defn ^:dynamic *web-heso*
+  "A function that should return the heso object that can be manipulated through
+  the web UI."
+  []
+  (throw (IllegalStateException.
+          "Must set *web-heso* to function that returns heso object.")))
 
 (defpartial -navbar [heso & [url]]
   (let [link (fn [link-url title]
@@ -48,7 +54,7 @@
    (include-css "/css.css")
    [:head [:title "heso main"]]
    [:body
-    (let [heso ((:snapshot heso))]
+    (let [heso ((:snapshot (*web-heso*)))]
       [:div
        (-navbar heso "/")
        [:h1 "config-file"]
@@ -60,7 +66,7 @@
              (format "%s %s<br>" host dir))])])]))
 
 (defpage "/errors/:type/:key" {:keys [type key]}
-  (let [heso ((:snapshot heso))
+  (let [heso ((:snapshot (*web-heso*)))
         errors (get-in heso [(keyword type) key :errors])]
     (html5
      (include-css "/css.css")
@@ -89,7 +95,7 @@
   (-> (case type
         "source-info" :restart-source
         "peer-info" :restart-peer)
-      heso
+      (*web-heso*)
       key)
   (redirect "/errors/:type/:key" type key))
 
@@ -97,7 +103,7 @@
   (html5
    (include-css "/css.css")
    [:head [:title "heso sources"]]
-   (let [heso ((:snapshot heso))]
+   (let [heso ((:snapshot (*web-heso*)))]
      [:body
       (-navbar heso "/sources")
       (for [[source-dir source] (heso :source-info)]
@@ -121,7 +127,7 @@
   (html5
    (include-css "/css.css")
    [:head [:title "heso peers"]]
-   (let [heso ((:snapshot heso))]
+   (let [heso ((:snapshot (*web-heso*)))]
      [:body
       (-navbar heso "/peers")
       (for [[peer-id peer] (heso :peer-info)
@@ -144,5 +150,5 @@
               "push now"]]])])])))
 
 (defpage [:post "/peers/push"] {:keys [peer-id]}
-  ((heso :push-sources-for-peer) peer-id)
+  (((*web-heso*) :push-sources-for-peer) peer-id)
   (redirect "/peers"))
