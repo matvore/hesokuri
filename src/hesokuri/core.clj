@@ -17,8 +17,8 @@
         [clojure.string :only [split trim]]
         hesokuri.branch-name
         hesokuri.peer
-        hesokuri.source
-        hesokuri.util))
+        hesokuri.util)
+  (:require [hesokuri.source :as source]))
 
 (defn config-file []
   (or (getenv "HESOCFG")
@@ -143,7 +143,7 @@
                     (fn [active]
                       (when active
                         (doseq [[_ source-agent] source-agents]
-                          (send source-agent stop-watching))
+                          (send source-agent source/stop-watching))
                         (send heartbeats stop-heartbeats))
                       false))
          nil)
@@ -157,7 +157,7 @@
                  :let [source-dir (source local-identity)
                        source-agent (source-agents source-dir)]]
            (maybe (format "pushing %s to %s" source-dir peer-hostname)
-                  send source-agent push-for-peer peer-hostname))
+                  send source-agent source/push-for-peer peer-hostname))
          nil)
 
        ;; Begins the automatic operations of this object asynchronously. This
@@ -168,8 +168,8 @@
                     (fn [active]
                       (when (not active)
                         (doseq [[_ source-agent] source-agents]
-                          (send source-agent advance)
-                          (send source-agent start-watching))
+                          (send source-agent source/advance)
+                          (send source-agent source/start-watching))
                         (doseq [:let [heso-agent *agent*]
                                 peer-hostname peer-hostnames]
                           (send heartbeats start-heartbeat 300000

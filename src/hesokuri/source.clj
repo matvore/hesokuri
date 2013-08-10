@@ -28,13 +28,13 @@
         hesokuri.watching)
   (:import [java.io File]))
 
-(defn -git-init
+(defn- git-init
   "Initializes the repository if it doesn't exist yet."
   [{:keys [source-dir] :as self}]
   (sh-print-when #(not= 0 (:exit %)) "git" "init" source-dir)
   self)
 
-(defn -refresh
+(defn- refresh
   "Updates all values of the source object based on the value of source-dir,
   which remains the same."
   [{:keys [peer-dirs peers local-identity source-dir] :as self}]
@@ -68,7 +68,7 @@
     (= (trim (slurp (File. git-dir "HEAD")))
        (str "ref: refs/heads/" canonical-branch-name))]))
 
-(defn -advance-b
+(defn- advance-b
   [{:keys [branches source-dir] :as self}]
   (doseq [branch (keys branches)
           :when
@@ -79,7 +79,7 @@
                    "git" "branch" "-d" (str branch) :dir source-dir))
   self)
 
-(defn -advance-a
+(defn- advance-a
   [{all-branches :branches
     :keys [source-dir canonical-checked-out working-area-clean]
     :as self}]
@@ -90,7 +90,7 @@
       (let [canonical-branch (all-branches canonical-branch-name)
             branch (first (first branches))]
         (cond
-         (not branches) (-advance-b self)
+         (not branches) (advance-b self)
 
          (or (not= (:branch canonical-branch-name)
                    (:branch branch))
@@ -108,7 +108,7 @@
                  (sh-print "git" "branch" "-d" branch))
                (sh-print "git" "branch" "-M"
                          branch (str canonical-branch-name))))
-           (let [self (-refresh self)]
+           (let [self (refresh self)]
              (recur self (seq (:branches self))))))))))
 
 (def advance
@@ -120,9 +120,9 @@
      existing hesokuri branch.
   b) For any two branches F and B, where F is a fast-forward of B, and B has a
      name (BRANCH)_hesokr_*, and BRANCH is not hesokuri, delete branch B."
-  #(-> % -git-init -refresh -advance-a))
+  #(-> % git-init refresh advance-a))
 
-(defn -push-for-peer
+(defn- do-push-for-peer
   "Push all branches as necessary to keep a peer up-to-date.
   When pushing:
   * third-party peer branches - which is any branch named *_hesokr_(HOST) where
@@ -158,7 +158,7 @@
 (defn push-for-peer
   "Push all branches necessary to keep one peer up-to-date."
   [self peer-host]
-  (-> self -git-init -refresh (-push-for-peer peer-host)))
+  (-> self git-init refresh (do-push-for-peer peer-host)))
 
 (defn push-for-all-peers
   "Pushes all branches necessary to keep all peers up-to-date."
@@ -187,4 +187,4 @@
                  (fn [_]
                    (send self-agent advance)
                    (send self-agent push-for-all-peers)))]
-    (-> self stop-watching -git-init -refresh (assoc :watcher watcher))))
+    (-> self stop-watching git-init refresh (assoc :watcher watcher))))
