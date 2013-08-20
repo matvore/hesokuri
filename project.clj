@@ -12,9 +12,10 @@
 ; See the License for the specific language governing permissions and
 ; limitations under the License.
 
-(defproject hesokuri "0.1.0-SNAPSHOT"
-  :description "personal distributed backup and duplication system"
-  :url "http://en.wikipedia.org/wiki/Tbd"
+(defproject hesokuri
+  "0.1.0-SNAPSHOT"
+  :description "distributed git repo backup and duplication daemon"
+  :url "https://github.com/google/hesokuri"
   :license {:name "Apache 2.0"
             :url "http://www.apache.org/licenses/LICENSE-2.0"}
   :dependencies [[org.clojure/clojure "1.5.1"]
