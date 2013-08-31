@@ -18,21 +18,14 @@
         hesokuri.test-hesokuri.mock))
 
 (defmacro sh-print-tests
-  [with-printed & body]
-  (let [args (gensym)
-        func (gensym)
-        print-when (gensym)
-        result (gensym)
-        return (gensym)
-        stderr (gensym)
-        stdout (gensym)]
-  `(let [~result (atom {})
+  [& body]
+  `(let [result# (atom {})
 
-        ~with-printed
-        (fn [~func ~args]
-          (swap! ~result #(dissoc % :printed :return))
-          (let [~return (apply ~func ~args)]
-            (swap! ~result #(assoc % :return ~return))))]
+         ~'with-printed
+         (fn [func# args#]
+           (swap! result# #(dissoc % :printed :return))
+           (let [return# (apply func# args#)]
+             (swap! result# #(assoc % :return return#))))]
      (binding [*sh* #(if (< %1 %2)
                        {:exit 1 :err "err" :out "out"}
                        {:exit 0
@@ -40,15 +33,14 @@
                         :out (format "out: %d" (- %1 %2))})
 
                *print-for-sh*
-               (fn [~args ~stderr ~stdout]
-                 (swap! ~result #(assoc % :printed {:args ~args
-                                                    :stderr ~stderr
-                                                    :stdout ~stdout})))]
-       ~@body))))
+               (fn [args# stderr# stdout#]
+                 (swap! result# #(assoc % :printed {:args args#
+                                                    :stderr stderr#
+                                                    :stdout stdout#})))]
+       ~@body)))
 
 (deftest test-sh-print-when
   (sh-print-tests
-   with-printed
    (are [args exp-return exp-stderr exp-stdout]
         (= (with-printed sh-print-when args)
            {:return exp-return
@@ -68,7 +60,6 @@
 
 (deftest test-sh-print
   (sh-print-tests
-   with-printed
    (are [args exp-return exp-stderr exp-stdout]
         (= (with-printed sh-print args)
            {:return exp-return
