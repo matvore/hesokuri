@@ -19,6 +19,41 @@ following situations:
    third-party’s machine or on a traditional cloud storage system.
 6. You want to use existing hardware rather than buy a dedicated backup device.
 
+###What Hesokuri does
+Simply stated, as soon as you commit a change in a repository, Hesokuri attempts
+to push the changes to every peer that holds an instance of the repository in
+the configuration file.
+
+Hesokuri generally pushes commits on local branches to a remote branch called
+`X_hesokr_Y`, where `X` is the local name of the branch and `Y` is the identity
+of the peer (actually, it sometimes tries to push to the branch of the _same_
+name, but this is just a shortcut to bypass what is explained below, so you
+don't have to think about it during normal use).
+
+The rest of this section goes into a lot of detail about Hesokuri behavior. If
+you want, you can skip to the "Getting started" section below.
+
+####Sharing changes from other peers
+For every branch named `X_hesokr_Y`, Hesokuri will try to push it to other peers
+(besides `Y`) using the same branch name. This is useful for sharing changes
+between two peers that are not running at the same time, but are running at the
+same time as a third machine that serves as the carrier.
+
+####The live edit branch
+Most of the time, you will manually merge changes from `X_hesokr_Y` into the
+local branch `X` when you need to access them. However, if `X` is actually
+`hesokuri` (the _live edit_ branch) and it is a fast-forward of the local
+`hesokuri` branch, and the local `hesokuri` branch is either not checked out or
+it is checked out and the working area and index are clean, `hesokuri` will
+automatically be reset to the commit pointed to by `hesokuri_hesokr_Y`. This
+means if `hesokuri` is checked out and there are no uncommitted changes to it,
+your working tree will update automatically when another peer commits changes to
+it. This process is referred to as _advancing_ in the source code.
+
+Notice that some of this behavior should be improved and made more configurable.
+See [issue #1](https://github.com/google/hesokuri/issues/1) and
+[issue #3](https://github.com/google/hesokuri/issues/3) for examples.
+
 ##Getting started
 
 ###Requirements
