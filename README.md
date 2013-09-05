@@ -25,17 +25,16 @@ following situations:
 All machines should have the following. Use earlier versions of each component
 at your own risk.
 
-1. One of:
-   - Leiningen 2.1.3 or higher, and Hesokuri source
-   - Release jar of Hesokuri
-2. Java runtime 1.7 or higher
-3. git version 1.7.10.1 or higher
-4. A Unix-like OS is recommended. Hesokuri is tested on Mac OS X and Linux, but
+1. Hesokuri source
+2. [Leiningen](http://leiningen.org/) 2.1.3 or higher
+3. Java runtime 1.7 or higher
+4. git version 1.7.10.1 or higher
+5. A Unix-like OS is recommended. Hesokuri is tested on Mac OS X and Linux, but
    Windows is worth a try if you are feeling adventurous.
-5. A static hostname or IP address. i.e. you should be able to do `ping FOO`
+6. A static hostname or IP address. i.e. you should be able to do `ping FOO`
    from any machine and get a response, where `FOO` always refers to the same
    machine. This is string is called the _identity_.
-6. Public-key ssh login enabled for each machine. Super-condensed directions
+7. Public-key ssh login enabled for each machine. Super-condensed directions
    which will work for most cases (`CENTRAL` is the identity of some arbitrary
    "central peer"):
    - Enable ssh login on each machine if it is not already
@@ -106,3 +105,30 @@ You can go to <http://localhost:8080> in a web browser on any peer to see the
 status of all sources and last-pushed hashes for each branch and peer. The port
 can be changed from the default of 8080 by setting the environment variable
 `HESOPORT` to the desired port number.
+
+##FAQ
+
+###Where does the name of the project come from?
+
+From the Japanese word meaning "secret cash hoard." It was chosen because this
+tool enables a kind of "hoarding" of data on a personal machine. The name also
+contrasts this practice with the alternative of storing your data on a third
+party server, while the alternative to a hesokuri is storing your money in the
+family bank account.
+
+###Does Hesokuri support synchronizing bare repositories?
+
+Hesokuri is mostly tested with non-bare repositories with their own working
+trees. Bare repositories should also work, assuming they are initialized
+manually with `git init --bare` in the directory specified by the configuration
+file.
+
+###What happens when some peer is unreachable?
+
+Before pushing a branch to a remote peer, Hesokuri makes sure it is responsive
+with [`InetAddress.isReachable`](http://goo.gl/VnJL7o) (essentially a ping). If
+it is not responsive, Hesokuri will not push anything to that peer. Every three
+minutes, Hesokuri attempts a ping and push for every peer that does not have the
+most recent version of a branch regardless of their last failed ping attempt.
+You can also use the web interface to force an immediate push for peers that
+failed their last ping.
