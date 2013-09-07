@@ -21,7 +21,8 @@
         [ring.util.codec :only [url-decode url-encode]])
   (:import [java.text DateFormat]
            [java.util Date])
-  (:require [hesokuri.branch :as branch]))
+  (:require clojure.pprint
+            [hesokuri.branch :as branch]))
 
 (defonce ^:dynamic
   ^{:doc
@@ -42,6 +43,7 @@
      (link "/" "config")
      (link "/peers" "peers")
      (link "/sources" "sources")
+     (link "/dump" "dump")
      [:div#nav-el "local-identity: " (heso :local-identity)]]))
 
 (defpartial -errors [detail-link errs]
@@ -155,3 +157,19 @@
 (defpage [:post "/peers/push"] {:keys [peer-id]}
   (((*web-heso*) :push-sources-for-peer) peer-id)
   (redirect "/peers"))
+
+(defpage "/dump" []
+  (comment
+    "Generates a pretty-printed page containing the snapshot of the entire heso
+    state. Currently, this is only used for debugging, when the normal web UI
+    does not give enough information.")
+  (html5
+   (include-css "/css.css")
+   [:head [:title "heso dump"]]
+   (let [heso ((:snapshot (*web-heso*)))
+         pprint-writer (java.io.StringWriter.)
+         dump-str (do (clojure.pprint/pprint heso pprint-writer)
+                      (.toString pprint-writer))]
+     [:body
+      (-navbar heso "/dump")
+      [:pre dump-str]])))
