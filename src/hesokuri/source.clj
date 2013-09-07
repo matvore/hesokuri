@@ -75,7 +75,8 @@
           (and (not= branch/live-edit-name (:name branch))
                (not (nil? (:peer branch))))]
     (sh-print-when #(= (:exit %) 0)
-                   "git" "branch" "-d" (str branch) :dir source-dir))
+                   "git" "branch" "-d" (branch/underscored-name branch)
+                   :dir source-dir))
   self)
 
 (defn- advance-a
