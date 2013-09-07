@@ -120,10 +120,11 @@
              [:span#branch-hash hash]]
             [:table#pushed
              (for [[peer-host peer] (heso :peer-info)
-                   :let [pushed ((peer :pushed) [source-dir branch])]]
+                   :let [pushed ((peer :pushed) [source-dir branch])]
+                   :when pushed]
                [:tr
                 [:td peer-host]
-                [:td (if (= hash pushed) "ok" (or pushed "none"))]])]])])])))
+                [:td (if (= hash pushed) "ok" pushed)]])]])])])))
 
 (defpage "/peers" []
   (html5
