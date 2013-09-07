@@ -12,22 +12,10 @@
 ; See the License for the specific language governing permissions and
 ; limitations under the License.
 
-(ns hesokuri.branch-name
-  (:use [clojure.string :only [split]]))
+(ns hesokuri.test-hesokuri.branch
+  (:use clojure.test
+        hesokuri.branch))
 
-(defrecord BranchName [branch peer]
-  Object
-  (toString [_]
-    (if peer
-      (str branch "_hesokr_" peer)
-      (str branch))))
-
-(defn parse-branch-name [name]
-  (let [s (split name #"_hesokr_" 2)]
-    (BranchName. (first s) (second s))))
-
-(def canonical-branch-name
-  "This is the name of the only branch that is aggressively synced between
-  clients. This branch has the property that it cannot be deleted, and automatic
-  updates must always be a fast-forward."
-  (BranchName. "hesokuri" nil))
+(deftest test-of
+  (is (= {:name "foo"} (of "foo"))
+      (= {:name "foo" :peer "bar"} (of "foo" "bar"))))

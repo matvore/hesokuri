@@ -22,11 +22,11 @@
   local-identity - the hostname or IP of this system."
   (:use [clojure.java.shell :only [with-sh-dir sh]]
         [clojure.string :only [trim]]
-        hesokuri.branch-name
         hesokuri.peer
         hesokuri.util
         hesokuri.watching)
-  (:import [java.io File]))
+  (:import [java.io File])
+  (:require [hesokuri.branch :as branch]))
 
 (defn- git-init
   "Initializes the repository if it doesn't exist yet."
@@ -48,13 +48,13 @@
       (if (.isDirectory source-dir-git)
         source-dir-git source-dir))
 
-    ;; Map of branch names to their hashes. The branch names should be created
-    ;; by hesokuri.branch-name/->BranchName
+    ;; Map of branch names to their hashes. The branches should be
+    ;; hesokuri.branch objects.
     branches
     (into
      {} (for [head-ref-file (seq (.listFiles (File. git-dir "refs/heads")))
               :let [hash (trim (slurp head-ref-file))]]
-          [(parse-branch-name (.getName head-ref-file)) hash]))
+          [(branch/parse-underscored-name (.getName head-ref-file)) hash]))
 
     ;; true iff there are no untracked files, unstaged changes, or
     ;; uncommitted changes.
@@ -64,16 +64,15 @@
           (and (= 0 (:exit status))
                (= "" (:out status)))))
 
-    canonical-checked-out
+    live-edit-checked-out
     (= (trim (slurp (File. git-dir "HEAD")))
-       (str "ref: refs/heads/" canonical-branch-name))]))
+       (str "ref: refs/heads/" branch/live-edit-name))]))
 
 (defn- advance-b
   [{:keys [branches source-dir] :as self}]
   (doseq [branch (keys branches)
           :when
-          (and (not= (:branch canonical-branch-name)
-                     (:branch branch))
+          (and (not= branch/live-edit-name (:name branch))
                (not (nil? (:peer branch))))]
     (sh-print-when #(= (:exit %) 0)
                    "git" "branch" "-d" (str branch) :dir source-dir))
@@ -81,33 +80,32 @@
 
 (defn- advance-a
   [{all-branches :branches
-    :keys [source-dir canonical-checked-out working-area-clean]
+    :keys [source-dir live-edit-checked-out working-area-clean]
     :as self}]
-  (if (and canonical-checked-out (not working-area-clean))
+  (if (and live-edit-checked-out (not working-area-clean))
     self
     (loop [self self
            branches (seq all-branches)]
-      (let [canonical-branch (all-branches canonical-branch-name)
+      (let [live-edit-branch (all-branches (branch/of branch/live-edit-name))
             branch (first (first branches))]
         (cond
          (not branches) (advance-b self)
 
-         (or (not= (:branch canonical-branch-name)
-                   (:branch branch))
-             (= canonical-branch-name branch)
-             (and canonical-branch
-                  (not (is-ff! source-dir canonical-branch
+         (or (not= branch/live-edit-name (:name branch))
+             (not (:peer branch))
+             (and live-edit-branch
+                  (not (is-ff! source-dir live-edit-branch
                                (second (first branches)) true))))
          (recur self (next branches))
 
          :else
-         (let [branch (str branch)]
+         (let [branch (branch/underscored-name branch)]
            (with-sh-dir source-dir
-             (if canonical-checked-out
+             (if live-edit-checked-out
                (when (zero? (sh-print "git" "reset" "--hard" branch))
                  (sh-print "git" "branch" "-d" branch))
                (sh-print "git" "branch" "-M"
-                         branch (str canonical-branch-name))))
+                         branch branch/live-edit-name)))
            (let [self (refresh self)]
              (recur self (seq (:branches self))))))))))
 
@@ -140,17 +138,20 @@
      (->PeerRepo peer-host (peer-dirs peer-host))
      branch
      (branches branch)
-     (let [force-branch (fn [] (->BranchName (:branch branch) local-identity))]
+     (let [force-args (-> (assoc branch :peer local-identity)
+                          branch/underscored-name
+                          (cons ["-f"]))
+           normal-args (-> branch branch/underscored-name list)]
        (cond
         (every? #(not= (:peer branch) %) [nil local-identity peer-host])
-        [[branch]]
+        [normal-args]
 
-        (= canonical-branch-name branch)
-        [[branch] [(force-branch) "-f"]]
+        (= {:name branch/live-edit-name} branch)
+        [normal-args force-args]
 
-        (and (not= canonical-branch-name branch)
+        (and (not= branch/live-edit-name (:name branch))
              (not (:peer branch)))
-        [[(force-branch) "-f"]]
+        [force-args]
 
         :else []))))
   self)

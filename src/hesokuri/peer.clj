@@ -16,7 +16,8 @@
   "Implementation of the peer object. It optimizes access to a peer by keeping
   track of what has been successfully pushed to it."
   (:use hesokuri.util)
-  (:import (java.net ConnectException InetAddress UnknownHostException)))
+  (:import (java.net ConnectException InetAddress UnknownHostException))
+  (:require [hesokuri.branch :as branch]))
 
 (defn- accessible
   "Checks if the given host is accessible, waiting for the specified timeout for
@@ -60,7 +61,7 @@
 
         :omit self @self
 
-        ;; A map of keys in the form [local-path-to-source branch-name] to
+        ;; A map of keys in the form [local-path-to-source branch] to
         ;; sha1 hash strings, which indicate what was most recently pushed to
         ;; the peer from the given branch on the given source. If the current
         ;; hash of the branch is the same as the entry in the map, a push will
@@ -87,19 +88,19 @@
          ;; a hesokuri.util.PeerRepo object that indicates the peer and source
          ;; to push to.
          peer-repo
-         ;; the local name of the branch
-         branch-name
+         ;; the branch to push
+         push-branch
          ;; the hash to push (in general, this should be the hash pointed to by
-         ;; branch-name).
+         ;; branch).
          hash
-         ;; a sequence of sequences in the form: [branch-name & push-args].
+         ;; a sequence of sequences in the form: [branch & push-args].
          ;; 'push-args' is a sequence of strings passed as arguments after 'git
-         ;; push' on the command line. 'branch-name' is the destination branch
-         ;; name to use."
+         ;; push' on the command line. 'branch' is the destination branch name
+         ;; as a string.
          tries]
       (send self (fn [{:keys [pushed last-fail-ping-time] :as self}]
         (let [current-time (current-time-millis)
-              pushed-key [local-path branch-name]]
+              pushed-key [local-path push-branch]]
           (cond
            (or (< (- current-time (or last-fail-ping-time
                                       (- minimum-retry-interval)))
@@ -111,9 +112,9 @@
            (assoc self :last-fail-ping-time current-time)
 
            :else
-           (-> (for [[branch-name & push-args] tries
+           (-> (for [[branch & push-args] tries
                      :let [latter-args [(str peer-repo)
-                                        (str hash ":refs/heads/" branch-name)
+                                        (str hash ":refs/heads/" branch)
                                         :dir local-path]]
                      :when (= 0 (apply sh-print "git" "push"
                                        `(~@push-args ~@latter-args)))]

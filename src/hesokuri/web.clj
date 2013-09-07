@@ -20,14 +20,16 @@
         [noir.response :only [redirect]]
         [ring.util.codec :only [url-decode url-encode]])
   (:import [java.text DateFormat]
-           [java.util Date]))
+           [java.util Date])
+  (:require [hesokuri.branch :as branch]))
 
-(defn ^:dynamic *web-heso*
-  "A function that should return the heso object that can be manipulated through
-  the web UI."
-  []
-  (throw (IllegalStateException.
-          "Must set *web-heso* to function that returns heso object.")))
+(defonce ^:dynamic
+  ^{:doc
+    "A function that should return the heso object that can be manipulated
+    through the web UI."}
+  *web-heso*
+  (fn [] (throw (IllegalStateException.
+                 "Must set *web-heso* to function that returns heso object."))))
 
 (defpartial -navbar [heso & [url]]
   (let [link (fn [link-url title]
@@ -114,7 +116,7 @@
          (for [[branch hash] (source :branches)]
            [:div#branch-info
             [:div#branch-heading
-             (str branch) " "
+             (branch/underscored-name branch) " "
              [:span#branch-hash hash]]
             [:table#pushed
              (for [[peer-host peer] (heso :peer-info)
