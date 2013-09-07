@@ -15,7 +15,6 @@
 (ns hesokuri.core
   (:use [clojure.java.shell :only [sh]]
         [clojure.string :only [split trim]]
-        hesokuri.branch-name
         hesokuri.peer
         hesokuri.util)
   (:require [hesokuri.source :as source]))
