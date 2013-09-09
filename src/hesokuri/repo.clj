@@ -13,10 +13,10 @@
 ; limitations under the License.
 
 (ns hesokuri.repo
-  "An object with a couple of multimethods that abstract out the access to the
-  git repository. This does not have logic that is specific to Hesokuri, so it
-  can be easily replaced with mock logic for testing or a more performant git
-  access layer (currently it just shells out to 'git' on the command line)."
+  "An object that abstracts out the access to the git repository. This does not
+  have logic that is specific to Hesokuri, so it can be easily replaced with a
+  more performant git access layer later. Currently it just shells out to 'git'
+  on the command line)."
   (:use [clojure.java.io :only [file]]
         [clojure.string :only [trim]]
         hesokuri.util
@@ -37,8 +37,6 @@
   (and (= (count s) 40)
        (every? hex-char? s)))
 
-(defn- type-dispatch [repo & _] (:type repo))
-
 (defn init
   "Returns a repo object that operates through the git command-line tool.
   Automatically initializes the repository if it does not exist."
@@ -47,34 +45,26 @@
     (when (not= 0 (:exit init-result))
       (throw (java.io.IOException.
               (str "Failed to init repo: " init-result)))))
-  {:type ::command-line
-   :dir (file dir)
+  {:dir (file dir)
    :bare (-> (file dir ".git") .isDirectory not)})
 
 (defn- git-dir
   "Returns the git directory (.git) of the repo as a java.io.File object. If it
   is a bare repository, it is equal to the :dir value."
-  [{:keys [type dir bare] :as repo}]
-  {:pre (= type ::command-line)}
+  [{:keys [dir bare] :as repo}]
   (if bare dir (file dir ".git")))
 
-(defmulti working-area-clean
+(defn working-area-clean
   "Returns true if this repo's working area is clean, or it is bare. It is clean
   if there are no untracked files, unstaged changes, or uncommitted changes."
-  type-dispatch)
-
-(defmethod working-area-clean ::command-line
   [{:keys [bare dir]}]
   (or bare
       (let [status (*sh* "git" "status" "--porcelain" :dir dir)]
         (and (= 0 (:exit status))
              (= "" (:out status))))))
 
-(defmulti branches
+(defn branches
   "Returns a map of refs/heads branches to their hashes."
-  type-dispatch)
-
-(defmethod branches ::command-line
   [repo]
   (into {}
    (let [heads-dir (file (git-dir repo) "refs" "heads")
@@ -85,53 +75,38 @@
            :when hash]
        [(.getName head-file) hash]))))
 
-(defmulti checked-out?
+(defn checked-out?
   "Returns true if the given branch is checked out."
-  type-dispatch)
-
-(defmethod checked-out? ::command-line
   [repo branch-name]
   {:pre [(string? branch-name)]}
   (= (trim (slurp (file (git-dir repo) "HEAD")))
      (str "ref: refs/heads/" branch-name)))
 
-(defmulti delete-branch
+(defn delete-branch
   "Deletes the given branch. This method always returns nil. It does not throw
   an exception if the branch delete failed."
-  type-dispatch)
-
-(defmethod delete-branch ::command-line
   [{:keys [dir]} branch-name]
   {:pre [(string? branch-name)]}
   (sh-print-when #(= (:exit %) 0) "git" "branch" "-d" branch-name :dir dir)
   nil)
 
-(defmulti hard-reset
+(defn hard-reset
   "Performs a hard reset to the given ref. Returns 0 for success, non-zero for
   failure."
-  type-dispatch)
-
-(defmethod hard-reset ::command-line
   [{:keys [dir]} ref]
   {:pre [(string? ref)]}
   (sh-print "git" "reset" "--hard" ref :dir dir))
 
-(defmulti rename-branch
+(defn rename-branch
   "Renames the given branch, allowing overwrites if specified. Returns 0 for
   success, non-zero for failure."
-  type-dispatch)
-
-(defmethod rename-branch ::command-line
   [{:keys [dir]} from to allow-overwrite]
   {:pre [(string? from) (string? to)]}
   (sh-print "git" "branch" (if allow-overwrite "-M" "-m") from to :dir dir))
 
-(defmulti fast-forward?
+(defn fast-forward?
   "Returns true iff the second hash is a fast-forward of the first hash. When
   the hashes are the same, returns when-equal."
-  type-dispatch)
-
-(defmethod fast-forward? ::command-line
   [{:keys [dir]} from-hash to-hash when-equal]
   {:pre [(full-hash? from-hash) (full-hash? to-hash)]}
   (if (= from-hash to-hash)
@@ -141,11 +116,8 @@
         trim
         (= from-hash))))
 
-(defmulti push-to-branch
+(defn push-to-branch
   "Performs a push. Returns 0 for success, non-zero for failure."
-  type-dispatch)
-
-(defmethod push-to-branch ::command-line
   [{:keys [dir]} peer-repo local-ref remote-branch allow-non-ff]
   {:pre [(string? peer-repo) (string? local-ref) (string? remote-branch)]}
   (apply sh-print "git" "push" peer-repo
@@ -153,12 +125,9 @@
          (concat (if allow-non-ff ["-f"] [])
                  [:dir dir])))
 
-(defmulti watch-refs-heads-dir
+(defn watch-refs-heads-dir
   "Sets up a watcher for the refs/heads directory and returns an object like
   that returned by hesokuri.watching/watcher-for-dir. on-change is a function
   that takes no arguments and is called when a change is detected."
-  type-dispatch)
-
-(defmethod watch-refs-heads-dir ::command-line
   [repo on-change]
   (watcher-for-dir (file (git-dir repo) "refs" "heads") (fn [_] (on-change))))

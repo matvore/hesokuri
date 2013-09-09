@@ -35,8 +35,7 @@
 
 (defn push []
   ((peer :push)
-   {:type :hesokuri.repo/command-line
-    :dir (file "/local-path")
+   {:dir (file "/local-path")
     :bare false}
    peer-repo
    "branch-name"
