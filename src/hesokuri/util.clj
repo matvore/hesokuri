@@ -38,14 +38,6 @@
   [& args]
   (apply sh-print-when (constantly true) args))
 
-(defn is-ff!
-  "Returns true iff the second hash is a fast-forward of the first hash. When
-  the hashes are the same, returns when-equal."
-  [source-dir from-hash to-hash when-equal]
-  (if (= from-hash to-hash) when-equal
-      (-> (*sh* "git" "merge-base" from-hash to-hash :dir source-dir)
-          :out trim (= from-hash))))
-
 (defrecord PeerRepo [host path]
   Object
   (toString [_]

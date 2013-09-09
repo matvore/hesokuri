@@ -17,7 +17,8 @@
         [clojure.string :only [split trim]]
         hesokuri.peer
         hesokuri.util)
-  (:require [hesokuri.source :as source]))
+  (:require [hesokuri.repo :as repo]
+            [hesokuri.source :as source]))
 
 (defn config-file []
   (or (getenv "HESOCFG")
@@ -94,7 +95,7 @@
        (into {} (for [source sources
                       :let [source-dir (source local-identity)]
                       :when source-dir]
-                  [source-dir (agent {:source-dir source-dir
+                  [source-dir (agent {:repo (repo/init source-dir)
                                       :peer-dirs source
                                       :peers peers
                                       :local-identity local-identity})]))

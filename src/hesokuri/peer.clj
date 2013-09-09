@@ -17,7 +17,8 @@
   track of what has been successfully pushed to it."
   (:use hesokuri.util)
   (:import (java.net ConnectException InetAddress UnknownHostException))
-  (:require [hesokuri.branch :as branch]))
+  (:require [hesokuri.branch :as branch]
+            [hesokuri.repo :as repo]))
 
 (defn- accessible
   "Checks if the given host is accessible, waiting for the specified timeout for
@@ -66,7 +67,9 @@
         ;; the peer from the given branch on the given source. If the current
         ;; hash of the branch is the same as the entry in the map, a push will
         ;; not be attempted.
-        pushed (self :pushed)
+        pushed (into {}
+                     (for [[[{:keys [dir]} branch] hash] (self :pushed)]
+                       [[(.getPath dir) branch] hash]))
 
         ;; The value returned by System/currentTimeMillis when the last test
         ;; for responsiveness failed. nil if it has never failed before, or if
@@ -83,8 +86,9 @@
     ;; Performs a push. Branch name parameters can either be a string or
     ;; something that evaluates to the name of the branch when str is invoked.
     push
-    (fn [;; the path to the source to push from on the local machine
-         local-path
+    (fn [;; hesokuri.repo object representing the source to push from on the
+         ;; local machine
+         local-repo
          ;; a hesokuri.util.PeerRepo object that indicates the peer and source
          ;; to push to.
          peer-repo
@@ -93,14 +97,14 @@
          ;; the hash to push (in general, this should be the hash pointed to by
          ;; branch).
          hash
-         ;; a sequence of sequences in the form: [branch & push-args].
-         ;; 'push-args' is a sequence of strings passed as arguments after 'git
-         ;; push' on the command line. 'branch' is the destination branch name
-         ;; as a string.
+         ;; a sequence of sequences in the form: [branch allow-non-ff].
+         ;; 'branch' is the destination branch name as a string. 'allow-non-ff'
+         ;; indicates whether a non-fast-forward should be allowed in the push
+         ;; Setting this to true is equivalent to passing "-f" to git push.
          tries]
       (send self (fn [{:keys [pushed last-fail-ping-time] :as self}]
         (let [current-time (current-time-millis)
-              pushed-key [local-path push-branch]]
+              pushed-key [local-repo push-branch]]
           (cond
            (or (< (- current-time (or last-fail-ping-time
                                       (- minimum-retry-interval)))
@@ -112,12 +116,12 @@
            (assoc self :last-fail-ping-time current-time)
 
            :else
-           (-> (for [[branch & push-args] tries
-                     :let [latter-args [(str peer-repo)
-                                        (str hash ":refs/heads/" branch)
-                                        :dir local-path]]
-                     :when (= 0 (apply sh-print "git" "push"
-                                       `(~@push-args ~@latter-args)))]
+           (-> (for [try tries
+                     :when (= 0 (apply repo/push-to-branch
+                                       local-repo
+                                       (str peer-repo)
+                                       hash
+                                       try))]
                  (assoc-in self [:pushed pushed-key] hash))
                first
                (or self)

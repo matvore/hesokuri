@@ -13,7 +13,8 @@
 ; limitations under the License.
 
 (ns hesokuri.test-hesokuri.peer
-  (:use clojure.test
+  (:use [clojure.java.io :only [file]]
+        clojure.test
         hesokuri.peer
         hesokuri.test-hesokuri.mock
         hesokuri.util))
@@ -34,7 +35,9 @@
 
 (defn push []
   ((peer :push)
-   "/local-path"
+   {:type :hesokuri.repo/command-line
+    :dir (file "/local-path")
+    :bare false}
    peer-repo
    "branch-name"
    "hash"

@@ -15,73 +15,47 @@
 (ns hesokuri.source
   "Implementation of the source object. A valid source object has the following
   required fields:
-  source-dir - The location of this source on the local disk.
+  repo - The repo object for accessing the repo on disk.
   peer-dirs - a map from peer hostnames to the location of the source on that
       peer.
   peers - a map of hostnames to the corresponding peer object.
   local-identity - the hostname or IP of this system."
-  (:use [clojure.java.shell :only [with-sh-dir sh]]
+  (:use [clojure.java.io :only [file]]
+        [clojure.java.shell :only [with-sh-dir sh]]
         [clojure.string :only [trim]]
         hesokuri.peer
         hesokuri.util
         hesokuri.watching)
-  (:import [java.io File])
-  (:require [hesokuri.branch :as branch]))
-
-(defn- git-init
-  "Initializes the repository if it doesn't exist yet."
-  [{:keys [source-dir] :as self}]
-  (sh-print-when #(not= 0 (:exit %)) "git" "init" source-dir)
-  self)
+  (:require [hesokuri.branch :as branch]
+            [hesokuri.repo :as repo]))
 
 (defn- refresh
-  "Updates all values of the source object based on the value of source-dir,
-  which remains the same."
-  [{:keys [peer-dirs peers local-identity source-dir] :as self}]
-  (letmap
-   [:keep [peer-dirs peers local-identity source-dir]
+  "Updates values of the source object based on the state of the repo."
+  [{:keys [repo] :as self}]
+  (into self
+   (letmap
+    [;; Map of branch names to their hashes. The branches should be
+     ;; hesokuri.branch objects.
+     branches
+     (into {}
+      (map (fn [[branch hash]] [(branch/parse-underscored-name branch) hash])
+           (repo/branches repo)))
 
-    ;; The .git directory of a repository as a java.io.File object, given its
-    ;; parent directory. If it is a bare repository, is equal to :source-dir
-    git-dir
-    (let [source-dir-git (File. source-dir ".git")]
-      (if (.isDirectory source-dir-git)
-        source-dir-git source-dir))
-
-    ;; Map of branch names to their hashes. The branches should be
-    ;; hesokuri.branch objects.
-    branches
-    (into
-     {} (for [head-ref-file (seq (.listFiles (File. git-dir "refs/heads")))
-              :let [hash (trim (slurp head-ref-file))]]
-          [(branch/parse-underscored-name (.getName head-ref-file)) hash]))
-
-    ;; true iff there are no untracked files, unstaged changes, or
-    ;; uncommitted changes.
-    working-area-clean
-    (or (= git-dir source-dir)
-        (let [status (sh "git" "status" "--porcelain" :dir source-dir)]
-          (and (= 0 (:exit status))
-               (= "" (:out status)))))
-
-    live-edit-checked-out
-    (= (trim (slurp (File. git-dir "HEAD")))
-       (str "ref: refs/heads/" branch/live-edit-name))]))
+     working-area-clean (repo/working-area-clean repo)
+     live-edit-checked-out (repo/checked-out? repo branch/live-edit-name)])))
 
 (defn- advance-b
-  [{:keys [branches source-dir] :as self}]
+  [{:keys [branches repo] :as self}]
   (doseq [branch (keys branches)
           :when
           (and (not= branch/live-edit-name (:name branch))
-               (not (nil? (:peer branch))))]
-    (sh-print-when #(= (:exit %) 0)
-                   "git" "branch" "-d" (branch/underscored-name branch)
-                   :dir source-dir))
+               (:peer branch))]
+    (repo/delete-branch repo (branch/underscored-name branch)))
   self)
 
 (defn- advance-a
   [{all-branches :branches
-    :keys [source-dir live-edit-checked-out working-area-clean]
+    :keys [repo live-edit-checked-out working-area-clean]
     :as self}]
   (if (and live-edit-checked-out (not working-area-clean))
     self
@@ -95,18 +69,19 @@
          (or (not= branch/live-edit-name (:name branch))
              (not (:peer branch))
              (and live-edit-branch
-                  (not (is-ff! source-dir live-edit-branch
-                               (second (first branches)) true))))
+                  (not (repo/fast-forward?
+                        repo live-edit-branch (second (first branches)) true))))
          (recur self (next branches))
 
          :else
          (let [branch (branch/underscored-name branch)]
-           (with-sh-dir source-dir
-             (if live-edit-checked-out
-               (when (zero? (sh-print "git" "reset" "--hard" branch))
-                 (sh-print "git" "branch" "-d" branch))
-               (sh-print "git" "branch" "-M"
-                         branch branch/live-edit-name)))
+           (if live-edit-checked-out
+             (when (zero? (repo/hard-reset repo branch))
+               (repo/delete-branch repo branch))
+             (repo/rename-branch repo
+                                 branch
+                                 branch/live-edit-name
+                                 :allow-overwrite))
            (let [self (refresh self)]
              (recur self (seq (:branches self))))))))))
 
@@ -119,7 +94,7 @@
      existing hesokuri branch.
   b) For any two branches F and B, where F is a fast-forward of B, and B has a
      name (BRANCH)_hesokr_*, and BRANCH is not hesokuri, delete branch B."
-  #(-> % git-init refresh advance-a))
+  #(-> % refresh advance-a))
 
 (defn- do-push-for-peer
   "Push all branches as necessary to keep a peer up-to-date.
@@ -131,18 +106,21 @@
     to hesokuri_hesokr_(MY_HOSTNAME).
   * local branch - which is any branch that is not hesokuri and not named in the
     form of *_hesokr_*, force push to (BRANCH_NAME)_hesokr_(MY_HOSTNAME)"
-  [{:keys [peers branches local-identity source-dir peer-dirs] :as self}
+  [{:keys [peers branches local-identity repo peer-dirs] :as self}
    peer-host]
   (doseq [branch (keys branches)]
     (((peers peer-host) :push)
-     source-dir
+     repo
      (->PeerRepo peer-host (peer-dirs peer-host))
      branch
      (branches branch)
-     (let [force-args (-> (assoc branch :peer local-identity)
+     (let [force-args (-> branch
+                          (assoc :peer local-identity)
                           branch/underscored-name
-                          (cons ["-f"]))
-           normal-args (-> branch branch/underscored-name list)]
+                          (cons [:allow-non-ff]))
+           normal-args (-> branch
+                           branch/underscored-name
+                           (cons [(not :allow-non-ff)]))]
        (cond
         (every? #(not= (:peer branch) %) [nil local-identity peer-host])
         [normal-args]
@@ -160,7 +138,7 @@
 (defn push-for-peer
   "Push all branches necessary to keep one peer up-to-date."
   [self peer-host]
-  (-> self git-init refresh (do-push-for-peer peer-host)))
+  (-> self refresh (do-push-for-peer peer-host)))
 
 (defn push-for-all-peers
   "Pushes all branches necessary to keep all peers up-to-date."
@@ -182,11 +160,11 @@
 (defn start-watching
   "Registers paths in this source's repo to be notified of changes so it can
   automatically advance and push"
-  [self]
+  [{:keys [repo] :as self}]
   (let [self-agent *agent*
-        watcher (watcher-for-dir
-                 (File. (:git-dir self) "refs/heads")
-                 (fn [_]
+        watcher (repo/watch-refs-heads-dir
+                 repo
+                 (fn []
                    (send self-agent advance)
                    (send self-agent push-for-all-peers)))]
-    (-> self stop-watching git-init refresh (assoc :watcher watcher))))
+    (-> self stop-watching refresh (assoc :watcher watcher))))

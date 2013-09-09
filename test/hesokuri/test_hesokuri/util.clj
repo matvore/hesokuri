@@ -69,23 +69,6 @@
         [5 4] 0 "err: 1" "out: 1"
         [5 6] 1 "err" "out")))
 
-(deftest test-is-ff
-  (let [sh-result (fn [output] (repeat 10 {:out output :exit 0}))
-        sh (mock {["git" "merge-base" "a" "b" :dir :srcdir] (sh-result "c")
-                  ["git" "merge-base" "b" "a" :dir :srcdir] (sh-result "c")
-                  ["git" "merge-base" "d" "e" :dir :srcdir] (sh-result "e")
-                  ["git" "merge-base" "e" "d" :dir :srcdir] (sh-result "e")
-                  ["git" "merge-base" "f" "g" :dir :srcdir] (sh-result "f")})]
-    (binding [*sh* sh]
-      (are [from-hash to-hash when-equal res]
-           (= (boolean res)
-              (boolean (is-ff! :srcdir from-hash to-hash when-equal)))
-           "a" "b" nil false
-           "b" "a" nil false
-           "d" "d" true true
-           "d" "e" nil false
-           "e" "d" nil true))))
-
 (deftest test-peer-repo
   (are [host path combined]
        (= combined (str (->PeerRepo host path)))
