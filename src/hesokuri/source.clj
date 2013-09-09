@@ -54,36 +54,35 @@
   self)
 
 (defn- advance-a
-  [{all-branches :branches
-    :keys [repo live-edit-checked-out working-area-clean]
-    :as self}]
-  (if (and live-edit-checked-out (not working-area-clean))
-    self
-    (loop [self self
-           branches (seq all-branches)]
-      (let [live-edit-branch (all-branches (branch/of branch/live-edit-name))
-            branch (first (first branches))]
-        (cond
-         (not branches) (advance-b self)
+  ([self]
+     (advance-a self (seq (:branches self))))
+  ([{all-branches :branches
+     :keys [repo live-edit-checked-out working-area-clean]
+     :as self}
+    branches]
+     (let [live-edit-branch (all-branches (branch/of branch/live-edit-name))
+           [[branch hash] & _] branches]
+       (cond
+        (or (not branches)
+            (and live-edit-checked-out (not working-area-clean)))
+        (advance-b self)
 
-         (or (not= branch/live-edit-name (:name branch))
-             (not (:peer branch))
-             (and live-edit-branch
-                  (not (repo/fast-forward?
-                        repo live-edit-branch (second (first branches)) true))))
-         (recur self (next branches))
+        (or (not= branch/live-edit-name (:name branch))
+            (not (:peer branch))
+            (and live-edit-branch
+                 (not (repo/fast-forward? repo live-edit-branch hash true))))
+        (recur self (next branches))
 
-         :else
-         (let [branch (branch/underscored-name branch)]
-           (if live-edit-checked-out
-             (when (zero? (repo/hard-reset repo branch))
-               (repo/delete-branch repo branch))
-             (repo/rename-branch repo
-                                 branch
-                                 branch/live-edit-name
-                                 :allow-overwrite))
-           (let [self (refresh self)]
-             (recur self (seq (:branches self))))))))))
+        :else
+        (let [branch (branch/underscored-name branch)]
+          (if live-edit-checked-out
+            (when (zero? (repo/hard-reset repo branch))
+              (repo/delete-branch repo branch))
+            (repo/rename-branch repo
+                                branch
+                                branch/live-edit-name
+                                :allow-overwrite))
+          (recur (refresh self) (seq all-branches)))))))
 
 (def advance
   "Checks for local branches that meet the following criteria, and performs
