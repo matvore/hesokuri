@@ -13,7 +13,7 @@
 ; limitations under the License.
 
 (defproject hesokuri
-  "1.0.0"
+  "1.0.1"
   :description "distributed git repo backup and duplication daemon"
   :url "https://github.com/google/hesokuri"
   :license {:name "Apache 2.0"
