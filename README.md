@@ -8,7 +8,7 @@ Hesokuri is a daemon utility that synchronizes one or more git source code
 repositories between multiple machines on a network. It is useful in the
 following situations:
 
-1. You want the piece of mind of controlling the machines where your source code
+1. You want the peace of mind of controlling the machines where your source code
    is stored.
 2. You control/own multiple machines and work on the same project on them.
 3. You want changes on one machine to appear on all other machines as soon as
