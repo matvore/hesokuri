@@ -17,6 +17,29 @@
         hesokuri.util
         hesokuri.watching))
 
+(def ^:private noop (constantly nil))
+
+(defn- dead-heso
+  [config-file]
+  {:config-file config-file
+   :sources []
+   :local-identity "localhost"
+   :restart-peer noop
+   :restart-source noop
+
+   :snapshot
+   (fn []
+     {:config-file config-file
+      :sources []
+      :local-identity "localhost"
+      :active false
+      :source-info {}
+      :peer-info {}})
+
+   :stop noop
+   :push-sources-for-peer noop
+   :start noop})
+
 (defn new-updateable-heso
   "Creates a new updateable-heso object."
   []
@@ -24,28 +47,6 @@
    [:omit self (agent {})
 
     config-file (config-file)
-
-    :omit dead-heso
-    (letmap
-     [:keep config-file
-      :omit noop (constantly nil)
-
-      sources []
-      local-identity "localhost"
-      restart-peer noop
-      restart-source noop
-
-      snapshot
-      (fn []
-        (letmap
-         [:keep [config-file sources local-identity]
-          active false
-          source-info {}
-          peer-info {}]))
-
-      stop noop
-      push-sources-for-peer noop
-      start noop])
 
     :omit on-change
     (fn [] (send self (fn [{:keys [heso] :as self}]
@@ -57,14 +58,14 @@
 
     ;; Returns the current heso object associated with this object. Returns a
     ;; default heso object that does nothing if one is not available.
-    heso (fn [] (or (@self :heso) dead-heso))
+    heso (fn [] (or (@self :heso) (dead-heso config-file)))
 
     start
     (fn [] (send self (fn [{:keys [watcher] :as self}]
       (if watcher self
           (do
             (on-change)
-            (letmap [watcher (watcher-for-file config-file on-change)]))))))
+            {:watcher (watcher-for-file config-file on-change)})))))
 
     stop
     (fn [] (send self (fn [{:keys [heso watcher] :as self}]

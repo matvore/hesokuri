@@ -63,16 +63,15 @@
         (is (= :stopped-1 ((*heso* :stop))))))))
 
 (deftest dead-heso-is-reasonable
-  (binding [*letmap-omitted-key* ::omitted]
-    (with-redefs [config-file (constantly *config-file*)]
-      (let [dead-heso (-> (new-updateable-heso) ::omitted :dead-heso)
+  (with-redefs [config-file (constantly *config-file*)]
+    (let [dead-heso (#'hesokuri.updateable-heso/dead-heso *config-file*)
 
-            check-properties
-            (fn [object]
-              (is (= [[] "localhost" *config-file*]
-               (map #(get object %)
-                    [:sources :local-identity :config-file]))))]
-        (check-properties dead-heso)
-        (check-properties ((dead-heso :snapshot)))
-        (is (get dead-heso :start))
-        (is (get dead-heso :stop))))))
+          check-properties
+          (fn [object]
+            (is (= [[] "localhost" *config-file*]
+                   (map #(get object %)
+                        [:sources :local-identity :config-file]))))]
+      (check-properties dead-heso)
+      (check-properties ((dead-heso :snapshot)))
+      (is (get dead-heso :start))
+      (is (get dead-heso :stop)))))
