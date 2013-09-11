@@ -13,62 +13,31 @@
 ; limitations under the License.
 
 (ns hesokuri.updateable-heso
-  (:use hesokuri.core
-        hesokuri.util
-        hesokuri.watching))
+  (:use hesokuri.util
+        hesokuri.watching)
+  (:require [hesokuri.heso :as heso]))
 
-(def ^:private noop (constantly nil))
-
-(defn- dead-heso
+(defn with-config-file
+  "Creates a new updateable-heso object with the given config-file, which
+  specifies the path of the file from which to read the heso configuration."
   [config-file]
   {:config-file config-file
-   :sources []
-   :local-identity "localhost"
-   :restart-peer noop
-   :restart-source noop
+   :heso (agent (heso/with-sources []))})
 
-   :snapshot
-   (fn []
-     {:config-file config-file
-      :sources []
-      :local-identity "localhost"
-      :active false
-      :source-info {}
-      :peer-info {}})
+(defn start-autoupdate
+  "Begins autoupdate, which uses a watcher object to monitor changes in the
+  config file. This call is idempotent. Returns the new state of the
+  updateable-heso object."
+  [{:keys [heso config-file watcher] :as self}]
+  (if watcher
+    self
+    (let [on-change
+          (fn [] (send heso heso/update-from-config-file config-file))]
+      (assoc self :watcher (watcher-for-file config-file on-change)))))
 
-   :stop noop
-   :push-sources-for-peer noop
-   :start noop})
-
-(defn new-updateable-heso
-  "Creates a new updateable-heso object."
-  []
-  (letmap
-   [:omit self (agent {})
-
-    config-file (config-file)
-
-    :omit on-change
-    (fn [] (send self (fn [{:keys [heso] :as self}]
-      (when heso (maybe "Stop heso" (heso :stop)))
-      (let [heso (maybe (str "Create new heso from " config-file)
-                        new-heso config-file)]
-        (when heso ((heso :start)))
-        (assoc self :heso heso)))))
-
-    ;; Returns the current heso object associated with this object. Returns a
-    ;; default heso object that does nothing if one is not available.
-    heso (fn [] (or (@self :heso) (dead-heso config-file)))
-
-    start
-    (fn [] (send self (fn [{:keys [watcher] :as self}]
-      (if watcher self
-          (do
-            (on-change)
-            {:watcher (watcher-for-file config-file on-change)})))))
-
-    stop
-    (fn [] (send self (fn [{:keys [heso watcher] :as self}]
-      (when heso ((heso :stop)))
-      (when watcher ((watcher :stopper)))
-      {})))]))
+(defn stop-autoupdate
+  "Stops autoupdate if it is currently started. Returns the new state of the
+  updateable-heso object."
+  [{:keys [watcher] :as self}]
+  (when watcher ((watcher :stopper)))
+  (dissoc self :watcher))

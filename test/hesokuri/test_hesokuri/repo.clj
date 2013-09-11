@@ -19,7 +19,7 @@
         hesokuri.util))
 
 (defn ff? [src-dir from-hash to-hash when-equal]
-  (fast-forward? {:dir src-dir :bare false}
+  (fast-forward? {:dir src-dir :bare false :init true}
                  from-hash
                  to-hash
                  when-equal))

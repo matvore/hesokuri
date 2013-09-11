@@ -23,10 +23,10 @@
   (:use [clojure.java.io :only [file]]
         [clojure.java.shell :only [with-sh-dir sh]]
         [clojure.string :only [trim]]
-        hesokuri.peer
         hesokuri.util
         hesokuri.watching)
   (:require [hesokuri.branch :as branch]
+            [hesokuri.peer :as peer]
             [hesokuri.repo :as repo]))
 
 (defn- refresh
@@ -84,6 +84,12 @@
                                 :allow-overwrite))
           (recur (refresh self) (seq all-branches)))))))
 
+(defn init-repo
+  "Initializes the git repo if it does not exist already. Returns the new state
+  of the source object."
+  [{:keys [repo] :as self}]
+  (assoc self :repo (repo/init repo)))
+
 (def advance
   "Checks for local branches that meet the following criteria, and performs
   the given operation, 'advancing' when appropriate.
@@ -108,7 +114,9 @@
   [{:keys [peers branches local-identity repo peer-dirs] :as self}
    peer-host]
   (doseq [branch (keys branches)]
-    (((peers peer-host) :push)
+    (send-off
+     (peers peer-host)
+     peer/push
      repo
      (->PeerRepo peer-host (peer-dirs peer-host))
      branch

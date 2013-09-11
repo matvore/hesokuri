@@ -14,7 +14,9 @@
 
 (ns hesokuri.web
   "Defines web pages that show and allow manipulation of hesokuri state."
-  (:use hiccup.page
+  (:use [clojure.java.io :only [file]]
+        hesokuri.util
+        hiccup.page
         [hiccup.util :only [escape-html]]
         [noir.core :only [defpage defpartial render]]
         [noir.response :only [redirect]]
@@ -22,15 +24,13 @@
   (:import [java.text DateFormat]
            [java.util Date])
   (:require clojure.pprint
-            [hesokuri.branch :as branch]))
+            [hesokuri.branch :as branch]
+            [hesokuri.heso :as heso]))
 
 (defonce ^:dynamic
-  ^{:doc
-    "A function that should return the heso object that can be manipulated
-    through the web UI."}
+  ^{:doc "The heso agent that should be shown in the web UI."}
   *web-heso*
-  (fn [] (throw (IllegalStateException.
-                 "Must set *web-heso* to function that returns heso object."))))
+  "Must set *web-heso* to heso agent.")
 
 (defpartial -navbar [heso & [url]]
   (let [link (fn [link-url title]
@@ -46,23 +46,24 @@
      (link "/dump" "dump")
      [:div#nav-el "local-identity: " (heso :local-identity)]]))
 
-(defpartial -errors [detail-link errs]
+(defpartial -errors [detail-link error]
   (html5
    (cond
-    (-> errs count zero?) [:div#no-errors "no errors"]
+    (nil? error) [:div#no-errors "no errors"]
     :else
-    [:div#errors [:a#error-link {:href detail-link} "errors!"]])))
+    [:div#errors [:a#error-link
+                  {:href detail-link}
+                  (-> error class .getName)]])))
 
 (defpage "/" []
   (html5
    (include-css "/css.css")
    [:head [:title "heso main"]]
    [:body
-    (let [heso ((:snapshot (*web-heso*)))]
+    (let [heso @*web-heso*]
       [:div
        (-navbar heso "/")
        [:h1 "config-file"]
-       [:div#config-file (heso :config-file)]
        (for [source-index (-> :sources heso count range)
              :let [source ((heso :sources) source-index)]]
          [:div#source-map
@@ -70,59 +71,57 @@
              (format "%s %s<br>" host dir))])])]))
 
 (defpage "/errors/:type/:key" {:keys [type key]}
-  (let [heso ((:snapshot (*web-heso*)))
-        errors (get-in heso [(keyword type) key :errors])]
+  (let [heso @*web-heso*
+        error (-> heso ((keyword type)) (get (str key)) agent-error)]
     (html5
      (include-css "/css.css")
      [:head [:title (str "errors for " type " " key)]]
      [:body
       (-navbar heso "")
-      (if (zero? (count errors))
+      (if (not error)
         [:div#no-errors "no errors"]
-        [:form {:id "clear-form", :action "/errors/clear", :method "post"}
-         [:input {:type "text", :name "type", :value type, :hidden "true"}]
-         [:input {:type "text", :name "key", :value key, :hidden "true"}]
-         [:a
-          {:href "javascript: document.forms['clear-form'].submit()"}
-          "clear"]])
-      [:pre
-       (for [error errors
-               :let [err-string-writer (java.io.StringWriter.)
-                     string-printer (java.io.PrintWriter. err-string-writer)]]
-         (do
+        [:div
+         [:form {:id "clear-form", :action "/errors/clear", :method "post"}
+          [:input {:type "text", :name "type", :value type, :hidden "true"}]
+          [:input {:type "text", :name "key", :value key, :hidden "true"}]
+          [:a
+           {:href "javascript: document.forms['clear-form'].submit()"}
+           "clear"]]
+         (let [err-string-writer (java.io.StringWriter.)
+               string-printer (java.io.PrintWriter. err-string-writer)]
            (.printStackTrace error string-printer)
            (.println string-printer (apply str (repeat 80 "-")))
            (.flush string-printer)
-           [:div#stack-trace (escape-html (.toString err-string-writer))]))]])))
+           [:pre [:div#stack-trace
+                  (escape-html (.toString err-string-writer))]])])])))
 
 (defpage [:post "/errors/clear"] {:keys [type key]}
-  (-> (case type
-        "source-info" :restart-source
-        "peer-info" :restart-peer)
-      (*web-heso*)
-      key)
-  (redirect "/errors/:type/:key" type key))
+  (let [agt (get-in @*web-heso* [(keyword type) key])]
+    (maybe "Remove errors from agent." restart-agent agt @agt)
+    (redirect (format "/errors/%s/%s" (url-encode type) (url-encode key)))))
 
 (defpage "/sources" []
   (html5
    (include-css "/css.css")
    [:head [:title "heso sources"]]
-   (let [heso ((:snapshot (*web-heso*)))]
+   (let [heso @*web-heso*]
      [:body
       (-navbar heso "/sources")
-      (for [[source-dir source] (heso :source-info)]
+      (for [[source-dir source-agent] (heso :source-agents)
+            :let [source @source-agent]]
         [:div#source-info-wrapper
          [:div#source-heading source-dir]
-         (-errors (str "/errors/source-info/" (url-encode source-dir))
-                  (source :errors))
+         (-errors (str "/errors/source-agents/" (url-encode source-dir))
+                  (agent-error source-agent))
          (for [[branch hash] (source :branches)]
            [:div#branch-info
             [:div#branch-heading
              (branch/underscored-name branch) " "
              [:span#branch-hash hash]]
             [:table#pushed
-             (for [[peer-host peer] (heso :peer-info)
-                   :let [pushed ((peer :pushed) [source-dir branch])]
+             (for [[peer-host peer-agent] (heso :peers)
+                   :let [peer @peer-agent
+                         pushed ((peer :pushed) [(file source-dir) branch])]
                    :when pushed]
                [:tr
                 [:td peer-host]
@@ -132,15 +131,16 @@
   (html5
    (include-css "/css.css")
    [:head [:title "heso peers"]]
-   (let [heso ((:snapshot (*web-heso*)))]
+   (let [heso @*web-heso*]
      [:body
       (-navbar heso "/peers")
-      (for [[peer-id peer] (heso :peer-info)
-            :let [form-id (str "push-" peer-id)]]
+      (for [[peer-id peer-agent] (heso :peers)
+            :let [peer @peer-agent
+                  form-id (str "push-" peer-id)]]
         [:div#peer-info-wrapper
          [:div#peer-heading peer-id]
-         (-errors (str "/errors/peer-info/" (url-encode peer-id))
-                  (peer :errors))
+         (-errors (str "/errors/peers/" (url-encode peer-id))
+                  (agent-error peer-agent))
          (when (:last-fail-ping-time peer)
            [:div#last-fail-ping-time
             "Last failed ping time: "
@@ -155,7 +155,7 @@
               "push now"]]])])])))
 
 (defpage [:post "/peers/push"] {:keys [peer-id]}
-  (((*web-heso*) :push-sources-for-peer) peer-id)
+  (send *web-heso* heso/push-sources-for-peer peer-id)
   (redirect "/peers"))
 
 (defpage "/dump" []
@@ -166,10 +166,10 @@
   (html5
    (include-css "/css.css")
    [:head [:title "heso dump"]]
-   (let [heso ((:snapshot (*web-heso*)))
+   (let [heso @*web-heso*
          pprint-writer (java.io.StringWriter.)
          dump-str (do (clojure.pprint/pprint heso pprint-writer)
                       (.toString pprint-writer))]
      [:body
       (-navbar heso "/dump")
-      [:pre dump-str]])))
+      [:pre (escape-html dump-str)]])))

@@ -13,65 +13,47 @@
 ; limitations under the License.
 
 (ns hesokuri.test-hesokuri.updateable-heso
-  (:use clojure.test
-        hesokuri.core
+  (:use [clojure.java.io :only [file]]
+        clojure.test
         hesokuri.test-hesokuri.mock
         hesokuri.updateable-heso
         hesokuri.util
-        hesokuri.watching))
+        hesokuri.watching)
+  (:require [hesokuri.heso :as heso]))
 
 (def ^:dynamic *config-file* "/home/jdoe/hesocfg")
 
-(def ^:dynamic *heso*
-  {:start (mock {[] [0 :started-1 1 :started-2]})
-   :stop (mock {[] [0 :stopped-1]})})
-
 (def ^:dynamic *on-change-cfg* (atom nil))
+
+(def ^:dynamic *sources-eg*
+  [{"peer1" "/peer1/foo"
+    "peer2" "/peer2/foo"}])
 
 (defn watcher-for-config-file [file on-change]
   (is (= file *config-file*))
   (swap! *on-change-cfg* (constantly on-change))
-  {:stopper (constantly nil)
+  {:stopper (mock {[] [nil :already-stopped]})
    :file file})
 
-(deftest restart-heso-when-config-file-changed
-  (binding [*letmap-omitted-key* ::omitted]
-    (with-redefs [config-file (constantly *config-file*)
+(deftest test-with-config-file
+  (let [result (with-config-file *config-file*)]
+    (is (= (:config-file result) *config-file*))
+    (is (= (-> result :heso deref :sources) []))
+    (is (not (:active result)))))
 
-                  watcher-for-file watcher-for-config-file
-
-                  new-heso
-                  (mock {[*config-file*] [*heso* *heso* :end-of-mock]})]
-      (let [updateable (new-updateable-heso)
-            updateable-agent (-> updateable ::omitted :self)
-
-            await-updateable-agent
-            (fn []
-              (await-for 3000 updateable-agent)
-              (is (nil? (agent-error updateable-agent))))]
-        ((updateable :start))
-        (await-updateable-agent)
-        (is (= *heso* ((updateable :heso))))
-        (is (= :started-1 ((*heso* :start))))
-
-        (@*on-change-cfg*)
-        (await-updateable-agent)
-        (is (= *heso* ((updateable :heso))))
-        (is (= :started-2 ((*heso* :start))))
-
-        (is (= :end-of-mock (new-heso *config-file*)))
-        (is (= :stopped-1 ((*heso* :stop))))))))
-
-(deftest dead-heso-is-reasonable
-  (with-redefs [config-file (constantly *config-file*)]
-    (let [dead-heso (#'hesokuri.updateable-heso/dead-heso *config-file*)
-
-          check-properties
-          (fn [object]
-            (is (= [[] "localhost" *config-file*]
-                   (map #(get object %)
-                        [:sources :local-identity :config-file]))))]
-      (check-properties dead-heso)
-      (check-properties ((dead-heso :snapshot)))
-      (is (get dead-heso :start))
-      (is (get dead-heso :stop)))))
+(deftest test-start-and-stop-autoupdate
+  (with-redefs
+    [watcher-for-file watcher-for-config-file
+     heso/update-from-config-file #(assoc %1 :updated-from-file %2)]
+    (let [not-started (with-config-file *config-file*)
+          heso-agent (:heso not-started)
+          started (start-autoupdate not-started)]
+      (is (nil? (-> started :heso :updated-from-file)))
+      (is (:watcher started))
+      (@*on-change-cfg*)
+      (await-for 3000 heso-agent)
+      (is (= *config-file* (-> @heso-agent :updated-from-file)))
+      (let [stopped (stop-autoupdate started)]
+        (is (= not-started stopped))
+        (is (= *config-file* (-> @heso-agent :updated-from-file)))
+        (is (= :already-stopped ((-> started :watcher :stopper))))))))

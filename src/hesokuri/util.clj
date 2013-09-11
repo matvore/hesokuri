@@ -162,3 +162,7 @@
       (binding [*read-eval* true]
         (error e "Error when:" description))
       nil)))
+
+(defn maybe-restart-agent
+  [agn]
+  (maybe (format "Restarting: %s" agn) restart-agent agn @agn))
