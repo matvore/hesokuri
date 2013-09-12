@@ -85,7 +85,7 @@
   abbreviated form:
     (letmap [a 10, b (* a 20)])
   evaluates to:
-    {:a 10, :b 20}
+    {:a 10, :b 200}
 
   In the full form, the symbol immediately after the macro name is the name of
   the map that can be used in the let body:
