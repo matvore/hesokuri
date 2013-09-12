@@ -73,7 +73,7 @@
        ;;   "host-3" "/foo/bar/path4"}]
        sources (read-string (slurp config-file))
 
-       :omit all-hostnames (set (apply concat (map keys sources)))
+       :omit all-hostnames (set (mapcat keys sources))
 
        ;; The hostname or IP of this system as known by the peers on the current
        ;; network. Here it is deduced from the vector returned by (identities)
