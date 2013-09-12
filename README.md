@@ -141,6 +141,13 @@ status of all sources and last-pushed hashes for each branch and peer. The port
 can be changed from the default of 8080 by setting the environment variable
 `HESOPORT` to the desired port number.
 
+##More information
+
+- The [wiki on Github](https://github.com/google/hesokuri/wiki) documents
+  things that don't quite fit in the README, like the contribution process.
+- Join the [Google group](https://groups.google.com/forum/#!forum/hesokuri)
+  to get tips, discuss possible improvements to the tool, etc.
+
 ##FAQ
 
 ###Where does the name of the project come from?
