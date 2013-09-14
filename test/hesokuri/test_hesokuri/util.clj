@@ -75,13 +75,3 @@
        "foo" "/bar" "ssh://foo/bar"
        "" "" "ssh://"
        "foo.bar" "/" "ssh://foo.bar/"))
-
-(deftest letmap-omitted-key
-  (binding [*letmap-omitted-key* ::omitted]
-    (is (= {:foo 42 ::omitted {:bar 1011 :baz 314}}
-           (letmap
-            [:omit baz 314
-             foo 42
-             :omit bar 1011])))
-    (is (= {:foo 42 ::omitted {}}
-           (letmap [foo 42])))))
