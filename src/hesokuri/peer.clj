@@ -58,6 +58,10 @@
         ;; or nil if there is no error.
         error (agent-error self)
 
+        ;; The previous value in a singleton sequence, or nil if there is no
+        ;; error.
+        errors (agent-errors self)
+
         :omit self @self
 
         ;; A map of keys in the form [local-path-to-source branch-name] to
@@ -128,5 +132,5 @@
     (fn []
       (let [error (agent-error self)]
         (when error
-          (restart-agent self)
+          (restart-agent self @self)
           error)))]))

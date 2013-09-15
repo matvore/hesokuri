@@ -22,12 +22,13 @@
   (:import [java.text DateFormat]
            [java.util Date]))
 
-(defn ^:dynamic *web-heso*
-  "A function that should return the heso object that can be manipulated through
-  the web UI."
-  []
-  (throw (IllegalStateException.
-          "Must set *web-heso* to function that returns heso object.")))
+(defonce ^:dynamic
+  ^{:doc
+    "A function that should return the heso object that can be manipulated
+    through the web UI."}
+  *web-heso*
+  (fn [] (throw (IllegalStateException.
+                 "Must set *web-heso* to function that returns heso object."))))
 
 (defpartial -navbar [heso & [url]]
   (let [link (fn [link-url title]
@@ -95,9 +96,9 @@
   (-> (case type
         "source-info" :restart-source
         "peer-info" :restart-peer)
-      (*web-heso*)
-      key)
-  (redirect "/errors/:type/:key" type key))
+      ((*web-heso*))
+      (apply [key]))
+  (redirect (format "/errors/%s/%s" (url-encode type) (url-encode key))))
 
 (defpage "/sources" []
   (html5

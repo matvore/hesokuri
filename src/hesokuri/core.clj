@@ -110,10 +110,10 @@
        ;; if there was no exception.
        restart-source
        (fn [key]
-         (let [agent (source-agents key)
-               error (agent-error agent)]
+         (let [agt (source-agents key)
+               error (agent-error agt)]
            (when error
-             (restart-agent agent)
+             (restart-agent agt @agt)
              error)))
 
        ;; Returns a snapshot of heso state, converting agents into their raw
