@@ -8,7 +8,7 @@ Hesokuri is a daemon utility that synchronizes one or more git source code
 repositories between multiple machines on a network. It is useful in the
 following situations:
 
-1. You want the piece of mind of controlling the machines where your source code
+1. You want the peace of mind of controlling the machines where your source code
    is stored.
 2. You control/own multiple machines and work on the same project on them.
 3. You want changes on one machine to appear on all other machines as soon as
@@ -140,6 +140,13 @@ You can go to <http://localhost:8080> in a web browser on any peer to see the
 status of all sources and last-pushed hashes for each branch and peer. The port
 can be changed from the default of 8080 by setting the environment variable
 `HESOPORT` to the desired port number.
+
+##More information
+
+- The [wiki on Github](https://github.com/google/hesokuri/wiki) documents
+  things that don't quite fit in the README, like the contribution process.
+- Join the [Google group](https://groups.google.com/forum/#!forum/hesokuri)
+  to get tips, discuss possible improvements to the tool, etc.
 
 ##FAQ
 
