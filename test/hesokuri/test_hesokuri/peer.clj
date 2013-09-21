@@ -51,7 +51,8 @@
 
                   sh-print (constantly 0)]
       (let [peer (push peer)]
-        (is (= "hash" (get-in peer [:pushed [local-repo "branch-name"]])))
+        (is (= "hash" (get-in peer
+                              [:pushed [(:dir local-repo) "branch-name"]])))
         (is (nil? (peer :last-fail-ping-time)))))))
 
 (deftest clear-fail-ping-even-when-failing-push
