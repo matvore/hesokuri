@@ -42,7 +42,9 @@
            (repo/branches repo)))
 
      working-area-clean (repo/working-area-clean repo)
-     live-edit-checked-out (repo/checked-out? repo branch/live-edit-name)])))
+
+     live-edit-checked-out
+     (= (repo/checked-out-branch repo) branch/live-edit-name)])))
 
 (defn- advance-b
   [{:keys [branches repo] :as self}]

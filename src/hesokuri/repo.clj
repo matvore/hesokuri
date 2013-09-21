@@ -85,13 +85,16 @@
            :when hash]
        [(.getName head-file) hash]))))
 
-(defn checked-out?
-  "Returns true if the given branch is checked out."
-  [repo branch-name]
-  {:pre [(string? branch-name)
-         (:init repo)]}
-  (= (trim (slurp (file (git-dir repo) "HEAD")))
-     (str "ref: refs/heads/" branch-name)))
+(defn checked-out-branch
+  "Returns the name of the currently checked-out branch, or nil if no local
+  branch is checked out."
+  [repo]
+  {:pre [(:init repo)]}
+  (let [head (trim (slurp (file (git-dir repo) "HEAD")))
+        local-branch-prefix "ref: refs/heads/"]
+    (if (.startsWith head local-branch-prefix)
+      (.substring head (count local-branch-prefix))
+      nil)))
 
 (defn delete-branch
   "Deletes the given branch. This method always returns nil. It does not throw

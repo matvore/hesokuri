@@ -13,9 +13,11 @@
 ; limitations under the License.
 
 (ns hesokuri.test-hesokuri.repo
-  (:use clojure.test
+  (:use [clojure.java.io :only [file]]
+        clojure.test
         hesokuri.repo
         hesokuri.test-hesokuri.mock
+        hesokuri.test-hesokuri.temp
         hesokuri.util))
 
 (defn ff? [src-dir from-hash to-hash when-equal]
@@ -53,3 +55,13 @@
            hash-d hash-d true true
            hash-d hash-e nil false
            hash-e hash-d nil true))))
+
+(deftest test-checked-out-branch
+  (are [head-file result]
+       (let [git-dir (create-temp-dir)
+             repo {:init true :bare true :dir (file git-dir)}]
+         (spit (file git-dir "HEAD") head-file)
+         (is (= result (checked-out-branch repo))))
+       "ref: refs/heads/foo" "foo"
+       "ref: not-local-branch" nil
+       "ref: refs/heads/bar" "bar"))
