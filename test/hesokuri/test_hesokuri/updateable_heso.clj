@@ -38,7 +38,7 @@
 (deftest test-with-config-file
   (let [result (with-config-file *config-file*)]
     (is (= (:config-file result) *config-file*))
-    (is (= (-> result :heso deref :sources) []))
+    (is (= (-> result :heso deref :source-defs) []))
     (is (not (:active result)))))
 
 (deftest test-start-and-stop-autoupdate

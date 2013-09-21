@@ -19,7 +19,8 @@
         hesokuri.util)
   (:require [hesokuri.peer :as peer]
             [hesokuri.repo :as repo]
-            [hesokuri.source :as source]))
+            [hesokuri.source :as source]
+            [hesokuri.source-def :as source-def]))
 
 (defn- ips
   "Returns the IP addresses of all network interfaces as a vector of strings."
@@ -31,39 +32,36 @@
              (-> addr .getAddress .getHostAddress (split #"%") first))))
 
 (defn- common-sources
-  "Returns a list of all items in the sources vector that are on all of the
-  given peers."
-  [sources & peer-names]
-  (for [source sources
-        :when (every? source peer-names)]
-    source))
+  "Returns a list of all host-to-path maps in the source-defs vector that are on
+  all of the given peers."
+  [source-defs & peer-names]
+  (for [source-def source-defs
+        :let [host-to-path (source-def/host-to-path source-def)]
+        :when (every? host-to-path peer-names)]
+    host-to-path))
 
 (defn with-sources
   "Creates a heso in the inactive state. Is a map with the following values:
-  :config-file - the path of the file from which to read the heso configuration
   :active - true when the agent is inactive, false when not
   :heartbeats - An agent that represents all the heartbeats started by this
       object. Heartbeats are used to push to a peer automatically (one heartbeat
       per peer) and monitor filesystem changes (one heartbeat). The heartbeats
-      are stopped and replaced with new ones whenever the sources are
+      are stopped and replaced with new ones whenever the source defs are
       reconfigured.
-  :sources - This value is an argument passed to this function. It defines the
-      hesokuri sources. This is the user-configurable settings that Hesokuri
-      needs to discover sources on the network and how to push and pull them.
-      In this function, this is read from the configuration file specified by
-      :config-file on this object. It is a map in the following form:
-      [{\"host-1\" \"/foo/bar/path1\"
-        \"host-2\" \"/foo/bar/path2\"}
-       {\"host-1\" \"/foo/bar/path3\"
-        \"host-3\" \"/foo/bar/path4\"}]
+  :source-defs - This value is an argument passed to this function.  This is the
+      user-configurable settings that Hesokuri needs to discover sources on the
+      network and how to push and pull them. It is a vector of source defs (see
+      source-def.clj).
   :local-identity - The hostname or IP of this system as known by the peers on
        the current network. Here it is deduced from the vector returned by
        (identities) and the peer-hostnames var.
   :peers - Map of peer hostnames to the corresponding peer object.
   :source-agents - A map of source-dirs to the corresponding agent."
-  [sources]
+  [source-defs]
   (letmap
-   [:keep sources
+   [:keep source-defs
+    :omit sources (map source-def/host-to-path source-defs)
+
     active false
     heartbeats (agent (atom nil))
     :omit all-hostnames (set (mapcat keys sources))
@@ -88,12 +86,12 @@
 (defn push-sources-for-peer
   "Pushes all sources to the given peer. This operation happens asynchronously.
   This function returns the new state of the heso object."
-  [{:keys [active peers sources source-agents local-identity] :as self}
+  [{:keys [active peers source-defs source-agents local-identity] :as self}
    peer-hostname]
   {:pre [active]}
   (send (peers peer-hostname) #(dissoc % :last-fail-ping-time))
-  (doseq [source (common-sources sources local-identity peer-hostname)
-          :let [source-dir (source local-identity)
+  (doseq [host-to-path (common-sources source-defs local-identity peer-hostname)
+          :let [source-dir (host-to-path local-identity)
                 source-agent (source-agents source-dir)]]
     (maybe (format "pushing %s to %s" source-dir peer-hostname)
            send source-agent source/push-for-peer peer-hostname))
@@ -133,13 +131,13 @@
   If the config-file has errors, this effectively stops the heso without
   starting a new one. Returns the new heso object."
   [self config-file]
-  (let [sources (maybe (str "Read sources from " config-file)
-                       read-string
-                       (slurp config-file))]
-    (if sources
+  (let [source-defs (maybe (str "Read sources from " config-file)
+                           read-string
+                           (slurp config-file))]
+    (if source-defs
       (do
         (stop self)
-        (info "Starting new heso with sources: " sources)
-        (-> sources with-sources start))
+        (info "Starting new heso with sources: " source-defs)
+        (-> source-defs with-sources start))
       self)))
 

@@ -68,11 +68,11 @@
    [:head [:title "heso main"]]
    [:body
     (let [heso @*web-heso*
-          sources (:sources heso)]
+          sources (:source-defs heso)]
       [:div
        (-navbar heso "/")
        [:h1 "config-file"]
-       (-pretty-print (:sources heso))])]))
+       (-pretty-print (:source-defs heso))])]))
 
 (defpage "/errors/:type/:key" {:keys [type key]}
   (let [heso @*web-heso*

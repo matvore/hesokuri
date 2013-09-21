@@ -20,14 +20,15 @@
         hesokuri.test-hesokuri.temp
         hesokuri.util)
   (:require [hesokuri.peer :as peer]
-            [hesokuri.repo :as repo]))
+            [hesokuri.repo :as repo]
+            [hesokuri.source-def :as source-def]))
 
 (def ^:dynamic *sources-eg*
-  [{"peer1" "/peer1/foo"
-    "peer2" "/peer2/foo"}
+  [{:host-to-path {"peer1" "/peer1/foo"
+                   "peer2" "/peer2/foo"}}
    {"peer2" "/peer2/bar"}
-   {"peer1" "/peer1/baz"
-    "peer3" "/peer3/baz"}
+   {:host-to-path {"peer1" "/peer1/baz"
+                   "peer3" "/peer3/baz"}}
    {"peer1" "/peer1/42"
     "peer3" "/peer3/42"
     "peer4" "/peer4/42"}])
@@ -42,7 +43,7 @@
 
 (deftest test-common-sources
   (are [sources peer-names source-indexes]
-       (is (= (map *sources-eg* source-indexes)
+       (is (= (map #(-> % *sources-eg* source-def/host-to-path) source-indexes)
               (apply #'hesokuri.heso/common-sources sources peer-names)))
        [] ["peer1"] []
        [] ["peer1" "peer2"] []
@@ -63,7 +64,7 @@
 
    :else o))
 
-(deftest test-with-sources
+(deftest test-with-simple-sources
   (with-redefs [getenv {"HESOHOST" "peer3"}]
     (let [result
           (-> *sources-eg* with-sources (dissoc :heartbeats) de-agentify)
@@ -74,15 +75,16 @@
           source-agents
           (into {}
                 (for [source *sources-eg*
-                      :let [source-dir (source "peer3")]
+                      :let [host-to-path (source-def/host-to-path source)
+                            source-dir (host-to-path "peer3")]
                       :when source-dir]
                   [source-dir {:repo (repo/with-dir source-dir)
-                               :peer-dirs source
+                               :peer-dirs host-to-path
                                :peers peers
                                :local-identity "peer3"
                                ::error nil}]))]
       (is (= result
-             {:sources *sources-eg*
+             {:source-defs *sources-eg*
               :active false
               :local-identity "peer3"
               :peer-hostnames #{"peer1" "peer2" "peer4"}
