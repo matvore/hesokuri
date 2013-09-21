@@ -55,20 +55,24 @@
                   {:href detail-link}
                   (-> error class .getName)]])))
 
+(defpartial -pretty-print [data]
+  (html5
+   (let [pprint-writer (java.io.StringWriter.)
+         dump-str (do (clojure.pprint/pprint data pprint-writer)
+                      (.toString pprint-writer))]
+     [:pre (escape-html dump-str)])))
+
 (defpage "/" []
   (html5
    (include-css "/css.css")
    [:head [:title "heso main"]]
    [:body
-    (let [heso @*web-heso*]
+    (let [heso @*web-heso*
+          sources (:sources heso)]
       [:div
        (-navbar heso "/")
        [:h1 "config-file"]
-       (for [source-index (-> :sources heso count range)
-             :let [source ((heso :sources) source-index)]]
-         [:div#source-map
-           (for [[host dir] source]
-             (format "%s %s<br>" host dir))])])]))
+       (-pretty-print (:sources heso))])]))
 
 (defpage "/errors/:type/:key" {:keys [type key]}
   (let [heso @*web-heso*
@@ -166,10 +170,7 @@
   (html5
    (include-css "/css.css")
    [:head [:title "heso dump"]]
-   (let [heso @*web-heso*
-         pprint-writer (java.io.StringWriter.)
-         dump-str (do (clojure.pprint/pprint heso pprint-writer)
-                      (.toString pprint-writer))]
-     [:body
-      (-navbar heso "/dump")
-      [:pre (escape-html dump-str)]])))
+    (let [heso @*web-heso*]
+      [:body
+       (-navbar heso "/dump")
+       (-pretty-print heso)])))
