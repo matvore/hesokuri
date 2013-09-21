@@ -1,10 +1,10 @@
 #Hesokuri
 
-Distributed git repo backup and duplication daemon.
+Distributed Git repo backup and duplication daemon.
 
 ##Intro
 
-Hesokuri is a daemon utility that synchronizes one or more git source code
+Hesokuri is a daemon utility that synchronizes one or more Git source code
 repositories between multiple machines on a network. It is useful in the
 following situations:
 
@@ -85,10 +85,10 @@ at your own risk.
      `cat /tmp/heso_keys >> ~/.ssh/authorized_keys`
 
 ###Configure
-On each peer, create a file at `~/.hesocfg` which specifies all git repos and
+On each peer, create a file at `~/.hesocfg` which specifies all Git repos and
 peers to sync with. Each copy of the file can be the same. The file should
 contain a Clojure expression (comments are allowed) that is a vector of maps.
-Each element in the vector is a different git repository to sync (called a
+Each element in the vector is a different Git repository to sync (called a
 _source_). The map is a dictionary of peer identities to local paths on each
 peer for the source. A source need not appear on every peer. Here is an example
 which demonstrates the expression syntax:
@@ -118,7 +118,7 @@ An annotated, real-world configuration file may look something like this:
 
 Note that you can save the configuration file in a location other than
 `~/.hesocfg` and set the environment variable `HESOCFG` to its location. This
-way, you can store the `HESOCFG` in a subdirectory and put it in a git repo to
+way, you can store the `HESOCFG` in a subdirectory and put it in a Git repo to
 sync (along with other miscellaneous configuration files and utilities that are
 shared between all systems).
 
@@ -127,7 +127,7 @@ Hesokuri daemon on it, the containing directory and repo will be created
 automatically on Hesokuri start up. This means that, in the above example, if
 the `hacks` folder containing the two repos does not exist on `192.168.0.4`, you
 can run Hesokuri anyway, `192.168.0.4` will create the folders and initialize
-empty git repos, and other peers will push the two repos to it as soon as they
+empty Git repos, and other peers will push the two repos to it as soon as they
 establish a connection to `192.168.0.4`.
 
 ###Run
