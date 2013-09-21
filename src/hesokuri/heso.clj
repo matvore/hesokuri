@@ -60,11 +60,12 @@
   [source-defs]
   (letmap
    [:keep source-defs
-    :omit sources (map source-def/host-to-path source-defs)
 
     active false
     heartbeats (agent (atom nil))
-    :omit all-hostnames (set (mapcat keys sources))
+
+    :omit host-to-paths (map source-def/host-to-path source-defs)
+    :omit all-hostnames (set (mapcat keys host-to-paths))
 
     local-identity
     (or (getenv "HESOHOST")
@@ -75,11 +76,12 @@
     peers (into {} (map (fn [p] [p (agent peer/default)]) peer-hostnames))
 
     source-agents
-    (into {} (for [source sources
-                   :let [source-dir (source local-identity)]
+    (into {} (for [source-def source-defs
+                   :let [host-to-path (source-def/host-to-path source-def)
+                         source-dir (host-to-path local-identity)]
                    :when source-dir]
                [source-dir (agent {:repo (repo/with-dir source-dir)
-                                   :peer-dirs source
+                                   :source-def source-def
                                    :peers peers
                                    :local-identity local-identity})]))]))
 

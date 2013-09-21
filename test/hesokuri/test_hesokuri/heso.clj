@@ -79,7 +79,7 @@
                             source-dir (host-to-path "peer3")]
                       :when source-dir]
                   [source-dir {:repo (repo/with-dir source-dir)
-                               :peer-dirs host-to-path
+                               :source-def source
                                :peers peers
                                :local-identity "peer3"
                                ::error nil}]))]

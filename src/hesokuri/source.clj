@@ -16,8 +16,7 @@
   "Implementation of the source object. A valid source object has the following
   required fields:
   repo - The repo object for accessing the repo on disk.
-  peer-dirs - a map from peer hostnames to the location of the source on that
-      peer.
+  source-def - the definition of this source (see hesokuri.source-def).
   peers - a map of hostnames to the corresponding peer object.
   local-identity - the hostname or IP of this system."
   (:use [clojure.java.io :only [file]]
@@ -27,7 +26,8 @@
         hesokuri.watching)
   (:require [hesokuri.branch :as branch]
             [hesokuri.peer :as peer]
-            [hesokuri.repo :as repo]))
+            [hesokuri.repo :as repo]
+            [hesokuri.source-def :as source-def]))
 
 (defn- refresh
   "Updates values of the source object based on the state of the repo."
@@ -111,14 +111,14 @@
     to hesokuri_hesokr_(MY_HOSTNAME).
   * local branch - which is any branch that is not hesokuri and not named in the
     form of *_hesokr_*, force push to (BRANCH_NAME)_hesokr_(MY_HOSTNAME)"
-  [{:keys [peers branches local-identity repo peer-dirs] :as self}
+  [{:keys [peers branches local-identity repo source-def] :as self}
    peer-host]
   (doseq [branch (keys branches)]
     (send-off
      (peers peer-host)
      peer/push
      repo
-     (->PeerRepo peer-host (peer-dirs peer-host))
+     (->PeerRepo peer-host ((source-def/host-to-path source-def) peer-host))
      branch
      (branches branch)
      (let [force-args (-> branch
