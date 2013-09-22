@@ -29,3 +29,31 @@
   (are [def result] (is (= result (#'hesokuri.source-def/kind def)))
        {:actually-valid 1 :host-to-path *host-to-path*} :extensible
        *host-to-path* :simple))
+
+(deftest test-live-edit-branch-fail-validity-check
+  (are [bad-def]
+       (thrown? AssertionError (live-edit-branch? bad-def "branch-name"))
+       {:host-to-path *host-to-path*, :live-edit-branches {}}
+       {:host-to-path *host-to-path*, :live-edit-branches {:foo #{}}}
+       {:host-to-path *host-to-path*,
+        :live-edit-branches {:except #{}, :only #{}}}
+       {:host-to-path *host-to-path*,
+        :live-edit-branches {:except #{}, :foo #{}}}
+       {:host-to-path *host-to-path*,
+        :live-edit-branches {:only #{}, :foo #{}}}))
+
+(deftest test-live-edit-branch
+  (are [live-edit-branches branch-name result]
+       (is (= (boolean result)
+              (boolean (live-edit-branch?
+                        {:host-to-path *host-to-path*
+                         :live-edit-branches live-edit-branches}
+                        branch-name))))
+       {:except #{}} "foobar" true
+       {:except #{"foobar"}} "foobar" false
+       nil "foo" false
+       nil "master" false
+       nil "hesokuri" true
+       {:only #{}} "hesokuri" false
+       {:only #{"foobar"}} "foobar" true
+       {:only #{"foo" "bar"}} "bar" true))

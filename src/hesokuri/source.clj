@@ -29,15 +29,6 @@
             [hesokuri.repo :as repo]
             [hesokuri.source-def :as source-def]))
 
-(defn- live-edit-branch?
-  "True if the branch name given is aggressively merged from the peer-originated
-  version to the locally-originated version. This means it is merged as long as
-  the local version is either not checked out or checked out with no uncommitted
-  changes, and the peer version is a fast-forward of the local version."
-  [branch-name]
-  {:pre [(string? branch-name)]}
-  (= branch-name "hesokuri"))
-
 (defn- refresh
   "Updates values of the source object based on the state of the repo."
   [{:keys [repo] :as self}]
@@ -56,10 +47,10 @@
      (branch/parse-underscored-name (repo/checked-out-branch repo))])))
 
 (defn- advance-b
-  [{:keys [branches repo] :as self}]
+  [{:keys [branches repo source-def] :as self}]
   (doseq [branch (keys branches)
           :when
-          (and (not (live-edit-branch? (:name branch)))
+          (and (not (source-def/live-edit-branch? source-def (:name branch)))
                (:peer branch))]
     (repo/delete-branch repo (branch/underscored-name branch)))
   self)
@@ -68,7 +59,7 @@
   ([self]
      (advance-a self (seq (:branches self))))
   ([{all-branches :branches
-     :keys [repo checked-out-branch working-area-clean]
+     :keys [repo checked-out-branch working-area-clean source-def]
      :as self}
     branches]
      (if branches
@@ -78,7 +69,7 @@
              checked-out-branch-local (= branch-local checked-out-branch)]
 
          (if (and (:peer branch)
-                  (live-edit-branch? (:name branch))
+                  (source-def/live-edit-branch? source-def (:name branch))
                   (or working-area-clean
                       (not checked-out-branch-local))
                   (or (not local-hash)

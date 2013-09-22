@@ -55,3 +55,24 @@
     :simple def
     :extensible (:host-to-path def)
     (assert false)))
+
+(defn live-edit-branch?
+  "Truthy if the branch name given is aggressively merged from the peer-
+  originated version to the locally-originated version. This means it is merged
+  as long as the local version is either not checked out or checked out with no
+  uncommitted changes, and the peer version is a fast-forward of the local
+  version."
+  [def branch-name]
+  {:pre [(string? branch-name)]}
+  ;; Validate def, even though we don't need to know the kind:
+  (kind def)
+  (let [live-edit-branches (or (:live-edit-branches def) {:only #{"hesokuri"}})]
+    (let [except (:except live-edit-branches)
+          only (:only live-edit-branches)]
+      (assert (#{[:except] [:only]} (keys live-edit-branches))
+              (str ":live-edit-branches entry should have one key labeled, and "
+                   "it should be :except or :only: "
+                   def))
+      (if except
+        (not (except branch-name))
+        (only branch-name)))))
