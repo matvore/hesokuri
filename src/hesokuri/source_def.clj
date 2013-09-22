@@ -42,21 +42,58 @@
   "Returns the kind of the given def, and also performs a sanity check on it
   with assert. Possible return values are :simple and :extensible."
   [def]
-  (let [[first-key & rest-keys] (keys def)
-        key-class-to-kind {String :simple, clojure.lang.Keyword :extensible}
-        result (key-class-to-kind (class first-key))]
-    (assert (every? #(= (class first-key) (class %)) rest-keys)
-            (str "All keys in source-def should be same class, but are: "
-                 (keys def)))
-    (assert result (str "Keys in source-def should be one of: "
-                        (keys key-class-to-kind)))
-    (when (= result :extensible)
-      (assert (:host-to-path def)
-              (str "extensible source-def requires :host-to-path: " def))
-      (assert (= :simple (kind (:host-to-path def)))
-              (str ":host-to-path entry should look like simple source-def: "
-                   (:host-to-path def))))
-    result))
+  ({String :simple, clojure.lang.Keyword :extensible}
+   (class (key (first def)))))
+
+(defn validation-error
+  "Sees if the given source-def appears valid. If it is valid, returns nil.
+  Otherwise, returns a plain English string explaining one of the errors in it."
+  [def]
+  (letfn [(first-key-class [] (class (key (first def))))
+          (first-key [] (key (first def)))
+          (first-non-matching-key []
+            (some #(and (not= (first-key-class) (class %))
+                        (or % "nil/false"))
+                  (keys def)))
+          (has-non-string-or-empty-string? [seq]
+            (some #(or (not= String (class %)) (= "" %)) seq))
+          (live-edit-branches-value []
+            (second (first (:live-edit-branches def))))]
+    (cond
+     (not (map? def)) "should be a map, e.g. {key1 value1, key2 value2}"
+     (empty? def) "should have at least one entry"
+
+     (not (#{String clojure.lang.Keyword} (first-key-class)))
+     (str "all keys should be a string or keyword, but first key ("
+          (first-key) ") is a" (first-key-class))
+
+     (first-non-matching-key)
+     (str "all keys should be same class, but '" (first-key)
+          "' is not the same class as '" (first-non-matching-key) "'")
+
+     (= (kind def) :extensible)
+     (cond
+      (not (:host-to-path def))
+      "extensible source def requires :host-to-path key"
+
+      (and (:live-edit-branches def)
+           (not (#{[:except] [:only]} (keys (:live-edit-branches def)))))
+      (str ":live-edit-branches requires exactly one key (:except or :only): "
+           (:live-edit-branches def))
+
+      (and (:live-edit-branches def)
+           (or (not (set? (live-edit-branches-value)))
+               (has-non-string-or-empty-string? (live-edit-branches-value))))
+      (str "Value in live-edit-branches map must be set of non-empty strings: "
+           (live-edit-branches-value))
+
+      :else
+      (validation-error (:host-to-path def)))
+
+     (has-non-string-or-empty-string? (apply concat def))
+     "all keys and values should be non-empty strings"
+
+     :else nil)))
 
 (defn host-to-path
   "Returns a map of host identities (strings) to paths (strings)."
@@ -74,8 +111,6 @@
   version."
   [def branch-name]
   {:pre [(string? branch-name)]}
-  ;; Validate def, even though we don't need to know the kind:
-  (kind def)
   (let [live-edit-branches (or (:live-edit-branches def) {:only #{"hesokuri"}})]
     (let [except (:except live-edit-branches)
           only (:only live-edit-branches)]

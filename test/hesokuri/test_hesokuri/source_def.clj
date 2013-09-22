@@ -18,15 +18,30 @@
 
 (def ^:dynamic *host-to-path* {"host" "/path"})
 
-(deftest test-kind-fail-validity-check
-  (are [bad-def]
-       (thrown? AssertionError (#'hesokuri.source-def/kind bad-def))
-       {}
-       {"foo" "foo", :host-to-path *host-to-path*}
-       {:missing-host-to-path []}))
+(deftest test-validation-error
+  (are [bad-def has-error]
+       (is (= has-error (boolean (validation-error bad-def))))
+       [[:host-to-path *host-to-path*]] true
+       {:host-to-path *host-to-path*} false
+       {} true
+       {1 2, 3 4} true
+       {"foo" "foo", :host-to-path *host-to-path*} true
+       {:foo :foo, :host-to-path *host-to-path*} false
+       {:host-to-path *host-to-path*, nil 42} true
+       {:host-to-path *host-to-path*, false 42} true
+       {"host" ""} true
+       {"" "path"} true
+       {"okay" "okay"} false
+       {:missing-host-to-path []} true
+       {:host-to-path *host-to-path* :live-edit-branches []} true
+       {:host-to-path *host-to-path* :live-edit-branches {:only []}} true
+       {:host-to-path *host-to-path* :live-edit-branches {:only #{}}} false
+       {:host-to-path *host-to-path* :live-edit-branches {:only #{""}}} true))
 
-(deftest test-kind
-  (are [def result] (is (= result (#'hesokuri.source-def/kind def)))
+(deftest test-kind-and-validation-error-on-valid-defs
+  (are [def result]
+       (do (is (nil? (validation-error def)))
+           (is (= result (#'hesokuri.source-def/kind def))))
        {:actually-valid 1 :host-to-path *host-to-path*} :extensible
        *host-to-path* :simple))
 
