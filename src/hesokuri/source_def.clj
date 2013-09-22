@@ -25,6 +25,16 @@
         \"host-2\" \"/foo/bar/path2\"}}
   The extensible form allows these entries:
       :host-to-path (required)
+      :live-edit-branches (optional)
+          Should be a map with a single entry called :only or :except, whose
+          value is a set of strings that indicates what branch names should or
+          should not be considered live-edit branches. For instance:
+          - :live-edit-branches #{:only #{\"hesokuri\" \"master\"}}
+            indicates that branches called hesokuri or master should be
+            considered live-edit.
+          - :live-edit-branches #{:except #{\"private\"}}
+            indicates that any branch, except one called private, should be
+            considered live-edit.
   More entries will be added in the future to allow advanced customization of
   behavior.")
 
