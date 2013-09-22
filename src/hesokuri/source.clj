@@ -29,6 +29,15 @@
             [hesokuri.repo :as repo]
             [hesokuri.source-def :as source-def]))
 
+(defn- live-edit-branch?
+  "True if the branch name given is aggressively merged from the peer-originated
+  version to the locally-originated version. This means it is merged as long as
+  the local version is either not checked out or checked out with no uncommitted
+  changes, and the peer version is a fast-forward of the local version."
+  [branch-name]
+  {:pre [(string? branch-name)]}
+  (= branch-name "hesokuri"))
+
 (defn- refresh
   "Updates values of the source object based on the state of the repo."
   [{:keys [repo] :as self}]
@@ -43,14 +52,14 @@
 
      working-area-clean (repo/working-area-clean repo)
 
-     live-edit-checked-out
-     (= (repo/checked-out-branch repo) branch/live-edit-name)])))
+     checked-out-branch
+     (branch/parse-underscored-name (repo/checked-out-branch repo))])))
 
 (defn- advance-b
   [{:keys [branches repo] :as self}]
   (doseq [branch (keys branches)
           :when
-          (and (not= branch/live-edit-name (:name branch))
+          (and (not (live-edit-branch? (:name branch)))
                (:peer branch))]
     (repo/delete-branch repo (branch/underscored-name branch)))
   self)
@@ -59,32 +68,33 @@
   ([self]
      (advance-a self (seq (:branches self))))
   ([{all-branches :branches
-     :keys [repo live-edit-checked-out working-area-clean]
+     :keys [repo checked-out-branch working-area-clean]
      :as self}
     branches]
-     (let [live-edit-branch (all-branches (branch/of branch/live-edit-name))
-           [[branch hash] & _] branches]
-       (cond
-        (or (not branches)
-            (and live-edit-checked-out (not working-area-clean)))
-        (advance-b self)
+     (if branches
+       (let [[[branch hash] & branches] branches
+             branch-local (branch/of (:name branch))
+             local-hash (all-branches branch-local)
+             checked-out-branch-local (= branch-local checked-out-branch)]
 
-        (or (not= branch/live-edit-name (:name branch))
-            (not (:peer branch))
-            (and live-edit-branch
-                 (not (repo/fast-forward? repo live-edit-branch hash true))))
-        (recur self (next branches))
+         (if (and (:peer branch)
+                  (live-edit-branch? (:name branch))
+                  (or working-area-clean
+                      (not checked-out-branch-local))
+                  (or (not local-hash)
+                      (repo/fast-forward? repo local-hash hash true)))
 
-        :else
-        (let [branch (branch/underscored-name branch)]
-          (if live-edit-checked-out
-            (when (zero? (repo/hard-reset repo branch))
-              (repo/delete-branch repo branch))
-            (repo/rename-branch repo
-                                branch
-                                branch/live-edit-name
-                                :allow-overwrite))
-          (recur (refresh self) (seq all-branches)))))))
+           (let [branch (branch/underscored-name branch)
+                 branch-local (branch/underscored-name branch-local)]
+             (if checked-out-branch-local
+               (when (zero? (repo/hard-reset repo branch))
+                 (repo/delete-branch repo branch))
+               (repo/rename-branch repo branch branch-local :allow-overwrite))
+             (recur (refresh self) (seq all-branches)))
+
+           (recur self branches)))
+
+       self)))
 
 (defn init-repo
   "Initializes the git repo if it does not exist already. Returns the new state
@@ -95,13 +105,13 @@
 (def advance
   "Checks for local branches that meet the following criteria, and performs
   the given operation, 'advancing' when appropriate.
-  a) If hesokuri is not checked out, or it is checked out but the working area
-     is clean, and some branch hesokuri_hesokr_* is a fast-forward of hesokuri,
-     then rename the hesokuri_hesokr_* branch to hesokuri, and remove the
-     existing hesokuri branch.
+  a) If some live-edit branch LEB is not checked out, or it is checked out but
+     the working area is clean, and some branch LEB_hesokr_* is a fast-forward
+     of LEB, then rename the LEB_hesokr_* branch to LEB, and remove the
+     existing LEB branch.
   b) For any two branches F and B, where F is a fast-forward of B, and B has a
      name (BRANCH)_hesokr_*, and BRANCH is not hesokuri, delete branch B."
-  #(-> % refresh advance-a))
+  #(-> % refresh advance-a advance-b))
 
 (defn- do-push-for-peer
   "Push all branches as necessary to keep a peer up-to-date.
@@ -134,11 +144,7 @@
         (every? #(not= (:peer branch) %) [nil local-identity peer-host])
         [normal-args]
 
-        (= {:name branch/live-edit-name} branch)
-        [normal-args force-args]
-
-        (and (not= branch/live-edit-name (:name branch))
-             (not (:peer branch)))
+        (not (:peer branch))
         [force-args]
 
         :else []))))

@@ -32,10 +32,3 @@
 (defn parse-underscored-name [name]
   (let [s (split name #"_hesokr_" 2)]
     (of (first s) (second s))))
-
-(def live-edit-name
-  "This is the name of the only branch that is aggressively merged from the
-  peer-originated version to the locally-originated version, as long as the
-  local version is either not checked out or checked out with no uncommitted
-  changes; and the peer version is a fast-forward of the local version."
-  "hesokuri")
