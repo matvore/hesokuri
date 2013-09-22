@@ -90,7 +90,8 @@
                (when (zero? (repo/hard-reset repo branch))
                  (repo/delete-branch repo branch))
                (repo/rename-branch repo branch branch-local :allow-overwrite))
-             (recur (refresh self) (seq all-branches)))
+             (let [self (refresh self)]
+               (recur self (seq (:branches self)))))
 
            (recur self branches)))
 
