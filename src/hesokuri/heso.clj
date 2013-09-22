@@ -14,7 +14,7 @@
 
 (ns hesokuri.heso
   (:use [clojure.java.shell :only [sh]]
-        [clojure.string :only [split trim]]
+        [clojure.string :only [join split trim]]
         clojure.tools.logging
         hesokuri.util)
   (:require [hesokuri.peer :as peer]
@@ -128,6 +128,20 @@
     (send heartbeats stop-heartbeats))
   (assoc self :active false))
 
+(defn- source-defs-validation-error
+  "Sees if the given source-defs appears valid. If it is valid, returns nil.
+  Otherwise, returns a plain English string explaining one of the errors in it."
+  [source-defs]
+  (let [error-messages
+        (for [source-def source-defs
+              :let [def-error-message (source-def/validation-error source-def)]
+              :when def-error-message]
+          (str "Source def '" source-def "' is invalid because: "
+               def-error-message))
+
+        full-message (join "\n" error-messages)]
+    (if (zero? (count full-message)) nil full-message)))
+
 (defn update-from-config-file
   "Reads the config file, stops the given heso object, and starts a new one.
   If the config-file has errors, this effectively stops the heso without
@@ -135,11 +149,18 @@
   [self config-file]
   (let [source-defs (maybe (str "Read sources from " config-file)
                            read-string
-                           (slurp config-file))]
-    (if source-defs
-      (do
-        (stop self)
-        (info "Starting new heso with sources: " source-defs)
-        (-> source-defs with-sources start))
-      self)))
+                           (slurp config-file))
+        validation-error (and source-defs
+                              (source-defs-validation-error source-defs))]
+    (cond
+     validation-error
+     (do (error "Not activating configuration from file " config-file
+                " because it is invalid: " validation-error)
+         self)
 
+     source-defs
+     (do (stop self)
+         (info "Starting new heso with sources: " source-defs)
+         (-> source-defs with-sources start))
+
+     :else self)))

@@ -90,3 +90,14 @@
               :peer-hostnames #{"peer1" "peer2" "peer4"}
               :peers peers
               :source-agents source-agents})))))
+
+(deftest test-source-defs-validation-error
+  (are [source-defs has-error]
+       (is (= has-error (boolean (#'hesokuri.heso/source-defs-validation-error
+                                  source-defs))))
+       [] false
+       *sources-eg* false
+       [:foo] true
+       [{}] true
+       (conj *sources-eg* {:missing-host-to-path 42}) true
+       (conj *sources-eg* {"" "host-name-is-empty-string"}) true))
