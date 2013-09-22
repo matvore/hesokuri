@@ -17,19 +17,13 @@
   the Java API at java.nio.file internally. All watcher objects are maps having
   a :stopper key. The value for this key is a function that, when called, stops
   the watcher and causes it to free its resources."
-  (:import [java.io File]
-           [java.nio.file
+  (:import [java.nio.file
             ClosedWatchServiceException
             FileSystems
             Path
             Paths
-            StandardWatchEventKinds]))
-
-(defn- to-file
-  [path]
-  (cond
-   (= File (.getClass path)) path
-    :else (File. (str path))))
+            StandardWatchEventKinds])
+  (:use [clojure.java.io :only [file]]))
 
 (defn- to-path
   [path]
@@ -48,7 +42,7 @@
                   (.take service)
                   (catch ClosedWatchServiceException _ nil))]
             (doseq [event (and watch-key (.pollEvents watch-key))]
-              (-> event .context to-file on-change))
+              (-> event .context str file on-change))
             (and watch-key (.reset watch-key) (recur))))]
     (.register watch-path service
                (into-array
@@ -65,14 +59,14 @@
       directory."
   [path on-change]
   {:stopper (stopper-for-watcher path on-change)
-   :dir (to-file path)})
+   :dir (file path)})
 
 (defn watcher-for-file
   "Same as watcher-for-dir, but works on files rather than directories. The
   given function is called (with no arguments) when the file is created or
   modified."
   [path on-change]
-  (let [path (to-file path)]
+  (let [path (file path)]
     {:stopper (stopper-for-watcher
                (.getParent path)
                #(when (= (str %) (.getName path))

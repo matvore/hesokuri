@@ -13,8 +13,9 @@
 ; limitations under the License.
 
 (ns hesokuri.test-hesokuri.watching
-  (:import [java.io File FileOutputStream])
-  (:use clojure.test
+  (:import [java.io FileOutputStream])
+  (:use [clojure.java.io :only [file]]
+        clojure.test
         hesokuri.test-hesokuri.temp
         hesokuri.watching))
 
@@ -28,16 +29,16 @@
         (watcher-for-dir temp-dir (fn [path] (swap! changed-files #(conj % path))))
 
         wait-for-change
-        (fn [file]
-          (let [file (File. file)]
+        (fn [filename]
+          (let [filename (file filename)]
             (loop [total-sleeps 0]
               (cond
                (> total-sleeps 400)
                (throw (IllegalStateException.
-                       (str "Watcher did not report change in time: " file
+                       (str "Watcher did not report change in time: " filename
                             " (changed-files: " (seq @changed-files) ")")))
 
-               (= (peek @changed-files) file)
+               (= (peek @changed-files) filename)
                (swap! changed-files pop)
 
                :else
@@ -46,16 +47,16 @@
                  (recur (inc total-sleeps)))))))]
     (Thread/sleep 1000)
 
-    (->> "file1" (File. temp-dir) .createNewFile)
+    (->> "file1" (file temp-dir) .createNewFile)
     (wait-for-change "file1")
 
-    (->> "file2" (File. temp-dir) .createNewFile)
+    (->> "file2" (file temp-dir) .createNewFile)
     (wait-for-change "file2")
 
-    (-> (File. temp-dir "file1") (FileOutputStream. true) (.write 42))
+    (-> (file temp-dir "file1") (FileOutputStream. true) (.write 42))
     (wait-for-change "file1")
 
-    (-> (File. temp-dir "file2") (FileOutputStream. true) (.write 1011))
+    (-> (file temp-dir "file2") (FileOutputStream. true) (.write 1011))
     (wait-for-change "file2")
 
     (Thread/sleep 100)
