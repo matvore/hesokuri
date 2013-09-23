@@ -35,6 +35,12 @@
           - :live-edit-branches #{:except #{\"private\"}}
             indicates that any branch, except one called private, should be
             considered live-edit.
+      :unwanted-branches (optional)
+          A set of strings which indicate unwanted branch names. For any string
+          in this set FOO, branches named FOO or FOO_hesokr_* will be
+          automatically deleted when they are created. This prevents other peers
+          from polluting your local set of branches. Obviously, care must be
+          taken when putting strings here.
   More entries will be added in the future to allow advanced customization of
   behavior.")
 
@@ -58,7 +64,9 @@
           (has-non-string-or-empty-string? [seq]
             (some #(or (not= String (class %)) (= "" %)) seq))
           (live-edit-branches-value []
-            (second (first (:live-edit-branches def))))]
+            (second (first (:live-edit-branches def))))
+          (set-of-non-empty-strings? [s]
+            (and (set? s) (not (has-non-string-or-empty-string? s))))]
     (cond
      (not (map? def)) "should be a map, e.g. {key1 value1, key2 value2}"
      (empty? def) "should have at least one entry"
@@ -82,10 +90,14 @@
            (:live-edit-branches def))
 
       (and (:live-edit-branches def)
-           (or (not (set? (live-edit-branches-value)))
-               (has-non-string-or-empty-string? (live-edit-branches-value))))
+           (not (set-of-non-empty-strings? (live-edit-branches-value))))
       (str "Value in live-edit-branches map must be set of non-empty strings: "
            (live-edit-branches-value))
+
+      (and (:unwanted-branches def)
+           (not (set-of-non-empty-strings? (:unwanted-branches def))))
+      (str ":unwanted-branches value must be set of non-empty strings: "
+           (:unwanted-branches def))
 
       :else
       (validation-error (:host-to-path def)))
@@ -121,3 +133,10 @@
       (if except
         (not (except branch-name))
         (only branch-name)))))
+
+(defn unwanted-branch?
+  "Truthy if the branch name given should be deleted if every found. This
+  includes versions of the branch that originate on another peer."
+  [def branch-name]
+  {:pre [(string? branch-name)]}
+  ((or (:unwanted-branches def) #{}) branch-name))

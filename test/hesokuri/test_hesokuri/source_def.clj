@@ -36,7 +36,11 @@
        {:host-to-path *host-to-path* :live-edit-branches []} true
        {:host-to-path *host-to-path* :live-edit-branches {:only []}} true
        {:host-to-path *host-to-path* :live-edit-branches {:only #{}}} false
-       {:host-to-path *host-to-path* :live-edit-branches {:only #{""}}} true))
+       {:host-to-path *host-to-path* :live-edit-branches {:only #{""}}} true
+       {:host-to-path *host-to-path* :unwanted-branches ["foo"]} true
+       {:host-to-path *host-to-path* :unwanted-branches #{}} false
+       {:host-to-path *host-to-path* :unwanted-branches #{""}} true
+       {:host-to-path *host-to-path* :unwanted-branches #{"foo"}} false))
 
 (deftest test-kind-and-validation-error-on-valid-defs
   (are [def result]
@@ -72,3 +76,15 @@
        {:only #{}} "hesokuri" false
        {:only #{"foobar"}} "foobar" true
        {:only #{"foo" "bar"}} "bar" true))
+
+(deftest test-unwanted-branch
+  (are [def branch-name result]
+       (is (= result (boolean (unwanted-branch? def branch-name))))
+       {"peer" "path"} "peer" false
+       {"peer" "path"} "path" false
+       {:host-to-path *host-to-path*} "foo" false
+       {:host-to-path *host-to-path* :unwanted-branches #{}} "foo" false
+       {:host-to-path *host-to-path* :unwanted-branches #{"foo"}} "foo" true
+
+       {:host-to-path *host-to-path* :unwanted-branches #{"a" "b" "c" "d"}}
+       "c" true))
