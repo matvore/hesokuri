@@ -101,8 +101,9 @@
      the working area is clean, and some branch LEB_hesokr_* is a fast-forward
      of LEB, then rename the LEB_hesokr_* branch to LEB, and remove the
      existing LEB branch.
-  b) For any two branches F and B, where F is a fast-forward of B, and B has a
-     name (BRANCH)_hesokr_*, and BRANCH is not hesokuri, delete branch B."
+  b) For any branch B, where B has been merged in its upstream branch, and B has
+     a name (BRANCH)_hesokr_*, and BRANCH is not a live-edit branch, delete
+     branch B."
   #(-> % refresh advance-a advance-b))
 
 (defn- do-push-for-peer
@@ -111,10 +112,8 @@
   * third-party peer branches - which is any branch named *_hesokr_(HOST) where
     HOST is not me or the push destination peer, try to push to the same branch
     name, but if it fails, ignore it.
-  * hesokuri - try to push to the same branch name, but if it fails, force push
-    to hesokuri_hesokr_(MY_HOSTNAME).
-  * local branch - which is any branch that is not hesokuri and not named in the
-    form of *_hesokr_*, force push to (BRANCH_NAME)_hesokr_(MY_HOSTNAME)"
+  * local branch - which is any branch that is not named in the form of
+    *_hesokr_*, force push to (BRANCH_NAME)_hesokr_(MY_HOSTNAME)"
   [{:keys [peers branches local-identity repo source-def] :as self}
    peer-host]
   (doseq [branch (keys branches)]
