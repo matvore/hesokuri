@@ -98,10 +98,13 @@
 
 (defn delete-branch
   "Deletes the given branch. This method always returns nil. It does not throw
-  an exception if the branch delete failed."
-  [{:keys [dir init]} branch-name]
+  an exception if the branch delete failed. 'force' indicates that -D will be
+  used to delete the branch, which means it will succeed even if the branch is
+  not yet merged to its upstream branch."
+  [{:keys [dir init]} branch-name & [force]]
   {:pre [(string? branch-name) init]}
-  (sh-print-when #(= (:exit %) 0) "git" "branch" "-d" branch-name :dir dir)
+  (sh-print-when #(= (:exit %) 0)
+                 "git" "branch" (if force "-D" "-d") branch-name :dir dir)
   nil)
 
 (defn hard-reset

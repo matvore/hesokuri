@@ -56,6 +56,18 @@
            hash-d hash-e nil false
            hash-e hash-d nil true))))
 
+(deftest test-delete-branch
+  (let [sh-invocations (atom [])
+        sh (fn [& args]
+             (swap! sh-invocations #(conj % args))
+             nil)]
+    (binding [*sh* sh]
+      (delete-branch {:dir "repodir" :init true} "byebye")
+      (delete-branch {:dir "repodir2" :init true} "ohnooo" true)
+      (is (= [["git" "branch" "-d" "byebye" :dir "repodir"]
+              ["git" "branch" "-D" "ohnooo" :dir "repodir2"]]
+             @sh-invocations)))))
+
 (deftest test-checked-out-branch
   (are [head-file result]
        (let [git-dir (create-temp-dir)
