@@ -24,35 +24,30 @@ Simply stated, as soon as you commit a change in a repository, Hesokuri attempts
 to push the changes to every peer that holds an instance of the repository in
 the configuration file.
 
-Hesokuri generally pushes commits on local branches to a remote branch called
+Hesokuri pushes commits on local branches to a remote branch called
 `X_hesokr_Y`, where `X` is the local name of the branch and `Y` is the identity
-of the peer (actually, it sometimes tries to push to the branch of the _same_
-name, but this is just a shortcut to bypass what is explained below, so you
-don't have to think about it during normal use).
+of the host pushing the change.
 
-The rest of this section goes into a lot of detail about Hesokuri behavior. If
-you want, you can skip to the "Getting started" section below.
+####Live-edit branches
+Sometimes, you will manually merge changes from `X_hesokr_Y` into the local
+branch `X` when you need to access them. However, if `X` is a _live-edit_
+branch, and it is a fast-forward of the local `X` branch, and the local `X`
+branch is either not checked out or it is checked out and the working area and
+index are clean, `X` will automatically be reset to the commit pointed to by
+`X_hesokr_Y`. _This means if `X` is checked out and there are no uncommitted
+changes to it, your working tree will update automatically when another peer
+commits changes to it._ This process is referred to as _advancing_ in the source
+code.
+
+You can specify which branches are live-edit in the configuration file (see the
+**Configure** section below).
 
 ####Sharing changes from other peers
 For every branch named `X_hesokr_Y`, Hesokuri will try to push it to other peers
 (besides `Y`) using the same branch name. This is useful for sharing changes
-between two peers that are not running at the same time, but are running at the
-same time as a third machine that serves as the carrier.
-
-####The live edit branch
-Most of the time, you will manually merge changes from `X_hesokr_Y` into the
-local branch `X` when you need to access them. However, if `X` is actually
-`hesokuri` (the _live edit_ branch) and it is a fast-forward of the local
-`hesokuri` branch, and the local `hesokuri` branch is either not checked out or
-it is checked out and the working area and index are clean, `hesokuri` will
-automatically be reset to the commit pointed to by `hesokuri_hesokr_Y`. This
-means if `hesokuri` is checked out and there are no uncommitted changes to it,
-your working tree will update automatically when another peer commits changes to
-it. This process is referred to as _advancing_ in the source code.
-
-Notice that some of this behavior should be improved and made more configurable.
-See [issue #1](https://github.com/google/hesokuri/issues/1) and
-[issue #3](https://github.com/google/hesokuri/issues/3) for examples.
+between two peers that are not running at the same time, but are running as some
+third peer. In this case, the third peer acts as a carrier for changes that did
+not originate from it.
 
 ##Getting started
 
@@ -87,17 +82,58 @@ at your own risk.
 ###Configure
 On each peer, create a file at `~/.hesocfg` which specifies all Git repos and
 peers to sync with. Each copy of the file can be the same. The file should
-contain a Clojure expression (comments are allowed) that is a vector of maps.
-Each element in the vector is a different Git repository to sync (called a
-_source_). The map is a dictionary of peer identities to local paths on each
-peer for the source. A source need not appear on every peer. Here is an example
-which demonstrates the expression syntax:
+contain a Clojure expression that is a vector of maps. Each element in the
+vector is a different Git repository to sync (called a _source_). The map is a
+dictionary which contains various parameters that control how the source is
+synchronized. It requires at least a `:host-to-path` entry, which must be set to
+a map of peer identities to local paths on each peer for the source. A source
+need not appear on every peer. Here is an example which demonstrates the syntax
+and optional source parameters:
+
 ```Clojure
-[{"host-1" "/foo/bar/path1"
-  "host-2" "/foo/bar/path2"}
- {"host-1" "/foo/bar/path3"
-  "host-3" "/foo/bar/path4"}]
+[{:host-to-path {"host-1" "/home/fbar/repo1"
+                 "host-2" "/home/fbar/repo1"}}
+
+ {:host-to-path {"host-1" "/home/fbar/repo2"
+                 "host-3" "/home/fbar/repo2"
+  :unwanted-branches #{"baz" "42"}}}
+
+ {:host-to-path {"host-1" "/home/fbar/repo3"
+                 "host-3" "/home/fbar/repo3"}
+  :live-edit-branches {:only #{"master"}}}]
 ```
+
+The syntax is identical to Clojure literal syntax. The important constructs are:
+* `:foo` indicates a keyword named `foo`, which is used for parameter names
+* `{}` indicates a map, which contains keys and values in alternating order.
+  Commas can be used in a map to separate key/value pairs, but they are
+  optional.
+* `#{}` indicates a set
+* `[]` indicates a vector
+* `;` indicates a comment
+
+Note that the distinction between maps, sets, and vectors are important when
+writing a configuration file.
+
+The meaning of each source parameter is as follows:
+* `:host-to-path` is a map of peer identities to the local path of that repo on
+  the peer. Generally, you will want to make each peer have the same or similar
+  path for a given repo.
+* `:unwanted-branches` indicates the names of branches that should be deleted on
+  this host. In the example, `baz` is an unwanted branch, so any branch named
+  `baz` or `baz_hesokr_*` will be deleted on the host with this configuration.
+  Such branches are deleted with `git branch -D`, which means that unmerged
+  changes will be lost. Be careful using this option!
+* `:live-edit-branches` indicates which branches are considered live-edit, which
+  by default is only `hesokuri`. Live-edit branches are branches that, when a
+  peer pushes changes to a local repo for a source, those peer's changes are
+  merged in automatically if it is a fast-forward. If you specify `{:only FOO}`
+  for this parameter, only the branches in the set `FOO` will be live-edit. If
+  you specify `{:except BAR}`, then every branch will be live-edit except for
+  the ones in the set `BAR`. 
+
+You can edit a configuration file while the Hesokuri process is running, and it
+will automatically restart with the new configuration.
 
 An annotated, real-world configuration file may look something like this:
 ```Clojure
@@ -106,14 +142,19 @@ An annotated, real-world configuration file may look something like this:
 ; 192.168.0.3 - the Mac desktop
 ; 192.168.0.4 - the home server
 [; Whiz bang project
- {"192.168.0.2" "/home/johndoe/whizbang"
-  "192.168.0.3" "/Users/johndoe/whizbang"
-  "192.168.0.4" "/home/johndoe/whizbang"}
+ {:host-to-path {"192.168.0.2" "/home/johndoe/whizbang"
+                 "192.168.0.3" "/Users/johndoe/whizbang"
+                 "192.168.0.4" "/home/johndoe/whizbang"}
+  :unwanted-branches #{"abandoned-feature1"}
+  :live-edit-branches {:only #{"master" "vnext"}}}
+
  ; hacking and small side projects
- {"192.168.0.3" "/Users/johndoe/hacks/lisp-snippits"
-  "192.168.0.4" "/home/johndoe/hacks/lisp-snippits"}
- {"192.168.0.3" "/Users/johndoe/hacks/game-engine"
-  "192.168.0.4" "/home/johndoe/hacks/game-engine"}]
+ {:host-to-path {"192.168.0.3" "/Users/johndoe/hacks/lisp-snippits"
+                 "192.168.0.4" "/home/johndoe/hacks/lisp-snippits"}
+  :live-edit-branches {:except #{"private"}}}
+
+ {:host-to-path {"192.168.0.3" "/Users/johndoe/hacks/game-engine"
+                 "192.168.0.4" "/home/johndoe/hacks/game-engine"}}]
 ```
 
 Note that you can save the configuration file in a location other than
@@ -131,9 +172,8 @@ empty Git repos, and other peers will push the two repos to it as soon as they
 establish a connection to `192.168.0.4`.
 
 ###Run
-If you are running from source, switch to the directory containing Hesokuri and
-run `lein run`. If you are running from the precompiled jar and it is located at
-some path `HESOKURI_JAR`, simply run `java -cp HESOKURI_JAR hesokuri.main`
+To run, switch to the directory containing the Hesokuri source and run
+`lein run`.
 
 ###Web interface
 You can go to <http://localhost:8080> in a web browser on any peer to see the
