@@ -46,13 +46,16 @@
      checked-out-branch
      (branch/parse-underscored-name (repo/checked-out-branch repo))])))
 
-(defn- advance-b
+(defn- advance-bc
   [{:keys [branches repo source-def] :as self}]
-  (doseq [branch (keys branches)
-          :when
-          (and (not (source-def/live-edit-branch? source-def (:name branch)))
-               (:peer branch))]
-    (repo/delete-branch repo (branch/underscored-name branch)))
+  (doseq [branch (keys branches)]
+    (cond
+     (source-def/unwanted-branch? source-def (:name branch))
+     (repo/delete-branch repo (branch/underscored-name branch) :force)
+
+     (and (not (source-def/live-edit-branch? source-def (:name branch)))
+          (:peer branch))
+     (repo/delete-branch repo (branch/underscored-name branch))))
   self)
 
 (defn- advance-a
@@ -103,8 +106,11 @@
      existing LEB branch.
   b) For any branch B, where B has been merged in its upstream branch, and B has
      a name (BRANCH)_hesokr_*, and BRANCH is not a live-edit branch, delete
-     branch B."
-  #(-> % refresh advance-a advance-b))
+     branch B with 'git branch -d'.
+  c) For any branch specified as unwanted in the source-def, delete it with
+     'git branch -D'. For instance, if 'foo' is unwanted, then any branch named
+     'foo' or 'foo_hesokr_*' will be deleted."
+  #(-> % refresh advance-a advance-bc))
 
 (defn- do-push-for-peer
   "Push all branches as necessary to keep a peer up-to-date.
