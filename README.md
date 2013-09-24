@@ -3,10 +3,8 @@
 Distributed Git repo backup and duplication daemon.
 
 ##Intro
-
-Hesokuri is a daemon utility that synchronizes one or more Git source code
-repositories between multiple machines on a network. It is useful in the
-following situations:
+Hesokuri synchronizes one or more Git source code repositories between multiple
+machines on a network. It is useful in the following situations:
 
 1. You want the peace of mind of controlling the machines where your source code
    is stored.
@@ -45,9 +43,9 @@ You can specify which branches are live-edit in the configuration file (see the
 ####Sharing changes from other peers
 For every branch named `X_hesokr_Y`, Hesokuri will try to push it to other peers
 (besides `Y`) using the same branch name. This is useful for sharing changes
-between two peers that are not running at the same time, but are running as some
-third peer. In this case, the third peer acts as a carrier for changes that did
-not originate from it.
+between two peers that are not running at the same time, but are running at the
+same time as some third peer. In this case, the third peer acts as a carrier for
+changes that did not originate from it.
 
 ##Getting started
 
@@ -95,8 +93,8 @@ and optional source parameters:
                  "host-2" "/home/fbar/repo1"}}
 
  {:host-to-path {"host-1" "/home/fbar/repo2"
-                 "host-3" "/home/fbar/repo2"
-  :unwanted-branches #{"baz" "42"}}}
+                 "host-3" "/home/fbar/repo2"}
+  :unwanted-branches #{"baz" "42"}}
 
  {:host-to-path {"host-1" "/home/fbar/repo3"
                  "host-3" "/home/fbar/repo3"}
@@ -132,8 +130,8 @@ The meaning of each source parameter is as follows:
   you specify `{:except BAR}`, then every branch will be live-edit except for
   the ones in the set `BAR`. 
 
-You can edit a configuration file while the Hesokuri process is running, and it
-will automatically restart with the new configuration.
+You can edit a configuration file while Hesokuri is running, and it will
+automatically restart with the new configuration.
 
 An annotated, real-world configuration file may look something like this:
 ```Clojure
@@ -163,17 +161,16 @@ way, you can store the `HESOCFG` in a subdirectory and put it in a Git repo to
 sync (along with other miscellaneous configuration files and utilities that are
 shared between all systems).
 
-If a repo or any containing directory does not exist on a peer and you start the
-Hesokuri daemon on it, the containing directory and repo will be created
-automatically on Hesokuri start up. This means that, in the above example, if
-the `hacks` folder containing the two repos does not exist on `192.168.0.4`, you
-can run Hesokuri anyway, `192.168.0.4` will create the folders and initialize
-empty Git repos, and other peers will push the two repos to it as soon as they
-establish a connection to `192.168.0.4`.
+If a repo or any containing directory does not exist on a peer and you start
+Hesokuri on it, the containing directory and repo will be created automatically.
+This means that, in the above example, if the `hacks` folder containing the two
+repos does not exist on `192.168.0.4`, you can run Hesokuri anyway,
+`192.168.0.4` will create the folders and initialize empty Git repos, and other
+peers will push the two repos to it as soon as they establish a connection.
 
 ###Run
-To run, switch to the directory containing the Hesokuri source and run
-`lein run`.
+To run, switch to the directory containing the Hesokuri source and enter
+`lein run` at the command line.
 
 ###Web interface
 You can go to <http://localhost:8080> in a web browser on any peer to see the
@@ -191,7 +188,6 @@ can be changed from the default of 8080 by setting the environment variable
 ##FAQ
 
 ###Where does the name of the project come from?
-
 From the Japanese word meaning "secret cash hoard." It was chosen because this
 tool enables a kind of "hoarding" of data on a personal machine. The name also
 contrasts this practice with the alternative of storing your data on a third
@@ -199,18 +195,15 @@ party server, while the alternative to a hesokuri is storing your money in the
 family bank account.
 
 ###Does Hesokuri support synchronizing bare repositories?
-
 Hesokuri is mostly tested with non-bare repositories with their own working
 trees. Bare repositories should also work, assuming they are initialized
 manually with `git init --bare` in the directory specified by the configuration
 file.
 
 ###What happens when some peer is unreachable?
-
 Before pushing a branch to a remote peer, Hesokuri makes sure it is responsive
 with [`InetAddress.isReachable`](http://goo.gl/VnJL7o) (essentially a ping). If
 it is not responsive, Hesokuri will not push anything to that peer. Every three
 minutes, Hesokuri attempts a ping and push for every peer that does not have the
-most recent version of a branch regardless of their last failed ping attempt.
-You can also use the web interface to force an immediate push for peers that
-failed their last ping.
+most recent version of a branch. You can also use the web interface to force an
+immediate push for peers that failed their last ping.
