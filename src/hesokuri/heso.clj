@@ -130,7 +130,8 @@
 
 (defn- source-defs-validation-error
   "Sees if the given source-defs appears valid. If it is valid, returns nil.
-  Otherwise, returns a plain English string explaining one of the errors in it."
+  Otherwise, returns a plain English string explaining which source-defs are
+  invalid and why."
   [source-defs]
   (let [error-messages
         (for [source-def source-defs
@@ -144,8 +145,8 @@
 
 (defn update-from-config-file
   "Reads the config file, stops the given heso object, and starts a new one.
-  If the config-file has errors, this effectively stops the heso without
-  starting a new one. Returns the new heso object."
+  If the config-file has errors, this effectively does nothing. Returns the new
+  state of the heso object."
   [self config-file]
   (let [source-defs (maybe (str "Read sources from " config-file)
                            read-string
