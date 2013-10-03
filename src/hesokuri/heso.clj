@@ -96,7 +96,7 @@
           :let [source-dir (host-to-path local-identity)
                 source-agent (source-agents source-dir)]]
     (maybe (format "pushing %s to %s" source-dir peer-hostname)
-           send source-agent source/push-for-peer peer-hostname))
+           (send source-agent source/push-for-peer peer-hostname)))
   self)
 
 (defn start
@@ -149,8 +149,7 @@
   state of the heso object."
   [self config-file]
   (let [source-defs (maybe (str "Read sources from " config-file)
-                           read-string
-                           (slurp config-file))
+                           (read-string (slurp config-file)))
         validation-error (and source-defs
                               (source-defs-validation-error source-defs))]
     (cond

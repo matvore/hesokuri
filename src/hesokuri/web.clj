@@ -101,7 +101,8 @@
 
 (defpage [:post "/errors/clear"] {:keys [type key]}
   (let [agt (get-in @*web-heso* [(keyword type) key])]
-    (maybe "Remove errors from agent." restart-agent agt @agt)
+    (maybe (str "Remove errors from agent: " [type key])
+           (restart-agent agt @agt))
     (redirect (format "/errors/%s/%s" (url-encode type) (url-encode key)))))
 
 (defpage "/sources" []

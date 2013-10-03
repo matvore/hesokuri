@@ -134,18 +134,14 @@
   []
   (System/currentTimeMillis))
 
-(defn maybe
-  "Runs the given function with the given args and returns the same value. If
-  the function throws an exception, logs it and return nil."
-  [description func & args]
-  (try
-    (apply func args)
-    (catch Exception e
-      ;; For some reason, log needs *read-eval* enabled.
-      (binding [*read-eval* true]
-        (error e "Error when:" description))
-      nil)))
-
-(defn maybe-restart-agent
-  [agn]
-  (maybe (format "Restarting: %s" agn) restart-agent agn @agn))
+(defmacro maybe
+  "Runs the given body (wrapping in do) and returns the value returned by the
+  body. If the body throws an exception, logs it and return nil."
+  [description & body]
+  `(try
+     (do ~@body)
+     (catch Exception e#
+       ;; For some reason, log needs *read-eval* enabled.
+       (binding [*read-eval* true]
+         (error e# "Error when: " ~description))
+       nil)))
