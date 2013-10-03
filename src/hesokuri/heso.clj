@@ -88,9 +88,8 @@
 (defn push-sources-for-peer
   "Pushes all sources to the given peer. This operation happens asynchronously.
   This function returns the new state of the heso object."
-  [{:keys [active peers source-defs source-agents local-identity] :as self}
+  [{:keys [peers source-defs source-agents local-identity] :as self}
    peer-hostname]
-  {:pre [active]}
   (send (peers peer-hostname) #(dissoc % :last-fail-ping-time))
   (doseq [host-to-path (common-sources source-defs local-identity peer-hostname)
           :let [source-dir (host-to-path local-identity)
@@ -99,21 +98,27 @@
            (send source-agent source/push-for-peer peer-hostname)))
   self)
 
+(defn- send-args-to-start-sources
+  "Returns a sequence of sequences of arguments to pass to send to start the
+  source agents."
+  [{:keys [source-agents]}]
+  (mapcat (fn [[_ agt]] [[agt source/init-repo]
+                         [agt source/advance]
+                         [agt source/start-watching]])
+          source-agents))
+
 (defn start
   "Begins the automatic operations of this object asynchronously. This function
   returns the new state of the heso object. This can safely be called multiple
   times or after the object has already started."
-  [{:keys [active heartbeats peer-hostnames source-agents] :as self}]
-  (let [active-self (assoc self :active true)]
-    (when-not active
-      (doseq [[_ source-agent] source-agents]
-        (send source-agent source/init-repo)
-        (send source-agent source/advance)
-        (send source-agent source/start-watching))
-      (doseq [peer-hostname peer-hostnames]
-        (send heartbeats start-heartbeat 300000
-              (fn [] (push-sources-for-peer active-self peer-hostname)))))
-    active-self))
+  [{:keys [active heartbeats peer-hostnames] :as self}]
+  (when-not active
+    (doseq [send-args (send-args-to-start-sources self)]
+      (apply send send-args))
+    (doseq [peer-hostname peer-hostnames]
+      (send heartbeats start-heartbeat 300000
+            (fn [] (push-sources-for-peer self peer-hostname)))))
+  (assoc self :active true))
 
 (defn stop
   "Terminates the automatic operations of this object. For instance, stops

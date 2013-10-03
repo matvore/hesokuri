@@ -21,6 +21,7 @@
         hesokuri.util)
   (:require [hesokuri.peer :as peer]
             [hesokuri.repo :as repo]
+            [hesokuri.source :as source]
             [hesokuri.source-def :as source-def]))
 
 (def ^:dynamic *sources-eg*
@@ -101,3 +102,10 @@
        [{}] true
        (conj *sources-eg* {:missing-host-to-path 42}) true
        (conj *sources-eg* {"" "host-name-is-empty-string"}) true))
+
+(deftest test-send-args-to-start-sources
+  (is (= [] (#'hesokuri.heso/send-args-to-start-sources {:source-agents {}}))
+      (= [[:a source/init-repo] [:a source/advance] [:a source/start-watching]
+          [:b source/init-repo] [:b source/advance] [:b source/start-watching]]
+         (#'hesokuri.heso/send-args-to-start-sources
+          {:source-agents {"a" :a, "b" :b}}))))
