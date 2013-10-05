@@ -18,7 +18,8 @@
   more performant git access layer later. Currently it just shells out to 'git'
   on the command line)."
   (:use [clojure.java.io :only [file]]
-        [clojure.string :only [trim]]
+        [clojure.string :only [split trim]]
+        clojure.tools.logging
         hesokuri.util
         hesokuri.watching))
 
@@ -72,18 +73,32 @@
         (and (= 0 (:exit status))
              (= "" (:out status))))))
 
+(defn- branch-and-hash-list
+  "Returns a sequence of pairs. Each pair is a sequence containing two strings:
+  a branch name and its hash. output is the output of the command
+  'git branch -v --no-abbrev' as a string."
+  [output]
+  (for [line (-> output trim (split #"\n+"))
+        :let [unmarked (if (.startsWith line "*") (.substring line 1) line)
+              [name hash] (-> unmarked trim (split #" +" 3))]
+        :when (and (full-hash? hash) (not= name ""))]
+    [name hash]))
+
 (defn branches
   "Returns a map of refs/heads branches to their hashes."
-  [repo]
-  {:pre [(:init repo)]}
-  (into {}
-   (let [heads-dir (file (git-dir repo) "refs" "heads")
-         head-files (seq (.listFiles heads-dir))]
-     (for [head-file head-files
-           :let [hash (try (trim (slurp head-file))
-                           (catch java.io.FileNotFoundException _ nil))]
-           :when hash]
-       [(.getName head-file) hash]))))
+  [{:keys [dir init]}]
+  {:pre [init]}
+  (let [{:keys [err out exit]}
+        (*sh* "git" "branch" "-v" "--no-abbrev" :dir dir)]
+    ;; git-branch can return error even though some branches were read
+    ;; correctly, so if there was an error just log a warning and try to parse
+    ;; the output anyway.
+    (when (not= 0 exit)
+      (warnf (str "git-branch returned error in %s, exit code %d:\n"
+                  "stdout:\n%s"
+                  "stderr:\n%s")
+                dir exit out err))
+    (into {} (branch-and-hash-list out))))
 
 (defn checked-out-branch
   "Returns the name of the currently checked-out branch, or nil if no local
