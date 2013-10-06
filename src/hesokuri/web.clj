@@ -15,6 +15,7 @@
 (ns hesokuri.web
   "Defines web pages that show and allow manipulation of hesokuri state."
   (:use [clojure.java.io :only [file]]
+        hesokuri.see
         hesokuri.util
         hiccup.page
         [hiccup.util :only [escape-html]]
@@ -174,4 +175,4 @@
     (let [heso @*web-heso*]
       [:body
        (-navbar heso "/dump")
-       (-pretty-print heso)])))
+       (-pretty-print (shrink heso))])))
