@@ -34,7 +34,7 @@
    :else (Paths/get (str path) (into-array String []))))
 
 (defn- service
-  [path on-change]
+  [path on-change on-change-args]
   (let [service (.newWatchService (FileSystems/getDefault))
         watch-path (to-path path)
         start
@@ -43,8 +43,9 @@
                 (try
                   (.take service)
                   (catch ClosedWatchServiceException _ nil))]
-            (doseq [event (and watch-key (.pollEvents watch-key))]
-              (-> event .context str file on-change))
+            (doseq [event (and watch-key (.pollEvents watch-key))
+                    :let [changed-file (-> event .context str file)]]
+              (apply on-change changed-file on-change-args))
             (and watch-key (.reset watch-key) (recur))))]
     (.register watch-path service
                (into-array
@@ -63,18 +64,26 @@
   function when such an event occurs with a relative path to the affected file.
   path - a string or File that specifies the directory to watch
   on-change - a function to call when a file is created or modified in that
-      directory."
-  [path on-change]
-  {:watch-service (service path on-change)
-   :path {:dir (file path)}})
+      directory
+  on-change-args - arguments to pass to on-change following the file that was
+      changed"
+  [path on-change & on-change-args]
+  {:watch-service (service path on-change on-change-args)
+   :dir (file path)
+   :on-change {:fn on-change :args on-change-args}})
+
+(defn- on-change-dir-of-watched-file
+  [changed-file watched-file on-change on-change-args]
+  (when (= (str changed-file) watched-file)
+    (apply on-change on-change-args)))
 
 (defn for-file
   "Similar to for-dir, but works on files rather than directories. The given
-  function is called (with no arguments) when the file is created or modified."
-  [path on-change]
+  function is called when the file is created or modified.
+  on-change - a function to call when the file is created or modified
+  on-change-args - the arguments to pass to on-change"
+  [path on-change & on-change-args]
   (let [path (file path)]
-    {:watch-service (service
-                     (.getParent path)
-                     #(when (= (str %) (.getName path))
-                        (on-change)))
-     :path {:file path}}))
+    (for-dir (.getParent path)
+             on-change-dir-of-watched-file
+             (.getName path) on-change on-change-args)))

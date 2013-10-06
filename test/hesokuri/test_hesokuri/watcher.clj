@@ -19,15 +19,17 @@
         hesokuri.test-hesokuri.temp
         hesokuri.watcher))
 
+(defn- add-changed-file
+  [path changed-files-atom]
+  (swap! changed-files-atom #(conj % path)))
+
 ;;; TODO: This test runs very slowly on Mac OS X. Figure out a way to mock out
 ;;;     the java.nio.file file watching system so that this is really a unit
 ;;;     test. See also: http://goo.gl/NgzBSP
 (deftest test-for-dir
   (let [changed-files (atom clojure.lang.PersistentQueue/EMPTY)
         temp-dir (create-temp-dir)
-
-        watcher
-        (for-dir temp-dir (fn [path] (swap! changed-files #(conj % path))))
+        watcher (for-dir temp-dir add-changed-file changed-files)
 
         wait-for-change
         (fn [filename]
