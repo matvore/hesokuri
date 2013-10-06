@@ -22,12 +22,12 @@
   (:use [clojure.java.io :only [file]]
         [clojure.java.shell :only [with-sh-dir sh]]
         [clojure.string :only [trim]]
-        hesokuri.util
-        hesokuri.watching)
+        hesokuri.util)
   (:require [hesokuri.branch :as branch]
             [hesokuri.peer :as peer]
             [hesokuri.repo :as repo]
-            [hesokuri.source-def :as source-def]))
+            [hesokuri.source-def :as source-def]
+            [hesokuri.watcher :as watcher]))
 
 (defn- refresh
   "Updates values of the source object based on the state of the repo."
@@ -166,7 +166,7 @@
 (defn stop-watching
   "Stops watching the file system. If not watching, this is a no-op."
   [{:keys [watcher] :as self}]
-  (when watcher ((watcher :stopper)))
+  (when watcher (watcher/stop watcher))
   (dissoc self :watcher))
 
 (defn start-watching

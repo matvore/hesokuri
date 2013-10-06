@@ -12,21 +12,22 @@
 ; See the License for the specific language governing permissions and
 ; limitations under the License.
 
-(ns hesokuri.test-hesokuri.watching
+(ns hesokuri.test-hesokuri.watcher
   (:import [java.io FileOutputStream])
   (:use [clojure.java.io :only [file]]
         clojure.test
         hesokuri.test-hesokuri.temp
-        hesokuri.watching))
+        hesokuri.watcher))
 
-; TODO: This test runs very slowly. Figure out a way to mock out the
-;     java.nio.file file watching system so that this is really a unit test.
-(deftest test-watcher-for-dir
+;;; TODO: This test runs very slowly on Mac OS X. Figure out a way to mock out
+;;;     the java.nio.file file watching system so that this is really a unit
+;;;     test. See also: http://goo.gl/NgzBSP
+(deftest test-for-dir
   (let [changed-files (atom clojure.lang.PersistentQueue/EMPTY)
         temp-dir (create-temp-dir)
 
         watcher
-        (watcher-for-dir temp-dir (fn [path] (swap! changed-files #(conj % path))))
+        (for-dir temp-dir (fn [path] (swap! changed-files #(conj % path))))
 
         wait-for-change
         (fn [filename]

@@ -13,9 +13,9 @@
 ; limitations under the License.
 
 (ns hesokuri.updateable-heso
-  (:use hesokuri.util
-        hesokuri.watching)
-  (:require [hesokuri.heso :as heso]))
+  (:use hesokuri.util)
+  (:require [hesokuri.heso :as heso]
+            [hesokuri.watcher :as watcher]))
 
 (defn with-config-file
   "Creates a new updateable-heso object with the given config-file, which
@@ -33,11 +33,11 @@
     self
     (let [on-change
           (fn [] (send heso heso/update-from-config-file config-file))]
-      (assoc self :watcher (watcher-for-file config-file on-change)))))
+      (assoc self :watcher (watcher/for-file config-file on-change)))))
 
 (defn stop-autoupdate
   "Stops autoupdate if it is currently started. Returns the new state of the
   updateable-heso object."
   [{:keys [watcher] :as self}]
-  (when watcher ((watcher :stopper)))
+  (when watcher (watcher/stop watcher))
   (dissoc self :watcher))

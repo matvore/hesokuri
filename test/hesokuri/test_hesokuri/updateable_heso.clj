@@ -17,9 +17,9 @@
         clojure.test
         hesokuri.test-hesokuri.mock
         hesokuri.updateable-heso
-        hesokuri.util
-        hesokuri.watching)
-  (:require [hesokuri.heso :as heso]))
+        hesokuri.util)
+  (:require [hesokuri.heso :as heso]
+            [hesokuri.watcher :as watcher]))
 
 (def ^:dynamic *config-file* "/home/jdoe/hesocfg")
 
@@ -33,7 +33,7 @@
   (is (= file *config-file*))
   (swap! *on-change-cfg* (constantly on-change))
   {:stopper (mock {[] [nil :already-stopped]})
-   :file file})
+   :path {:file file}})
 
 (deftest test-with-config-file
   (let [result (with-config-file *config-file*)]
@@ -43,7 +43,8 @@
 
 (deftest test-start-and-stop-autoupdate
   (with-redefs
-    [watcher-for-file watcher-for-config-file
+    [watcher/for-file watcher-for-config-file
+     watcher/stop (fn [{:keys [stopper]}] (stopper))
      heso/update-from-config-file #(assoc %1 :updated-from-file %2)]
     (let [not-started (with-config-file *config-file*)
           heso-agent (:heso not-started)

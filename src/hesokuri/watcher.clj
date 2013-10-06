@@ -12,11 +12,13 @@
 ; See the License for the specific language governing permissions and
 ; limitations under the License.
 
-(ns hesokuri.watching
+(ns hesokuri.watcher
   "Module that makes watching file systems for changes easier. This modules uses
   the Java API at java.nio.file internally. All watcher objects are maps having
-  a :stopper key. The value for this key is a function that, when called, stops
-  the watcher and causes it to free its resources."
+  these keys:
+  :watch-service - the underlying java.nio.file.WatchService object
+  :path - a map in the form of {:dir DIR-PATH} or {:file FILE-PATH} indicating
+      the directory or file being watched"
   (:import [java.nio.file
             ClosedWatchServiceException
             FileSystems
@@ -31,7 +33,7 @@
    (= Path (.getClass path)) path
    :else (Paths/get (str path) (into-array String []))))
 
-(defn- stopper-for-watcher
+(defn- service
   [path on-change]
   (let [service (.newWatchService (FileSystems/getDefault))
         watch-path (to-path path)
@@ -49,26 +51,30 @@
                 [StandardWatchEventKinds/ENTRY_CREATE
                  StandardWatchEventKinds/ENTRY_MODIFY]))
     (-> start Thread. .start)
-    (fn [] (.close service))))
+    service))
 
-(defn watcher-for-dir
+(defn stop
+  "Stops the given watcher. This is an idempotent operation."
+  [{:keys [watch-service]}]
+  (.close watch-service))
+
+(defn for-dir
   "Watches a directory for modification or creation, and calls the given
   function when such an event occurs with a relative path to the affected file.
   path - a string or File that specifies the directory to watch
   on-change - a function to call when a file is created or modified in that
       directory."
   [path on-change]
-  {:stopper (stopper-for-watcher path on-change)
-   :dir (file path)})
+  {:watch-service (service path on-change)
+   :path {:dir (file path)}})
 
-(defn watcher-for-file
-  "Same as watcher-for-dir, but works on files rather than directories. The
-  given function is called (with no arguments) when the file is created or
-  modified."
+(defn for-file
+  "Similar to for-dir, but works on files rather than directories. The given
+  function is called (with no arguments) when the file is created or modified."
   [path on-change]
   (let [path (file path)]
-    {:stopper (stopper-for-watcher
-               (.getParent path)
-               #(when (= (str %) (.getName path))
-                  (on-change)))
-     :file path}))
+    {:watch-service (service
+                     (.getParent path)
+                     #(when (= (str %) (.getName path))
+                        (on-change)))
+     :path {:file path}}))

@@ -17,11 +17,11 @@
   have logic that is specific to Hesokuri, so it can be easily replaced with a
   more performant git access layer later. Currently it just shells out to 'git'
   on the command line)."
+  (:require [hesokuri.watcher :as watcher])
   (:use [clojure.java.io :only [file]]
         [clojure.string :only [split trim]]
         clojure.tools.logging
-        hesokuri.util
-        hesokuri.watching))
+        hesokuri.util))
 
 (defn hex-char?
   "Returns true iff the given character is a hexadecimal character: 0-9 or a-f.
@@ -163,4 +163,4 @@
   that takes no arguments and is called when a change is detected."
   [repo on-change]
   {:pre [(:init repo)]}
-  (watcher-for-dir (file (git-dir repo) "refs" "heads") (fn [_] (on-change))))
+  (watcher/for-dir (file (git-dir repo) "refs" "heads") (fn [_] (on-change))))
