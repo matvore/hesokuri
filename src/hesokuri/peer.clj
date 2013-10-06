@@ -16,22 +16,8 @@
   "Implementation of the peer object. It optimizes access to a peer by keeping
   track of what has been successfully pushed to it."
   (:use hesokuri.util)
-  (:import (java.net ConnectException InetAddress UnknownHostException))
-  (:require [hesokuri.repo :as repo]))
-
-(defn- accessible
-  "Checks if the given host is accessible, waiting for the specified timeout for
-  a respose.
-  host - hostname or IP address of host to check
-  timeout - the number of millis to wait for a response"
-  [host timeout]
-  (-> host
-      InetAddress/getByName
-      (.isReachable timeout)
-      (try (catch UnknownHostException _ false)
-           ;; ConnectException happens when "Host is down" which is
-           ;; not "exceptional"
-           (catch ConnectException _ false))))
+  (:require [hesokuri.peer-repo :as peer-repo]
+            [hesokuri.repo :as repo]))
 
 (def default
   "A new peer with default values for each entry. A peer has the following keys:
@@ -64,8 +50,7 @@
   is responsive.
   local-repo - hesokuri.repo object representing the source to push from on the
       local machine
-  peer-repo - a hesokuri.util.PeerRepo object that indicates the peer and source
-      to push to
+  peer-repo - a hesokuri.peer-repo object that indicates the repo to push to
   push-branch - an object representing the branch to push
   hash - the hash to push (in general, this should be the hash pointed to by
       push-branch
@@ -86,14 +71,14 @@
 
      (= hash (pushed pushed-key)) self
 
-     (not (accessible (:host peer-repo) timeout-for-ping))
+     (not (peer-repo/accessible peer-repo timeout-for-ping))
      (assoc self :last-fail-ping-time current-time)
 
      :else
      (-> (for [[branch allow-non-ff] tries
                :when (= 0 (repo/push-to-branch
                            local-repo
-                           (str peer-repo)
+                           (peer-repo/push-str peer-repo)
                            hash
                            branch
                            allow-non-ff))]

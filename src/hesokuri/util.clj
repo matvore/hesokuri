@@ -38,11 +38,6 @@
   [& args]
   (apply sh-print-when (constantly true) args))
 
-(defrecord PeerRepo [host path]
-  Object
-  (toString [_]
-    (str "ssh://" host path)))
-
 (defn start-heartbeat
   "Gives functionality to run a repeated task at regular intervals, and stops
   when stop-heartbeats is called. self should be an atom."

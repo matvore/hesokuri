@@ -68,10 +68,3 @@
                       :stdout exp-stdout}})
         [5 4] 0 "err: 1" "out: 1"
         [5 6] 1 "err" "out")))
-
-(deftest test-peer-repo
-  (are [host path combined]
-       (= combined (str (->PeerRepo host path)))
-       "foo" "/bar" "ssh://foo/bar"
-       "" "" "ssh://"
-       "foo.bar" "/" "ssh://foo.bar/"))

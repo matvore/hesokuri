@@ -17,9 +17,10 @@
         clojure.test
         hesokuri.test-hesokuri.mock
         hesokuri.util)
-  (:require [hesokuri.peer :as peer]))
+  (:require [hesokuri.peer :as peer]
+            [hesokuri.peer-repo :as peer-repo]))
 
-(def ^:dynamic peer-repo (->PeerRepo "repohost" "/repopath"))
+(def ^:dynamic peer-repo {:host "repohost" :path "/repopath"})
 
 (def ^:dynamic local-repo {:dir (file "/local-path") :bare false :init true})
 
@@ -33,10 +34,10 @@
    [["push-branch" :push-arg]]))
 
 (defn accessible-args []
-  [(:host peer-repo) (peer/default :timeout-for-ping)])
+  [peer-repo (peer/default :timeout-for-ping)])
 
 (defn push-but-fail-ping [peer]
-  (with-redefs [peer/accessible (mock {(accessible-args) [false]})
+  (with-redefs [peer-repo/accessible (mock {(accessible-args) [false]})
                 current-time-millis (mock {[] [42 43 44 45]})]
     (let [peer (-> peer push push push push)]
       (is (= 42 (peer :last-fail-ping-time)))
@@ -44,7 +45,7 @@
 
 (deftest retrying-unresponsive-peer
   (let [peer (push-but-fail-ping peer/default)]
-    (with-redefs [peer/accessible (mock {(accessible-args) [true]})
+    (with-redefs [peer-repo/accessible (mock {(accessible-args) [true]})
 
                   current-time-millis
                   (mock {[] [(+ 46 (peer/default :minimum-retry-interval))]})
@@ -57,7 +58,7 @@
 
 (deftest clear-fail-ping-even-when-failing-push
   (let [peer (push-but-fail-ping peer/default)]
-    (with-redefs [hesokuri.peer/accessible (mock {(accessible-args) [true]})
+    (with-redefs [peer-repo/accessible (mock {(accessible-args) [true]})
 
                   current-time-millis
                   (mock {[] [(+ 46 (peer/default :minimum-retry-interval))]})

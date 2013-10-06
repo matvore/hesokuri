@@ -127,7 +127,7 @@
      (peers peer-host)
      peer/push
      repo
-     (->PeerRepo peer-host ((source-def/host-to-path source-def) peer-host))
+     {:host peer-host, :path ((source-def/host-to-path source-def) peer-host)}
      branch
      (branches branch)
      (let [force-args (-> branch
