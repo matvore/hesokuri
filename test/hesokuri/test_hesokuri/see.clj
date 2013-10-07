@@ -22,7 +22,7 @@
        (repeat 3 (repeat 10 :x))
        [(repeat 10 :x) [:hesokuri.see/path 0] [:hesokuri.see/path 0]]
 
-       (hesokuri.see/shrink [{} {}])
+       (shrink [{} {}])
        [{} [:hesokuri.see/path 0]]
 
        (let [atm (atom [:foo])]
@@ -30,3 +30,25 @@
        [[:hesokuri.see/atom [:foo]]
         [:hesokuri.see/path 0]
         [:hesokuri.see/path 0 :deref]]))
+
+(defn throw-exception [s e] (throw e) s)
+
+(deftest test-shrink-agent
+  (let [exception (RuntimeException. "test exception")
+        agent-with-error (-> (agent :test-agent)
+                             (send throw-exception exception))]
+    (while (nil? (agent-error agent-with-error))
+      (Thread/sleep 25))
+    (is (= [:hesokuri.see/agent exception :test-agent]
+           (shrink agent-with-error)))
+    (is (= [:hesokuri.see/agent :test-agent-2]
+           (shrink (agent :test-agent-2))))))
+
+(deftest test-shrink-box-with-abbreviation
+  (let [expr (shrink {:foo [1 2 3]
+                      :bar (atom [1 2 3])})]
+    (is (or (= {:foo [:hesokuri.see/path :bar :deref]
+                :bar [:hesokuri.see/atom [1 2 3]]}
+               expr)
+            (= {:foo [1 2 3]
+                :bar [:hesokuri.see/atom [:hesokuri.see/path :foo]]})))))

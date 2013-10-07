@@ -14,27 +14,35 @@
 
 (ns hesokuri.see
   "A module that helps transform a data structure so that redundant sections are
-  abbreviated. For instance, (repeat 3 (repeat 10 :x)) will be transformed to:
-  ((:x :x :x :x :x :x :x :x :x :x)
-   {:hesokuri.see/p [0]}
-   {:hesokuri.see/p [0]})")
+  abbreviated.")
+
+(defn- box-kind [box]
+  ({clojure.lang.Atom ::atom
+    clojure.lang.Ref ::ref
+    clojure.lang.Agent ::agent
+    clojure.lang.Var ::var}
+   (class box)))
+
+(defn- printable-box
+  "Turns a 'box' (atom, ref, agent, var) into a vector that describes the box.
+  This includes the box kind and (if an agent in error state) the error on it."
+  [box]
+  (let [kind (box-kind box)
+        error (delay (agent-error box))]
+    (if (and (= kind ::agent) @error)
+      [kind @error] [kind])))
 
 (defn- shrink-with-paths
   [expr curr-path path-map]
   (let [previous-path (delay (path-map expr))
-        new-path-map (delay (assoc path-map expr (cons ::path curr-path)))
-        box-kind (delay ({clojure.lang.Atom ::atom
-                          clojure.lang.Ref ::ref
-                          clojure.lang.Agent ::agent
-                          clojure.lang.Var ::var}
-                         (class expr)))]
+        new-path-map (delay (assoc path-map expr curr-path))]
     (cond
      @previous-path [@previous-path path-map]
 
-     @box-kind
+     (box-kind expr)
      (let [[shrunk-value path-map]
            (shrink-with-paths @expr (conj curr-path :deref) @new-path-map)]
-       [(list @box-kind shrunk-value) path-map])
+       [(conj (printable-box expr) shrunk-value) path-map])
 
      (or (vector? expr) (seq? expr) (list? expr) (set? expr))
      (loop [i 0
@@ -46,7 +54,6 @@
                (shrink-with-paths e (conj curr-path i) path-map)]
            (recur (inc i) (next els) path-map (conj shrunk shrunk-e)))
         [shrunk path-map]))
-
 
      (map? expr)
      (loop [[[k v] :as els] (seq expr)
@@ -60,7 +67,11 @@
 
      :else [expr path-map])))
 
-
 (defn shrink
+  "Transforms a data structure so that redundant sections are abbrevated. For
+  instance, (repeat 3 (repeat 10 :x)) will be transformed to:
+  ((:x :x :x :x :x :x :x :x :x :x)
+   {:hesokuri.see/p [0]}
+   {:hesokuri.see/p [0]})"
   [expr]
-  (first (shrink-with-paths expr [] {})))
+  (first (shrink-with-paths expr [::path] {})))
