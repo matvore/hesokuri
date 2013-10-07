@@ -17,7 +17,8 @@
         [clojure.string :only [join split trim]]
         clojure.tools.logging
         hesokuri.util)
-  (:require [hesokuri.peer :as peer]
+  (:require [hesokuri.heartbeats :as heartbeats]
+            [hesokuri.peer :as peer]
             [hesokuri.repo :as repo]
             [hesokuri.source :as source]
             [hesokuri.source-def :as source-def]))
@@ -62,7 +63,7 @@
    [:keep source-defs
 
     active false
-    heartbeats (agent (atom nil))
+    heartbeats (agent {})
 
     :omit host-to-paths (map source-def/host-to-path source-defs)
     :omit all-hostnames (set (mapcat keys host-to-paths))
@@ -116,8 +117,8 @@
     (doseq [send-args (send-args-to-start-sources self)]
       (apply send send-args))
     (doseq [peer-hostname peer-hostnames]
-      (send heartbeats start-heartbeat 300000
-            (fn [] (push-sources-for-peer self peer-hostname)))))
+      (send heartbeats heartbeats/start 300000
+            push-sources-for-peer self peer-hostname)))
   (assoc self :active true))
 
 (defn stop
@@ -130,7 +131,7 @@
   (when active
     (doseq [[_ source-agent] source-agents]
       (send source-agent source/stop-watching))
-    (send heartbeats stop-heartbeats))
+    (send heartbeats heartbeats/stop-all))
   (assoc self :active false))
 
 (defn- source-defs-validation-error

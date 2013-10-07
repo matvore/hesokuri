@@ -39,8 +39,7 @@
         beats-1 (initial-heartbeats)
         beats-2 (initial-heartbeats)]
     (is (not= beats-1 beats-2))
-    (is (not= (deref beats-1) (deref beats-2)))
-    (is (nil? (deref (deref beats-1))))))
+    (is (= {} (deref beats-1)))))
 
 (deftest test-common-sources
   (are [sources peer-names source-indexes]
