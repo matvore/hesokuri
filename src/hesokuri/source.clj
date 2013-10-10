@@ -44,7 +44,8 @@
      working-area-clean (repo/working-area-clean repo)
 
      checked-out-branch
-     (branch/parse-underscored-name (repo/checked-out-branch repo))])))
+     (let [s (repo/checked-out-branch repo)]
+       (and s (branch/parse-underscored-name s)))])))
 
 (defn- advance-bc
   [{:keys [branches repo source-def] :as self}]
