@@ -14,10 +14,11 @@
 
 (ns hesokuri.main
   (:use hesokuri.util
-        hesokuri.web)
-  (:require [noir.server :as server]
-            [hesokuri.heso :as heso]
-            [hesokuri.updateable-heso :as updateable-heso])
+        [ring.adapter.jetty :only [run-jetty]]
+        [ring.middleware.params :only [wrap-params]])
+  (:require [hesokuri.heso :as heso]
+            [hesokuri.updateable-heso :as updateable-heso]
+            [hesokuri.web :as web])
   (:gen-class))
 
 (defn- port []
@@ -27,8 +28,6 @@
 (defn- config-file []
   (or (getenv "HESOCFG")
       (str (getenv "HOME") "/.hesocfg")))
-
-(server/load-views-ns 'hesokuri.web)
 
 (defn -main
   "Starts up hesokuri."
@@ -42,4 +41,6 @@
                        :heso)]
     (send heso-agent heso/update-from-config-file config-file)
     (alter-var-root #'hesokuri.web/*web-heso* (constantly heso-agent)))
-  (server/start (port) {:mode :dev, :ns 'hesokuri}))
+  (run-jetty (-> web/heso-web-routes
+                 wrap-params)
+             {:port (port) :join? false}))

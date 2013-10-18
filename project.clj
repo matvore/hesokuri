@@ -18,7 +18,11 @@
   :url "https://github.com/google/hesokuri"
   :license {:name "Apache 2.0"
             :url "http://www.apache.org/licenses/LICENSE-2.0"}
-  :dependencies [[org.clojure/clojure "1.5.1"]
+  :dependencies [[compojure "1.1.5"]
+                 [hiccup "1.0.4"]
+                 [lib-noir "0.7.0"]
+                 [org.clojure/clojure "1.5.1"]
                  [org.clojure/tools.logging "0.2.6"]
-                 [noir "1.3.0-beta3"]]
+                 [ring/ring-core "1.2.0"]
+                 [ring/ring-jetty-adapter "1.2.0"]]
   :main hesokuri.main)
