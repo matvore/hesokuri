@@ -47,18 +47,6 @@
      (let [s (repo/checked-out-branch repo)]
        (and s (branch/parse-underscored-name s)))])))
 
-(defn- advance-bc
-  [{:keys [branches repo source-def] :as self}]
-  (doseq [branch (keys branches)]
-    (cond
-     (source-def/unwanted-branch? source-def (:name branch))
-     (repo/delete-branch repo (branch/underscored-name branch) :force)
-
-     (and (not (source-def/live-edit-branch? source-def (:name branch)))
-          (:peer branch))
-     (repo/delete-branch repo (branch/underscored-name branch))))
-  self)
-
 (defn- advance-a
   ([self]
      (advance-a self (seq (:branches self))))
@@ -92,6 +80,27 @@
 
        self)))
 
+(defn- branches-to-delete
+  "Returns a sequence of branch objects corresponding to the branches that
+  should be deleted.
+  ff? - a function that takes two hash string arguments, and returns true if the
+      latter is a fast-forward of the former, or they are equal."
+  [{:keys [branches source-def]} ff?]
+  (for [[branch hash] branches
+          :let [local-branch (dissoc branch :peer)
+                local-hash (branches local-branch)]
+          :when (or (source-def/unwanted-branch? source-def (:name branch))
+                    (and (not= branch local-branch)
+                         local-hash
+                         (ff? hash local-hash)))]
+    branch))
+
+(defn- advance-bc [{:keys [repo] :as self}]
+  (doseq [branch (branches-to-delete
+                  self #(repo/fast-forward? repo %1 %2 true))]
+    (repo/delete-branch repo (branch/underscored-name branch) :force))
+  self)
+
 (defn init-repo
   "Initializes the git repo if it does not exist already. Returns the new state
   of the source object."
@@ -105,9 +114,8 @@
      the working area is clean, and some branch LEB_hesokr_* is a fast-forward
      of LEB, then rename the LEB_hesokr_* branch to LEB, and remove the
      existing LEB branch.
-  b) For any branch B, where B has been merged in its upstream branch, and B has
-     a name (BRANCH)_hesokr_*, and BRANCH is not a live-edit branch, delete
-     branch B with 'git branch -d'.
+  b) For any branch B and B_hesokr_C, where B is a fast-forward of B_hesokr_C,
+     delete B_hesokr_C with 'git branch -D'.
   c) For any branch specified as unwanted in the source-def, delete it with
      'git branch -D'. For instance, if 'foo' is unwanted, then any branch named
      'foo' or 'foo_hesokr_*' will be deleted."
