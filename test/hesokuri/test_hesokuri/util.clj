@@ -68,3 +68,22 @@
                       :stdout exp-stdout}})
         [5 4] 0 "err: 1" "out: 1"
         [5 6] 1 "err" "out")))
+
+(defn- sane-at [at]
+  (is (= {:file String
+          :line Integer
+          :column Integer}
+         (into {} (map (fn [[k v]] [k (class v)]) at)))))
+
+(deftest test-cb
+  (let [x 10
+        result (cb [x] [y] (+ x y))]
+    (is (= {:x 10} (:closure result)))
+    (is (= 7 ((:fn result) -3)))
+    (is (= 110 (cbinvoke result 100)))
+    (sane-at (:at result)))
+  (let [result (cb [] [x y] (* x y))]
+    (is (= {} (:closure result)))
+    (is (= 42 ((:fn result) 6 7)))
+    (is (= 121 (cbinvoke result 11 11)))
+    (sane-at (:at result))))
