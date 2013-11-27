@@ -29,10 +29,10 @@
   [{"peer1" "/peer1/foo"
     "peer2" "/peer2/foo"}])
 
-(defn watcher-for-config-file [file on-change & on-change-args]
+(defn watcher-for-config-file [file on-change-cb]
   (is (= file *config-file*))
   (swap! *on-change-cfg*
-         (constantly (fn [] (apply on-change on-change-args))))
+         (constantly (fn [] (cbinvoke on-change-cb))))
   {:stopper (mock {[] [nil :already-stopped]})
    :path {:file file}})
 

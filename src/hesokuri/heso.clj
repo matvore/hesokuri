@@ -118,7 +118,8 @@
       (apply send send-args))
     (doseq [peer-hostname peer-hostnames]
       (send heartbeats heartbeats/start 300000
-            push-sources-for-peer self peer-hostname)))
+            (cb [self peer-hostname] []
+                (push-sources-for-peer self peer-hostname)))))
   (assoc self :active true))
 
 (defn stop

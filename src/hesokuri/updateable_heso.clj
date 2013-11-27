@@ -24,16 +24,16 @@
   {:config-file config-file
    :heso (agent (heso/with-sources []))})
 
-(defn- on-change-hesocfg [heso config-file]
-  (send heso heso/update-from-config-file config-file))
-
 (defn start-autoupdate
   "Begins autoupdate, which uses a watcher object to monitor changes in the
   config file. This call is idempotent. Returns the new state of the
   updateable-heso object."
   [{:keys [heso config-file watcher] :as self}]
   (if watcher self (assoc self :watcher
-    (watcher/for-file config-file on-change-hesocfg heso config-file))))
+    (watcher/for-file
+     config-file
+     (cb [heso config-file] []
+         (send heso heso/update-from-config-file config-file))))))
 
 (defn stop-autoupdate
   "Stops autoupdate if it is currently started. Returns the new state of the

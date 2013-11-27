@@ -19,12 +19,12 @@
         clojure.tools.logging))
 
 (defn- beat
-  [{:keys [interval-millis action group] :as self} sleep-millis]
+  [{:keys [interval-millis action-cb group] :as self} sleep-millis]
   {:pre [(identical? self @*agent*)]}
   (Thread/sleep sleep-millis)
   (if (not= (:orig group) @(:current group))
     (assoc self :state :stopped)
-    (do (apply (:fn action) (:args action))
+    (do (cbinvoke action-cb)
         (send-off *agent* beat interval-millis)
         self)))
 
@@ -32,10 +32,10 @@
   (-> #(not= (:state %) :stopped) (filter beats) vec))
 
 (defn start
-  [{:keys [group beats] :as self} interval-millis action-fn & action-args]
+  [{:keys [group beats] :as self} interval-millis action-cb]
   (let [group (or group (atom nil))
         new-beat (agent {:interval-millis interval-millis
-                         :action {:fn action-fn :args action-args}
+                         :action-cb action-cb
                          :group {:orig @group :current group}
                          :state :started})
         filtered-beats (without-stopped-beats beats)]

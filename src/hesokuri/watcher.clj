@@ -25,7 +25,8 @@
             Path
             Paths
             StandardWatchEventKinds])
-  (:use [clojure.java.io :only [file]]))
+  (:use [clojure.java.io :only [file]]
+        hesokuri.util))
 
 (defn- to-path
   [path]
@@ -34,7 +35,7 @@
    :else (Paths/get (str path) (into-array String []))))
 
 (defn- service
-  [path on-change on-change-args]
+  [path on-change-cb]
   (let [service (.newWatchService (FileSystems/getDefault))
         watch-path (to-path path)
         start
@@ -45,7 +46,7 @@
                   (catch ClosedWatchServiceException _ nil))]
             (doseq [event (and watch-key (.pollEvents watch-key))
                     :let [changed-file (-> event .context str file)]]
-              (apply on-change changed-file on-change-args))
+              (cbinvoke on-change-cb changed-file))
             (and watch-key (.reset watch-key) (recur))))]
     (.register watch-path service
                (into-array
@@ -63,27 +64,21 @@
   "Watches a directory for modification or creation, and calls the given
   function when such an event occurs with a relative path to the affected file.
   path - a string or File that specifies the directory to watch
-  on-change - a function to call when a file is created or modified in that
-      directory
-  on-change-args - arguments to pass to on-change following the file that was
-      changed"
-  [path on-change & on-change-args]
-  {:watch-service (service path on-change on-change-args)
+  on-change-cb - a cb to call when a file is created or modified in that
+      directory. It will be passed the file that was changed."
+  [path on-change-cb]
+  {:watch-service (service path on-change-cb)
    :dir (file path)
-   :on-change {:fn on-change :args on-change-args}})
-
-(defn- on-change-dir-of-watched-file
-  [changed-file watched-file on-change on-change-args]
-  (when (= (str changed-file) watched-file)
-    (apply on-change on-change-args)))
+   :on-change-cb on-change-cb})
 
 (defn for-file
   "Similar to for-dir, but works on files rather than directories. The given
   function is called when the file is created or modified.
-  on-change - a function to call when the file is created or modified
-  on-change-args - the arguments to pass to on-change"
-  [path on-change & on-change-args]
+  on-change-cb - a cb to call when the file is created or modified. It does not
+      get called with any arguments."
+  [path on-change-cb]
   (let [path (file path)]
     (for-dir (.getParent path)
-             on-change-dir-of-watched-file
-             (.getName path) on-change on-change-args)))
+             (cb [path on-change-cb] [file]
+                 (when (= (str file) (.getName path))
+                   (cbinvoke on-change-cb))))))

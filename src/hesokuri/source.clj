@@ -178,14 +178,13 @@
   (when watcher (watcher/stop watcher))
   (dissoc self :watcher))
 
-(defn- on-change-refs-heads-dir [self-agent]
-  (send self-agent advance)
-  (send self-agent push-for-all-peers))
-
 (defn start-watching
   "Registers paths in this source's repo to be notified of changes so it can
   automatically advance and push"
   [{:keys [repo] :as self}]
-  (let [watcher
-        (repo/watch-refs-heads-dir repo on-change-refs-heads-dir *agent*)]
+  (let [agt *agent*
+        watcher (repo/watch-refs-heads-dir repo
+                                           (cb [agt] []
+                                               (send agt advance)
+                                               (send agt push-for-all-peers)))]
     (-> self stop-watching refresh (assoc :watcher watcher))))

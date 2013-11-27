@@ -157,15 +157,11 @@
          (concat (if allow-non-ff ["-f"] [])
                  [:dir dir])))
 
-(defn- invoke-refs-head-change
-  [_ on-refs-head-change & on-refs-head-change-args]
-  (apply on-refs-head-change on-refs-head-change-args))
-
 (defn watch-refs-heads-dir
   "Sets up a watcher for the refs/heads directory and returns an object like
-  that returned by hesokuri.watching/watcher-for-dir. on-change is a function
+  that returned by hesokuri.watching/watcher-for-dir. on-change-cb is a cb
   that takes no arguments and is called when a change is detected."
-  [repo on-change & on-change-args]
+  [repo on-change-cb]
   {:pre [(:init repo)]}
-  (apply watcher/for-dir (file (git-dir repo) "refs" "heads")
-                         invoke-refs-head-change on-change on-change-args))
+  (watcher/for-dir (file (git-dir repo) "refs" "heads")
+                   (cb [on-change-cb] [_] (cbinvoke on-change-cb))))

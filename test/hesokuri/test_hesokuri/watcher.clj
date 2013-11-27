@@ -17,11 +17,19 @@
   (:use [clojure.java.io :only [file]]
         clojure.test
         hesokuri.test-hesokuri.temp
+        hesokuri.util
         hesokuri.watcher))
 
-(defn- add-changed-file
-  [path changed-files-atom]
-  (swap! changed-files-atom #(conj % path)))
+(defn wait-for [f]
+  (loop [total-sleeps 0]
+    (cond
+     (> total-sleeps 400)
+     (throw (IllegalStateException. "Watcher did not report change in time."))
+
+     (f) nil
+     :else (do
+             (Thread/sleep 100)
+             (recur (inc total-sleeps))))))
 
 ;;; TODO: This test runs very slowly on Mac OS X. Figure out a way to mock out
 ;;;     the java.nio.file file watching system so that this is really a unit
@@ -29,25 +37,13 @@
 (deftest test-for-dir
   (let [changed-files (atom clojure.lang.PersistentQueue/EMPTY)
         temp-dir (create-temp-dir)
-        watcher (for-dir temp-dir add-changed-file changed-files)
+        watcher (for-dir temp-dir (cb [changed-files] [path]
+                                      (swap! changed-files #(conj % path))))
 
         wait-for-change
         (fn [filename]
-          (let [filename (file filename)]
-            (loop [total-sleeps 0]
-              (cond
-               (> total-sleeps 400)
-               (throw (IllegalStateException.
-                       (str "Watcher did not report change in time: " filename
-                            " (changed-files: " (seq @changed-files) ")")))
-
-               (= (peek @changed-files) filename)
-               (swap! changed-files pop)
-
-               :else
-               (do
-                 (Thread/sleep 100)
-                 (recur (inc total-sleeps)))))))]
+          (wait-for #(= (peek @changed-files) (file filename)))
+          (swap! changed-files pop))]
     (Thread/sleep 1000)
 
     (->> "file1" (file temp-dir) .createNewFile)
@@ -64,3 +60,19 @@
 
     (Thread/sleep 100)
     (is (= [] @changed-files))))
+
+(deftest test-for-file
+  (let [changed-file-count (atom 0)
+        temp-dir (create-temp-dir)
+        watcher (for-file (file temp-dir "foo")
+                          (cb [changed-file-count] []
+                              (swap! changed-file-count inc)))
+        wait-for-change
+        (fn [] (wait-for #(> @changed-file-count 0)))]
+    (Thread/sleep 1000)
+
+    (->> "foo" (file temp-dir) .createNewFile)
+    (wait-for-change)
+
+    (Thread/sleep 100)
+    (is (= 1 @changed-file-count))))
