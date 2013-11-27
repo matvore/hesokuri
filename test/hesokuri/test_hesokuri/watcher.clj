@@ -20,13 +20,12 @@
         hesokuri.util
         hesokuri.watcher))
 
-(defn wait-for [f]
+(defn wait-for [condition-fn]
   (loop [total-sleeps 0]
     (cond
-     (> total-sleeps 400)
-     (throw (IllegalStateException. "Watcher did not report change in time."))
+     (> total-sleeps 400) false
 
-     (f) nil
+     (condition-fn) true
      :else (do
              (Thread/sleep 100)
              (recur (inc total-sleeps))))))
@@ -42,7 +41,9 @@
 
         wait-for-change
         (fn [filename]
-          (wait-for #(= (peek @changed-files) (file filename)))
+          (or (wait-for #(= (peek @changed-files) (file filename)))
+              (throw (IllegalStateException.
+                      (str "changed files: " (seq @changed-files)))))
           (swap! changed-files pop))]
     (Thread/sleep 1000)
 
@@ -68,7 +69,7 @@
                           (cb [changed-file-count] []
                               (swap! changed-file-count inc)))
         wait-for-change
-        (fn [] (wait-for #(> @changed-file-count 0)))]
+        (fn [] (is (wait-for #(> @changed-file-count 0))))]
     (Thread/sleep 1000)
 
     (->> "foo" (file temp-dir) .createNewFile)
