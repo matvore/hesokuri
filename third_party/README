@@ -1,0 +1,10 @@
+barbarywatchservice
+--------------------------------------------------------------------------------
+URL: http://barbarywatchservice.googlecode.com/svn/trunk/
+Version: r12
+Local modifications:
+- Delete pre-built binaries in lib/ and bin/
+- Delete .idea directory
+- Delete WatchService.iml
+- Add a LICENSE file for the LGPL, which is the distribution license according
+  to the Google Code page
