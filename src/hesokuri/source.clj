@@ -182,6 +182,7 @@
   "Registers paths in this source's repo to be notified of changes so it can
   automatically advance and push"
   [{:keys [repo] :as self}]
+  {:pre [(identical? self @*agent*)]}
   (let [agt *agent*
         watcher (repo/watch-refs-heads-dir repo
                                            (cb [agt] []
