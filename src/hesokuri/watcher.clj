@@ -13,14 +13,19 @@
 ; limitations under the License.
 
 (ns hesokuri.watcher
-  "Module that makes watching file systems for changes easier. This modules uses
-  the Java API at java.nio.file internally. All watcher objects are maps having
-  these keys:
-  :watch-service - the underlying java.nio.file.WatchService object
-  :path - a map in the form of {:dir DIR-PATH} or {:file FILE-PATH} indicating
-      the directory or file being watched"
-  (:import [java.nio.file
-            ClosedWatchServiceException
+  "Module that makes watching file systems for changes easier. Internally, this
+  modules uses barbarywatchservice for Macs, and java.nio.file otherwise. All
+  watcher objects are maps having these keys:
+  :watch-service - the underlying WatchService object (the WatchService class
+      either in java.nio.file or the Barbary namespace)
+  :dir - a java.io.File indicating the directory being watched. When watching a
+      file, this indicates the containing directory
+  :on-change-cb a cb that is invoked with the name of the changed file as a
+      java.io.File object as the only argument"
+  (:import [com.barbarysoftware.watchservice
+            StandardWatchEventKind
+            WatchableFile]
+           [java.nio.file
             FileSystems
             Path
             Paths
@@ -28,30 +33,52 @@
   (:use [clojure.java.io :only [file]]
         hesokuri.util))
 
-(defn- to-path
-  [path]
-  (cond
-   (= Path (.getClass path)) path
-   :else (Paths/get (str path) (into-array String []))))
+(defmulti ^:private register (fn [service _ _] (class service)))
+
+(defmethod register java.nio.file.WatchService
+  [service path events]
+  (let [path (Paths/get (str path) (into-array String []))
+        events (into-array (map {:create StandardWatchEventKinds/ENTRY_CREATE
+                                 :modify StandardWatchEventKinds/ENTRY_MODIFY
+                                 :delete StandardWatchEventKinds/ENTRY_DELETE}
+                                events))]
+    (.register path service events)))
+
+(defmethod register com.barbarysoftware.watchservice.WatchService
+  [service path events]
+  (let [path (WatchableFile. (file path))
+        events (into-array (map {:create StandardWatchEventKind/ENTRY_CREATE
+                                 :modify StandardWatchEventKind/ENTRY_MODIFY
+                                 :delete StandardWatchEventKind/ENTRY_DELETE}
+                                events))]
+    (.register path service events)))
+
+(defn- new-watch-service []
+  (if (= "Mac OS X" (System/getProperty "os.name"))
+    ;; Use barbarywatchservice library for Mac OS X so we can avoid polling.
+    (com.barbarysoftware.watchservice.WatchService/newWatchService)
+
+    ;; Use java.nio file system watcher
+    (.newWatchService (FileSystems/getDefault))))
+
+(defn- take-watch-key [service]
+  (try
+    (.take service)
+    (catch java.nio.file.ClosedWatchServiceException _ nil)
+    (catch com.barbarysoftware.watchservice.ClosedWatchServiceException _ nil)))
 
 (defn- service
   [path on-change-cb]
-  (let [service (.newWatchService (FileSystems/getDefault))
-        watch-path (to-path path)
+  (let [service (new-watch-service)
+        path (file path)
         start
         (fn []
-          (let [watch-key
-                (try
-                  (.take service)
-                  (catch ClosedWatchServiceException _ nil))]
+          (let [watch-key (take-watch-key service)]
             (doseq [event (and watch-key (.pollEvents watch-key))
                     :let [changed-file (-> event .context str file)]]
               (cbinvoke on-change-cb changed-file))
             (and watch-key (.reset watch-key) (recur))))]
-    (.register watch-path service
-               (into-array
-                [StandardWatchEventKinds/ENTRY_CREATE
-                 StandardWatchEventKinds/ENTRY_MODIFY]))
+    (register service path [:create :modify])
     (-> start Thread. .start)
     service))
 
