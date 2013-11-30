@@ -35,7 +35,8 @@ class MacOSXListeningWatchService extends AbstractWatchService {
 
         final long kFSEventStreamEventIdSinceNow = -1; //  this is 0xFFFFFFFFFFFFFFFF
         final int kFSEventStreamCreateFlagNoDefer = 0x00000002;
-        final CarbonAPI.FSEventStreamCallback callback = new MacOSXListeningCallback(watchKey, lastModifiedMap);
+        final CarbonAPI.FSEventStreamCallback callback =
+                new MacOSXListeningCallback(file, watchKey, lastModifiedMap);
         callbackList.add(callback);
         final FSEventStreamRef stream = CarbonAPI.INSTANCE.FSEventStreamCreate(
                 Pointer.NULL,
@@ -83,19 +84,17 @@ class MacOSXListeningWatchService extends AbstractWatchService {
 
     private Map<File, Long> createLastModifiedMap(File file) {
         Map<File, Long> lastModifiedMap = new ConcurrentHashMap<File, Long>();
-        for (File child : recursiveListFiles(file)) {
+        for (File child : listFiles(file)) {
             lastModifiedMap.put(child, child.lastModified());
         }
         return lastModifiedMap;
     }
 
-    private static Set<File> recursiveListFiles(File file) {
+    private static Set<File> listFiles(File directory) {
         Set<File> files = new HashSet<File>();
-        files.add(file);
-        if (file.isDirectory()) {
-            for (File child : file.listFiles()) {
-                files.addAll(recursiveListFiles(child));
-            }
+        File[] children = directory.listFiles();
+        if (children != null) {
+            files.addAll(Arrays.asList(children));
         }
         return files;
     }
@@ -110,12 +109,22 @@ class MacOSXListeningWatchService extends AbstractWatchService {
         callbackList.clear();
     }
 
+    private static File canonical(File file) {
+        try {
+            return file.getCanonicalFile();
+        } catch (IOException e) {
+            return file;
+        }
+    }
 
     private static class MacOSXListeningCallback implements CarbonAPI.FSEventStreamCallback {
+        private final File root;
         private final MacOSXWatchKey watchKey;
         private final Map<File, Long> lastModifiedMap;
 
-        private MacOSXListeningCallback(MacOSXWatchKey watchKey, Map<File, Long> lastModifiedMap) {
+        private MacOSXListeningCallback(File root, MacOSXWatchKey watchKey,
+                                        Map<File, Long> lastModifiedMap) {
+            this.root = canonical(root);
             this.watchKey = watchKey;
             this.lastModifiedMap = lastModifiedMap;
         }
@@ -124,29 +133,37 @@ class MacOSXListeningWatchService extends AbstractWatchService {
             final int length = numEvents.intValue();
 
             for (String folderName : eventPaths.getStringArray(0, length)) {
-                final Set<File> filesOnDisk = recursiveListFiles(new File(folderName));
+                File folder = canonical(new File(folderName));
+                if (!folder.equals(root) &&
+                        !folder.getParentFile().equals(root)) {
+                    continue;
+                }
+                final Set<File> filesOnDisk = listFiles(root);
 
                 final List<File> createdFiles = findCreatedFiles(filesOnDisk);
                 final List<File> modifiedFiles = findModifiedFiles(filesOnDisk);
-                final List<File> deletedFiles = findDeletedFiles(folderName, filesOnDisk);
+                final List<File> deletedFiles = findDeletedFiles(filesOnDisk);
 
                 for (File file : createdFiles) {
                     if (watchKey.isReportCreateEvents()) {
-                        watchKey.signalEvent(StandardWatchEventKind.ENTRY_CREATE, file);
+                        watchKey.signalEvent(StandardWatchEventKind.ENTRY_CREATE,
+                                             new File(file.getName()));
                     }
                     lastModifiedMap.put(file, file.lastModified());
                 }
 
                 for (File file : modifiedFiles) {
                     if (watchKey.isReportModifyEvents()) {
-                        watchKey.signalEvent(StandardWatchEventKind.ENTRY_MODIFY, file);
+                        watchKey.signalEvent(StandardWatchEventKind.ENTRY_MODIFY,
+                                             new File(file.getName()));
                     }
                     lastModifiedMap.put(file, file.lastModified());
                 }
 
                 for (File file : deletedFiles) {
                     if (watchKey.isReportDeleteEvents()) {
-                        watchKey.signalEvent(StandardWatchEventKind.ENTRY_DELETE, file);
+                        watchKey.signalEvent(StandardWatchEventKind.ENTRY_DELETE,
+                                             new File(file.getName()));
                     }
                     lastModifiedMap.remove(file);
                 }
@@ -174,10 +191,10 @@ class MacOSXListeningWatchService extends AbstractWatchService {
             return createdFileList;
         }
 
-        private List<File> findDeletedFiles(String folderName, Set<File> filesOnDisk) {
+        private List<File> findDeletedFiles(Set<File> filesOnDisk) {
             List<File> deletedFileList = new ArrayList<File>();
             for (File file : lastModifiedMap.keySet()) {
-                if (file.getAbsolutePath().startsWith(folderName) && !filesOnDisk.contains(file)) {
+                if (!filesOnDisk.contains(file)) {
                     deletedFileList.add(file);
                 }
             }
