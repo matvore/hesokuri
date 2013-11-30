@@ -13,7 +13,6 @@
 ; limitations under the License.
 
 (ns hesokuri.test-hesokuri.watcher
-  (:import [java.io FileOutputStream])
   (:use [clojure.java.io :only [file]]
         clojure.test
         hesokuri.test-hesokuri.temp
@@ -47,16 +46,19 @@
           (swap! changed-files pop))]
     (Thread/sleep 1000)
 
-    (->> "file1" (file temp-dir) .createNewFile)
+    (spit (file temp-dir "file1") "new file #1")
     (wait-for-change "file1")
 
-    (->> "file2" (file temp-dir) .createNewFile)
+    (spit (file temp-dir "file2") "new file #2")
     (wait-for-change "file2")
 
-    (-> (file temp-dir "file1") (FileOutputStream. true) (.write 42))
+    (is (->> "dir" (file temp-dir) .mkdir))
+    (wait-for-change "dir")
+
+    (spit (file temp-dir "file1") "42" :append true)
     (wait-for-change "file1")
 
-    (-> (file temp-dir "file2") (FileOutputStream. true) (.write 1011))
+    (spit (file temp-dir "file2") "1011" :append true)
     (wait-for-change "file2")
 
     (Thread/sleep 100)
