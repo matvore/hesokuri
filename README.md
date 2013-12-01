@@ -55,7 +55,7 @@ at your own risk.
 
 1. Hesokuri source
 2. [Leiningen](http://leiningen.org/) 2.1.3 or higher
-3. Java runtime 1.7 or higher
+3. Java Development Kit 1.7 or higher
 4. git version 1.7.10.1 or higher
 5. A Unix-like OS is recommended. Hesokuri is tested on Mac OS X and Linux, but
    Windows is worth a try if you are feeling adventurous.
