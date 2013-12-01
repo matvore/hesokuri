@@ -89,31 +89,36 @@ need not appear on every peer. Here is an example which demonstrates the syntax
 and optional source parameters:
 
 ```Clojure
-[{:host-to-path {"host-1" "/home/fbar/repo1"
-                 "host-2" "/home/fbar/repo1"}}
+{:comment
+ ["You can put any data here as notes to maintainers of this file."]
 
- {:host-to-path {"host-1" "/home/fbar/repo2"
-                 "host-3" "/home/fbar/repo2"}
-  :unwanted-branches #{"baz" "42"}}
+ :sources
+ [{:host-to-path {"host-1" "/home/fbar/repo1"
+                  "host-2" "/home/fbar/repo1"}}
 
- {:host-to-path {"host-1" "/home/fbar/repo3"
-                 "host-3" "/home/fbar/repo3"}
-  :live-edit-branches {:only #{"master"}}}]
+  {:host-to-path {"host-1" "/home/fbar/repo2"
+                  "host-3" "/home/fbar/repo2"}
+   :unwanted-branches #{"baz" "42"}}
+
+  {:host-to-path {"host-1" "/home/fbar/repo3"
+                  "host-3" "/home/fbar/repo3"}
+   :live-edit-branches {:only #{"master"}}}]
 ```
 
 The syntax is identical to Clojure literal syntax. The important constructs are:
-* `:foo` indicates a keyword named `foo`, which is used for parameter names
 * `{}` indicates a map, which contains keys and values in alternating order.
   Commas can be used in a map to separate key/value pairs, but they are
   optional.
+* `:foo` indicates a keyword named `foo`, which is used for keys in maps
 * `#{}` indicates a set
 * `[]` indicates a vector
-* `;` indicates a comment
 
 Note that the distinction between maps, sets, and vectors are important when
-writing a configuration file.
+writing a configuration file. The top level data structure is a map with a
+`:sources` key (required) and `:comment` key (optional). The value of `:sources`
+must be a vector containing source definitions, each definition being a map.
 
-The meaning of each source parameter is as follows:
+The meaning of each entry in a source definition is as follows:
 * `:host-to-path` is a map of peer identities to the local path of that repo on
   the peer. Generally, you will want to make each peer have the same or similar
   path for a given repo.
@@ -135,24 +140,27 @@ automatically restart with the new configuration.
 
 An annotated, real-world configuration file may look something like this:
 ```Clojure
-; My machines:
-; 192.168.0.2 - the Linux laptop
-; 192.168.0.3 - the Mac desktop
-; 192.168.0.4 - the home server
-[; Whiz bang project
- {:host-to-path {"192.168.0.2" "/home/johndoe/whizbang"
-                 "192.168.0.3" "/Users/johndoe/whizbang"
-                 "192.168.0.4" "/home/johndoe/whizbang"}
-  :unwanted-branches #{"abandoned-feature1"}
-  :live-edit-branches {:only #{"master" "vnext"}}}
+{:comment
+ ["My machines:"
+  "192.168.0.2 - the Linux laptop"
+  "192.168.0.3 - the Mac desktop"
+  "192.168.0.4 - the home server"]
 
- ; hacking and small side projects
- {:host-to-path {"192.168.0.3" "/Users/johndoe/hacks/lisp-snippits"
-                 "192.168.0.4" "/home/johndoe/hacks/lisp-snippits"}
-  :live-edit-branches {:except #{"private"}}}
+ :sources
+ [{:comment "Whiz bang project"
+   :host-to-path {"192.168.0.2" "/home/johndoe/whizbang"
+                  "192.168.0.3" "/Users/johndoe/whizbang"
+                  "192.168.0.4" "/home/johndoe/whizbang"}
+   :unwanted-branches #{"abandoned-feature1"}
+   :live-edit-branches {:only #{"master" "vnext"}}}
 
- {:host-to-path {"192.168.0.3" "/Users/johndoe/hacks/game-engine"
-                 "192.168.0.4" "/home/johndoe/hacks/game-engine"}}]
+  {:comment "Code that may come in handy later"
+   :host-to-path {"192.168.0.3" "/Users/johndoe/hacks/lisp-snippits"
+                  "192.168.0.4" "/home/johndoe/hacks/lisp-snippits"}
+   :live-edit-branches {:except #{"private"}}}
+
+  {:host-to-path {"192.168.0.3" "/Users/johndoe/hacks/game-engine"
+                  "192.168.0.4" "/home/johndoe/hacks/game-engine"}}]}
 ```
 
 Note that you can save the configuration file in a location other than

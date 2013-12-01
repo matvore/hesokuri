@@ -72,12 +72,11 @@
      (include-css "/css.css")
      [:head [:title "heso main"]]
      [:body
-      (let [heso @*web-heso*
-            sources (:source-defs heso)]
+      (let [heso @*web-heso*]
         [:div
          (navbar heso "/")
          [:h1 "config-file"]
-         (pretty-print (:source-defs heso))])]))
+         (pretty-print (:config heso))])]))
 
   (GET "/errors/:type/:key" [type key]
     (let [heso @*web-heso*

@@ -14,10 +14,11 @@
 
 (ns hesokuri.heso
   (:use [clojure.java.shell :only [sh]]
-        [clojure.string :only [join split trim]]
+        [clojure.string :only [split trim]]
         clojure.tools.logging
         hesokuri.util)
-  (:require [hesokuri.heartbeats :as heartbeats]
+  (:require [hesokuri.config :as config]
+            [hesokuri.heartbeats :as heartbeats]
             [hesokuri.peer :as peer]
             [hesokuri.repo :as repo]
             [hesokuri.source :as source]
@@ -41,7 +42,7 @@
         :when (every? host-to-path peer-names)]
     host-to-path))
 
-(defn with-sources
+(defn with-config
   "Creates a heso in the inactive state. Is a map with the following values:
   :active - true when the agent is inactive, false when not
   :heartbeats - An agent that represents all the heartbeats started by this
@@ -49,22 +50,23 @@
       per peer) and monitor filesystem changes (one heartbeat). The heartbeats
       are stopped and replaced with new ones whenever the source defs are
       reconfigured.
-  :source-defs - This value is an argument passed to this function.  This is the
+  :config - This value is an argument passed to this function.  This is the
       user-configurable settings that Hesokuri needs to discover sources on the
-      network and how to push and pull them. It is a vector of source defs (see
-      source-def.clj).
+      network and how to push and pull them. This data is interpreted by code in
+      config.clj.
   :local-identity - The hostname or IP of this system as known by the peers on
        the current network. Here it is deduced from the vector returned by
        (identities) and the peer-hostnames var.
   :peers - Map of peer hostnames to the corresponding peer object.
   :source-agents - A map of source-dirs to the corresponding agent."
-  [source-defs]
+  [config]
   (letmap
-   [:keep source-defs
+   [:keep config
 
     active false
     heartbeats (agent {})
 
+    :omit source-defs (config/source-defs config)
     :omit host-to-paths (map source-def/host-to-path source-defs)
     :omit all-hostnames (set (mapcat keys host-to-paths))
 
@@ -89,10 +91,12 @@
 (defn push-sources-for-peer
   "Pushes all sources to the given peer. This operation happens asynchronously.
   This function returns the new state of the heso object."
-  [{:keys [peers source-defs source-agents local-identity] :as self}
+  [{:keys [peers config source-agents local-identity] :as self}
    peer-hostname]
   (send (peers peer-hostname) #(dissoc % :last-fail-ping-time))
-  (doseq [host-to-path (common-sources source-defs local-identity peer-hostname)
+  (doseq [host-to-path
+          (common-sources
+           (config/source-defs config) local-identity peer-hostname)
           :let [source-dir (host-to-path local-identity)
                 source-agent (source-agents source-dir)]]
     (maybe (format "pushing %s to %s" source-dir peer-hostname)
@@ -135,39 +139,23 @@
     (send heartbeats heartbeats/stop-all))
   (assoc self :active false))
 
-(defn- source-defs-validation-error
-  "Sees if the given source-defs appears valid. If it is valid, returns nil.
-  Otherwise, returns a plain English string explaining which source-defs are
-  invalid and why."
-  [source-defs]
-  (let [error-messages
-        (for [source-def source-defs
-              :let [def-error-message (source-def/validation-error source-def)]
-              :when def-error-message]
-          (str "Source def '" source-def "' is invalid because: "
-               def-error-message))
-
-        full-message (join "\n" error-messages)]
-    (if (zero? (count full-message)) nil full-message)))
-
 (defn update-from-config-file
   "Reads the config file, stops the given heso object, and starts a new one.
   If the config-file has errors, this effectively does nothing. Returns the new
   state of the heso object."
   [self config-file]
-  (let [source-defs (maybe (str "Read sources from " config-file)
-                           (read-string (slurp config-file)))
-        validation-error (and source-defs
-                              (source-defs-validation-error source-defs))]
+  (let [config (maybe (str "Read config from " config-file)
+                      (read-string (slurp config-file)))
+        validation-error (and config (config/validation-error config))]
     (cond
      validation-error
      (do (error "Not activating configuration from file " config-file
                 " because it is invalid: " validation-error)
          self)
 
-     source-defs
+     config
      (do (stop self)
-         (info "Starting new heso with sources: " source-defs)
-         (-> source-defs with-sources start))
+         (info "Starting new heso with config: " config)
+         (-> config with-config start))
 
      :else self)))
