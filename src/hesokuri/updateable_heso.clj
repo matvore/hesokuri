@@ -22,7 +22,7 @@
   specifies the path of the file from which to read the heso configuration."
   [config-file]
   {:config-file config-file
-   :heso (agent (heso/with-sources []))})
+   :heso (agent (heso/with-config []))})
 
 (defn start-autoupdate
   "Begins autoupdate, which uses a watcher object to monitor changes in the

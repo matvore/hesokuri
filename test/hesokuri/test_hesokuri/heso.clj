@@ -16,6 +16,7 @@
   (:use [clojure.java.io :only [file]]
         clojure.test
         hesokuri.heso
+        hesokuri.test-hesokuri.data
         hesokuri.test-hesokuri.mock
         hesokuri.test-hesokuri.temp
         hesokuri.util)
@@ -24,18 +25,8 @@
             [hesokuri.source :as source]
             [hesokuri.source-def :as source-def]))
 
-(def ^:dynamic *sources-eg*
-  [{:host-to-path {"peer1" "/peer1/foo"
-                   "peer2" "/peer2/foo"}}
-   {"peer2" "/peer2/bar"}
-   {:host-to-path {"peer1" "/peer1/baz"
-                   "peer3" "/peer3/baz"}}
-   {"peer1" "/peer1/42"
-    "peer3" "/peer3/42"
-    "peer4" "/peer4/42"}])
-
 (deftest test-new-heso-make-heartbeats
-  (let [initial-heartbeats #(-> *sources-eg* with-sources :heartbeats)
+  (let [initial-heartbeats #(-> *sources-eg* with-config :heartbeats)
         beats-1 (initial-heartbeats)
         beats-2 (initial-heartbeats)]
     (is (not= beats-1 beats-2))
@@ -67,7 +58,7 @@
 (deftest test-with-simple-sources
   (with-redefs [getenv {"HESOHOST" "peer3"}]
     (let [result
-          (-> *sources-eg* with-sources (dissoc :heartbeats) de-agentify)
+          (-> *sources-eg* with-config (dissoc :heartbeats) de-agentify)
 
           new-peer (assoc peer/default ::error nil)
           peers {"peer1" new-peer, "peer2" new-peer, "peer4" new-peer}
@@ -84,23 +75,12 @@
                                :local-identity "peer3"
                                ::error nil}]))]
       (is (= result
-             {:source-defs *sources-eg*
+             {:config *sources-eg*
               :active false
               :local-identity "peer3"
               :peer-hostnames #{"peer1" "peer2" "peer4"}
               :peers peers
               :source-agents source-agents})))))
-
-(deftest test-source-defs-validation-error
-  (are [source-defs has-error]
-       (is (= has-error (boolean (#'hesokuri.heso/source-defs-validation-error
-                                  source-defs))))
-       [] false
-       *sources-eg* false
-       [:foo] true
-       [{}] true
-       (conj *sources-eg* {:missing-host-to-path 42}) true
-       (conj *sources-eg* {"" "host-name-is-empty-string"}) true))
 
 (deftest test-send-args-to-start-sources
   (is (= [] (#'hesokuri.heso/send-args-to-start-sources {:source-agents {}}))
