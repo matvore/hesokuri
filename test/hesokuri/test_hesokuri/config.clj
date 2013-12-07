@@ -64,7 +64,13 @@
        [#{} #{} #{}] true []
        [(list 'foo 'bar)] false ["(foo bar)"]
        ['(foo) "ok" '(bar)] false ["(foo)" "(bar)"]
-       #{[] [1] ["two"]} true []))
+       #{[] [1] ["two"]} true []
+
+       {:a '(bad-value 1) :b '(bad-value 2)} false
+       ["(bad-value 1)" "(bad-value 2)"]
+
+       {'(bad-key 1) :a '(bad-key 2) :b} false ["(bad-key 1)" "(bad-key 2)"]
+       {'(1) '(2) '(3) '(4)} false ["(1)" "(2)" "(3)" "(4)"]))
 
 (deftest test-validation-error
   (are [config okay substrings]

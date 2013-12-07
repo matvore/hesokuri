@@ -51,9 +51,7 @@
    (nil? data) nil
 
    (map? data)
-   (join-error-strings
-    (apply concat (for [[k v] data] [(round-trip-validation-error k)
-                                     (round-trip-validation-error v)])))
+   (join-error-strings (map round-trip-validation-error (apply concat data)))
 
    (or (vector? data) (set? data))
    (join-error-strings (map round-trip-validation-error data))
