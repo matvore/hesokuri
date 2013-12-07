@@ -70,8 +70,8 @@
 (defn shrink
   "Transforms a data structure so that redundant sections are abbrevated. For
   instance, (repeat 3 (repeat 10 :x)) will be transformed to:
-  ((:x :x :x :x :x :x :x :x :x :x)
-   {:hesokuri.see/p [0]}
-   {:hesokuri.see/p [0]})"
+  [[:x :x :x :x :x :x :x :x :x :x]
+   [:hesokuri.see/path 0]
+   [:hesokuri.see/path 0]]"
   [expr]
   (first (shrink-with-paths expr [::path] {})))
