@@ -139,23 +139,9 @@
     (send heartbeats heartbeats/stop-all))
   (assoc self :active false))
 
-(defn update-from-config-file
-  "Reads the config file, stops the given heso object, and starts a new one.
-  If the config-file has errors, this effectively does nothing. Returns the new
-  state of the heso object."
-  [self config-file]
-  (let [config (maybe (str "Read config from " config-file)
-                      (read-string (slurp config-file)))
-        validation-error (and config (config/validation-error config))]
-    (cond
-     validation-error
-     (do (error "Not activating configuration from file " config-file
-                " because it is invalid: " validation-error)
-         self)
-
-     config
-     (do (stop self)
-         (info "Starting new heso with config: " config)
-         (-> config with-config start))
-
-     :else self)))
+(defn update-config
+  "Starts the heso again with the given config."
+  [self config]
+  (do (stop self)
+      (info "Starting new heso with config: " config)
+      (-> config with-config start)))

@@ -16,8 +16,8 @@
   (:use hesokuri.util
         [ring.adapter.jetty :only [run-jetty]]
         [ring.middleware.params :only [wrap-params]])
-  (:require [hesokuri.heso :as heso]
-            [hesokuri.updateable-heso :as updateable-heso]
+  (:require [hesokuri.dynamic-config :as dynamic-config]
+            [hesokuri.heso :as heso]
             [hesokuri.web :as web])
   (:gen-class))
 
@@ -35,11 +35,14 @@
   ;; work around dangerous default behaviour in Clojure
   (alter-var-root #'*read-eval* (constantly false))
   (let [config-file (config-file)
-        heso-agent (-> config-file
-                       updateable-heso/with-config-file
-                       updateable-heso/start-autoupdate
-                       :heso)]
-    (send heso-agent heso/update-from-config-file config-file)
+        heso-agent (agent (heso/with-config []))
+
+        dynamic-config-agent
+        (->> (cb [heso-agent] [config]
+                 (send heso-agent heso/update-config config))
+             (dynamic-config/of config-file)
+             agent)]
+    (send dynamic-config-agent dynamic-config/start)
     (alter-var-root #'hesokuri.web/*web-heso* (constantly heso-agent)))
   (run-jetty (-> web/heso-web-routes
                  wrap-params)

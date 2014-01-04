@@ -16,18 +16,9 @@
   (:use [clojure.java.io :only [file]]
         clojure.test
         hesokuri.test-hesokuri.temp
+        hesokuri.test-hesokuri.waiting
         hesokuri.util
         hesokuri.watcher))
-
-(defn wait-for [condition-fn]
-  (loop [total-sleeps 0]
-    (cond
-     (> total-sleeps 200) false
-
-     (condition-fn) true
-     :else (do
-             (Thread/sleep 100)
-             (recur (inc total-sleeps))))))
 
 (deftest test-for-dir
   (let [changed-files (atom clojure.lang.PersistentQueue/EMPTY)
