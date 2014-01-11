@@ -26,11 +26,11 @@
   [config-file on-change-cb]
   (let [config (maybe (str "Read config from " config-file)
                       (read-string (slurp config-file)))
-        validation-error (and config (config/validation-error config))]
+        validation (and config (config/validation config))]
     (cond
-     validation-error
+     validation
      (error "Not activating configuration from file " config-file
-            " because it is invalid: " validation-error)
+            " because it is invalid: " validation)
 
      config
      (cbinvoke on-change-cb config))))

@@ -51,9 +51,8 @@
   ({String :simple, clojure.lang.Keyword :extensible}
    (class (key (first def)))))
 
-(defn validation-error
-  "Sees if the given source-def appears valid. If it is valid, returns nil.
-  Otherwise, returns a plain English string explaining one of the errors in it."
+(defn validation
+  "Performs validation on the given source-def."
   [def]
   (letfn [(first-key-class [] (class (key (first def))))
           (first-key [] (key (first def)))
@@ -100,7 +99,7 @@
            (:unwanted-branches def))
 
       :else
-      (validation-error (:host-to-path def)))
+      (validation (:host-to-path def)))
 
      (has-non-string-or-empty-string? (apply concat def))
      "all keys and values should be non-empty strings"

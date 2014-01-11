@@ -13,32 +13,23 @@
 ; limitations under the License.
 
 (ns hesokuri.config
-  (:use [clojure.string :only [join]])
-  (:require [hesokuri.source-def :as source-def]
-            [hesokuri.util :as util]))
+  (:require [hesokuri.discovery-dir-def :as discovery-dir-def]
+            [hesokuri.source-def :as source-def]
+            [hesokuri.util :as util]
+            [hesokuri.validation :as validation]))
 
 (defn source-defs
   [config]
   (if (map? config) (:sources config) config))
 
-(defn- join-error-strings [all-strings]
-  (let [non-nil-strings (filter identity all-strings)]
-    (and (seq non-nil-strings) (join "\n" non-nil-strings))))
-
-(defn- source-defs-validation-error
-  "Sees if the given source-defs appears valid. If it is valid, returns nil.
-  Otherwise, returns a plain English string explaining which source-defs are
-  invalid and why."
-  [source-defs]
-  (if (vector? source-defs)
-    (join-error-strings
-     (for [source-def source-defs
-           :let [def-error-message (source-def/validation-error source-def)]
-           :when def-error-message]
-       (str "Source def '" source-def "' is invalid because: "
-            def-error-message)))
-    (str "Sources must be specified with a vector, but it is a "
-         (class source-defs))))
+(defn discovery-dir-defs
+  "Returns the discovery dirs in the given config. For the legacy config format,
+  this is always an empty vector. For the normal config format, this is the
+  :discovery-dirs entry, and is a vector of any number of discovery-dir-def
+  values, defined in the discovery-dir-def module."
+  [config]
+  (or (and (map? config) (:discovery-dirs config))
+      []))
 
 (defn- round-trip-validation-error
   [data]
@@ -51,20 +42,24 @@
    (nil? data) nil
 
    (map? data)
-   (join-error-strings (map round-trip-validation-error (apply concat data)))
+   (validation/combine (map round-trip-validation-error (apply concat data)))
 
    (or (vector? data) (set? data))
-   (join-error-strings (map round-trip-validation-error data))
+   (validation/combine (map round-trip-validation-error data))
 
    true
    (str "Data of type " (class data) " is not allowed in config files: " data)))
 
-(defn validation-error
-  "Sees if the configuration appears valid. If it is valid, returns nil.
-  Otherwise, returns a plain English string explaining which source-defs are
-  invalid and why."
+(defn validation
+  "Performs validation on the given config."
   [config]
   (if (not (or (map? config) (vector? config)))
     (str "config must be map or vector, but it is a " (class config))
-    (join-error-strings [(source-defs-validation-error (source-defs config))
-                         (round-trip-validation-error config)])))
+    (validation/combine
+     [(validation/for-vector "source def"
+                             source-def/validation
+                             (source-defs config))
+      (validation/for-vector "discovery dir def"
+                             discovery-dir-def/validation
+                             (discovery-dir-defs config))
+      (round-trip-validation-error config)])))

@@ -18,9 +18,9 @@
 
 (def ^:dynamic *host-to-path* {"host" "/path"})
 
-(deftest test-validation-error
+(deftest test-validation
   (are [bad-def has-error]
-       (is (= has-error (boolean (validation-error bad-def))))
+       (is (= has-error (boolean (validation bad-def))))
        [[:host-to-path *host-to-path*]] true
        {:host-to-path *host-to-path*} false
        {} true
@@ -42,9 +42,9 @@
        {:host-to-path *host-to-path* :unwanted-branches #{""}} true
        {:host-to-path *host-to-path* :unwanted-branches #{"foo"}} false))
 
-(deftest test-kind-and-validation-error-on-valid-defs
+(deftest test-kind-and-validation--on-valid-defs
   (are [def result]
-       (do (is (nil? (validation-error def)))
+       (do (is (nil? (validation def)))
            (is (= result (#'hesokuri.source-def/kind def))))
        {:actually-valid 1 :host-to-path *host-to-path*} :extensible
        *host-to-path* :simple))

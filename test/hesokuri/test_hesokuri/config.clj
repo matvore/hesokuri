@@ -25,26 +25,16 @@
        {:sources "bar", :comment "baz"} "bar"
        ["foo" "bar"] ["foo" "bar"]))
 
-(deftest test-join-error-strings
-  (are [all-strings result]
-       (is (= result (#'hesokuri.config/join-error-strings all-strings)))
+(deftest test-discovery-dir-defs
+  (are [config result]
+       (is (= result (discovery-dir-defs config)))
 
-       [] nil
-       [nil nil] nil
-       [nil nil "foo" nil] "foo"
-       ["foo"] "foo"
-       ["foo" nil "bar"] "foo\nbar"))
-
-(deftest test-source-defs-validation-error
-  (are [source-defs has-error]
-       (is (= has-error (boolean (#'hesokuri.config/source-defs-validation-error
-                                  source-defs))))
-       [] false
-       *sources-eg* false
-       [:foo] true
-       [{}] true
-       (conj *sources-eg* {:missing-host-to-path 42}) true
-       (conj *sources-eg* {"" "host-name-is-empty-string"}) true))
+       {} []
+       [] []
+       [{"foo", "/path"} {"bar" "/path"}] []
+       {:discovery-dirs nil} []
+       {:discovery-dirs []} []
+       {:discovery-dirs [1 2 3]} [1 2 3]))
 
 (defn- error-is-correct [error-string okay substrings]
   (is (= okay (= error-string nil)))
@@ -75,7 +65,7 @@
 (deftest test-validation-error
   (are [config okay substrings]
        (error-is-correct
-        (#'hesokuri.config/validation-error config) okay substrings)
+        (validation config) okay substrings)
 
        *sources-eg* true []
        *config-eg* true []
