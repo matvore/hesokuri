@@ -42,7 +42,8 @@
           from polluting your local set of branches. Obviously, care must be
           taken when putting strings here.
   More entries will be added in the future to allow advanced customization of
-  behavior.")
+  behavior."
+  (:require [hesokuri.validation :as validation]))
 
 (defn- kind
   "Returns the kind of the given def, and also performs a sanity check on it
@@ -51,60 +52,75 @@
   ({String :simple, clojure.lang.Keyword :extensible}
    (class (key (first def)))))
 
+(defn- all-non-empty-strings? [s]
+  (every? #(and (string? %) (not (empty? %))) s))
+
+(defn- set-of-non-empty-strings? [s]
+  (and (set? s) (all-non-empty-strings? s)))
+
+(declare validation)
+
+(defn- extensible-validation
+  [def]
+  (let [live-edit-branches-value
+        (delay (second (first (:live-edit-branches def))))]
+    (validation/conditions
+     (= (kind def) :extensible)
+     "expected :extensible, but got :simple"
+
+     (:host-to-path def)
+     "extensible source def requires :host-to-path key"
+
+     (or (not (:live-edit-branches def))
+         (#{[:except] [:only]} (keys (:live-edit-branches def))))
+     [":live-edit-branches requires exactly one key (:except or :only): "
+      (:live-edit-branches def)]
+
+     (or (not (:live-edit-branches def))
+         (set-of-non-empty-strings? @live-edit-branches-value))
+     ["Value in live-edit-branches map must be set of non-empty strings: "
+      @live-edit-branches-value]
+
+     (or (not (:unwanted-branches def))
+         (set-of-non-empty-strings? (:unwanted-branches def)))
+     [":unwanted-branches value must be set of non-empty strings: "
+      (:unwanted-branches def)]
+
+     :passes
+     (validation (:host-to-path def)))))
+
 (defn validation
   "Performs validation on the given source-def."
   [def]
-  (letfn [(first-key-class [] (class (key (first def))))
-          (first-key [] (key (first def)))
-          (first-non-matching-key []
-            (some #(and (not= (first-key-class) (class %))
-                        (or % "nil/false"))
-                  (keys def)))
-          (has-non-string-or-empty-string? [seq]
-            (some #(or (not= String (class %)) (= "" %)) seq))
-          (live-edit-branches-value []
-            (second (first (:live-edit-branches def))))
-          (set-of-non-empty-strings? [s]
-            (and (set? s) (not (has-non-string-or-empty-string? s))))]
-    (cond
-     (not (map? def)) "should be a map, e.g. {key1 value1, key2 value2}"
-     (empty? def) "should have at least one entry"
+  (let [first-key-class (delay (class (key (first def))))
+        first-key (delay (key (first def)))
+        first-non-matching-key
+        (delay (some #(and (not= @first-key-class (class %))
+                           (or % "nil/false"))
+                     (keys def)))]
+    (validation/conditions
+     (map? def)
+     "should be a map, e.g. {key1 value1, key2 value2}"
 
-     (not (#{String clojure.lang.Keyword} (first-key-class)))
-     (str "all keys should be a string or keyword, but first key ("
-          (first-key) ") is a" (first-key-class))
+     (not (empty? def))
+     "should have at least one entry"
 
-     (first-non-matching-key)
-     (str "all keys should be same class, but '" (first-key)
-          "' is not the same class as '" (first-non-matching-key) "'")
+     (#{String clojure.lang.Keyword} @first-key-class)
+     ["all keys should be a string or keyword, but first key ("
+      @first-key ") is a " @first-key-class]
 
-     (= (kind def) :extensible)
-     (cond
-      (not (:host-to-path def))
-      "extensible source def requires :host-to-path key"
+     (not @first-non-matching-key)
+     ["all keys should be same class, but '" @first-key
+      "' is not the same class as '" @first-non-matching-key "'"]
 
-      (and (:live-edit-branches def)
-           (not (#{[:except] [:only]} (keys (:live-edit-branches def)))))
-      (str ":live-edit-branches requires exactly one key (:except or :only): "
-           (:live-edit-branches def))
+     :passes
+     (if (= (kind def) :simple)
+       nil
+       (extensible-validation def))
 
-      (and (:live-edit-branches def)
-           (not (set-of-non-empty-strings? (live-edit-branches-value))))
-      (str "Value in live-edit-branches map must be set of non-empty strings: "
-           (live-edit-branches-value))
-
-      (and (:unwanted-branches def)
-           (not (set-of-non-empty-strings? (:unwanted-branches def))))
-      (str ":unwanted-branches value must be set of non-empty strings: "
-           (:unwanted-branches def))
-
-      :else
-      (validation (:host-to-path def)))
-
-     (has-non-string-or-empty-string? (apply concat def))
-     "all keys and values should be non-empty strings"
-
-     :else nil)))
+     (or (= (kind def) :extensible)
+         (all-non-empty-strings? (apply concat def)))
+     "all keys and values should be non-empty strings")))
 
 (defn host-to-path
   "Returns a map of host identities (strings) to paths (strings)."
