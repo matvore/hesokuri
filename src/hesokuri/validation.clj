@@ -49,10 +49,30 @@
   are true. COND-y is only evaluated if all of the previous CONDs are true.
 
   Each ERROR is a sequence. To convert it to a string, each element in the
-  sequence is concatenated with the clojure.core/str function."
+  sequence is concatenated with the clojure.core/str function.
+
+  Instead of COND-x and ERROR-x, you can put :passes and a validation
+  expression, e.g.:
+
+  COND-x ERROR-x
+  :passes (separate-validation-function data)
+  COND-y ERROR-y
+
+  In this case, if the validation expression is nil, validation proceeds to the
+  next condition. If the validation expression is a string, the conditions form
+  evaluates to it."
   [& cond-error-s]
   `(or ~@(map (fn [[condition# error#]]
-                `(when-not ~condition# (str ~@error#)))
+                (cond
+                 (= :passes condition#)
+                 error#
+
+                 (keyword? condition#)
+                 (throw (IllegalArgumentException.
+                         (str "Unknown keyword: " condition#)))
+
+                 :else
+                 `(when-not ~condition# (str ~@error#))))
               (partition 2 cond-error-s))))
 
 (defn for-vector

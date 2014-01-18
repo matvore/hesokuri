@@ -61,4 +61,6 @@
   (is (= "evaluated" (conditions
                       false ["evaluated"]
                       false [(throw (RuntimeException. "not evaluated"))])))
-  (is (= "not in a vector" (conditions false "not in a vector"))))
+  (is (= "not in a vector" (conditions false "not in a vector")))
+  (is (= nil (conditions :passes nil, true "okay")))
+  (is (= "fails" (conditions true "okay", :passes "fails"))))
