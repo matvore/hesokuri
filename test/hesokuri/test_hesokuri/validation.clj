@@ -44,3 +44,21 @@
        [13 0 2 1] 2
        {} 1
        {:a 1, :b 2} 1))
+
+(deftest test-conditions
+  (is (= nil (conditions)))
+  (is (= "error" (conditions
+                  (= 1 1) ["okay"]
+                  (= 2 2) ["okay"]
+                  (= 3 3.14) ["error"])))
+  (is (= "abcd" (conditions
+                 false ["a" "b" "c" "d"])))
+  (is (= nil (conditions
+              (= 1 1) ["okay"]
+              (= 2 2) ["okay"])))
+  (is (= "" (conditions
+             false [])))
+  (is (= "evaluated" (conditions
+                      false ["evaluated"]
+                      false [(throw (RuntimeException. "not evaluated"))])))
+  (is (= "not in a vector" (conditions false "not in a vector"))))

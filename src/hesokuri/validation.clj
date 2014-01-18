@@ -30,6 +30,31 @@
   (let [error-results (filter identity all-results)]
     (and (seq error-results) (join "\n" error-results))))
 
+(defmacro conditions
+  "Macro for creating a validation expression based on several checks to perform
+  in sequence. Uses of the macro should take this form:
+
+  (conditions
+   COND-1 ERROR-1
+   COND-2 ERROR-2
+   ...
+   COND-n ERROR-n)
+
+  Each COND is a boolean expression which is checked in order. If the COND
+  evaluates to true, the corresponding ERROR is ignored. If the COND evaluates
+  to false, the corresponding ERROR is processed and used as the result. If all
+  CONDs evaluate to true, the result is nil.
+
+  ERROR-x is only evaluated if COND-x is false and all of the previous CONDs
+  are true. COND-y is only evaluated if all of the previous CONDs are true.
+
+  Each ERROR is a sequence. To convert it to a string, each element in the
+  sequence is concatenated with the clojure.core/str function."
+  [& cond-error-s]
+  `(or ~@(map (fn [[condition# error#]]
+                `(when-not ~condition# (str ~@error#)))
+              (partition 2 cond-error-s))))
+
 (defn for-vector
   "Performs validation for a vector, where the validation for each element uses
   the same logic. Combines the results of each one into a single validation
