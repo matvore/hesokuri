@@ -15,7 +15,8 @@
 (ns hesokuri.test-hesokuri.config
   (:use clojure.test
         hesokuri.config
-        hesokuri.testing.data))
+        hesokuri.testing.data
+        hesokuri.testing.validation))
 
 (deftest test-source-defs
   (are [config sources]
@@ -36,15 +37,9 @@
        {:discovery-dirs []} []
        {:discovery-dirs [1 2 3]} [1 2 3]))
 
-(defn- error-is-correct [error-string okay substrings]
-  (is (= okay (= error-string nil)))
-  (doseq [substring substrings]
-    (is (not= -1 (.indexOf error-string substring))))
-  true)
-
 (deftest test-round-trip-validation-error
   (are [data okay substrings]
-       (error-is-correct
+       (validation-is-correct
         (#'hesokuri.config/round-trip-validation-error data) okay substrings)
 
        ["ok"] true []
@@ -64,7 +59,7 @@
 
 (deftest test-validation-error
   (are [config okay substrings]
-       (error-is-correct
+       (validation-is-correct
         (validation config) okay substrings)
 
        *sources-eg* true []
