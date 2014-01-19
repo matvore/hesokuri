@@ -16,7 +16,7 @@
   (:import [java.io File])
   (:use clojure.test
         hesokuri.dynamic-config
-        hesokuri.test-hesokuri.waiting
+        hesokuri.testing.waiting
         hesokuri.util))
 
 (def ^:dynamic *config-file* nil)

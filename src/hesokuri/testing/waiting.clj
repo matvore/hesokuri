@@ -12,18 +12,15 @@
 ; See the License for the specific language governing permissions and
 ; limitations under the License.
 
-(ns hesokuri.test-hesokuri.data)
+(ns hesokuri.testing.waiting)
 
-(def ^:dynamic *sources-eg*
-  [{:host-to-path {"peer1" "/peer1/foo"
-                   "peer2" "/peer2/foo"}}
-   {"peer2" "/peer2/bar"}
-   {:host-to-path {"peer1" "/peer1/baz"
-                   "peer3" "/peer3/baz"}}
-   {"peer1" "/peer1/42"
-    "peer3" "/peer3/42"
-    "peer4" "/peer4/42"}])
+(defn wait-for [condition-fn]
+  (loop [total-sleeps 0]
+    (cond
+     (> total-sleeps 200) false
 
-(def ^:dynamic *config-eg*
-  {:comment "config comment"
-   :sources *sources-eg*})
+     (condition-fn) true
+     :else (do
+             (Thread/sleep 100)
+             (recur (inc total-sleeps))))))
+

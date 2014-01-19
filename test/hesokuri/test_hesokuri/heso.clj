@@ -16,9 +16,9 @@
   (:use [clojure.java.io :only [file]]
         clojure.test
         hesokuri.heso
-        hesokuri.test-hesokuri.data
-        hesokuri.test-hesokuri.mock
-        hesokuri.test-hesokuri.temp
+        hesokuri.testing.data
+        hesokuri.testing.mock
+        hesokuri.testing.temp
         hesokuri.util)
   (:require [hesokuri.peer :as peer]
             [hesokuri.repo :as repo]

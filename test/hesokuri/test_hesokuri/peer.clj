@@ -15,7 +15,7 @@
 (ns hesokuri.test-hesokuri.peer
   (:use [clojure.java.io :only [file]]
         clojure.test
-        hesokuri.test-hesokuri.mock
+        hesokuri.testing.mock
         hesokuri.util)
   (:require [hesokuri.peer :as peer]
             [hesokuri.peer-repo :as peer-repo]))

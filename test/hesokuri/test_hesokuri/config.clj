@@ -15,7 +15,7 @@
 (ns hesokuri.test-hesokuri.config
   (:use clojure.test
         hesokuri.config
-        hesokuri.test-hesokuri.data))
+        hesokuri.testing.data))
 
 (deftest test-source-defs
   (are [config sources]

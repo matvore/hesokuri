@@ -15,7 +15,7 @@
 (ns hesokuri.test-hesokuri.util
   (:use clojure.test
         hesokuri.util
-        hesokuri.test-hesokuri.mock))
+        hesokuri.testing.mock))
 
 (defmacro sh-print-tests
   [& body]

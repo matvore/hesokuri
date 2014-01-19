@@ -15,8 +15,8 @@
 (ns hesokuri.test-hesokuri.watcher
   (:use [clojure.java.io :only [file]]
         clojure.test
-        hesokuri.test-hesokuri.temp
-        hesokuri.test-hesokuri.waiting
+        hesokuri.testing.temp
+        hesokuri.testing.waiting
         hesokuri.util
         hesokuri.watcher))
 

@@ -12,7 +12,7 @@
 ; See the License for the specific language governing permissions and
 ; limitations under the License.
 
-(ns hesokuri.test-hesokuri.mock)
+(ns hesokuri.testing.mock)
 
 (defn mock [arg-sets]
   (let [arg-sets (ref arg-sets)]

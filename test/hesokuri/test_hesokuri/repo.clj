@@ -16,8 +16,8 @@
   (:use [clojure.java.io :only [file]]
         clojure.test
         hesokuri.repo
-        hesokuri.test-hesokuri.mock
-        hesokuri.test-hesokuri.temp
+        hesokuri.testing.mock
+        hesokuri.testing.temp
         hesokuri.util))
 
 (defn ff? [src-dir from-hash to-hash when-equal]
