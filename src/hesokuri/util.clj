@@ -17,6 +17,9 @@
         clojure.tools.logging)
   (:require clojure.java.shell))
 
+;;; TODO(matvore): Delete these sh functions, and refactor users of them to use
+;;; the functionality of the hesokuri.git namespace.
+
 (defn ^:dynamic *print-for-sh*
   [args stderr stdout]
   (infof "execute: %s\nstderr:\n%sstdout:\n%s" args stderr stdout))
