@@ -14,7 +14,8 @@
 
 (ns hesokuri.git
   "Module that facilitates invoking git."
-  (:require clojure.java.shell)
+  (:require clojure.java.io
+            clojure.java.shell)
   (:use [clojure.string :only [join]]))
 
 (def default-git
@@ -52,6 +53,28 @@ strings to pass to git."
   [git args]
   {:pre [(args? args) (git? git)]}
   (apply clojure.java.shell/sh (:path git) args))
+
+(defn invoke-streams
+  "Invokes git with the given arguments. The semantics of the arguments are
+identical to the invoke function. The return value is a sequence of at least
+three elements: an OutputStream corresponding to stdin, an InputStream
+corresponding to stdout, and a future that will realize when the process
+terminates. The future is a map with two keys: :exit and :err, whose values
+correspond to the values of the same keys in the invoke return value."
+  [git args]
+  {:pre [(args? args) (git? git)]}
+  (let [process (new ProcessBuilder (into [(:path git)] args))]
+    (doto process
+      (.redirectInput java.lang.ProcessBuilder$Redirect/PIPE)
+      (.redirectOutput java.lang.ProcessBuilder$Redirect/PIPE)
+      (.redirectError java.lang.ProcessBuilder$Redirect/PIPE))
+    (let [process (.start process)]
+      [(.getOutputStream process)
+       (.getInputStream process)
+       (future
+         (let [stderr (slurp (.getErrorStream process))]
+           {:exit (.waitFor process)
+            :err stderr}))])))
 
 (defn summary
   "Returns a user-readable summary of the result of 'invoke' as a string."

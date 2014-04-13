@@ -13,6 +13,7 @@
 ; limitations under the License.
 
 (ns hesokuri.test-hesokuri.git
+  (:require clojure.java.io)
   (:use clojure.test
         hesokuri.git
         hesokuri.testing.temp))
@@ -68,17 +69,46 @@
        ["rev-parse"]
        '("checkout" "branch")))
 
+(defn git-dir-flag [dir]
+  (str "--git-dir=" dir))
+
+(defmacro with-temp-repo
+  [[dir] & body]
+  `(let [~dir (create-temp-dir)
+         init-result# (invoke default-git [(git-dir-flag ~dir) "init"])]
+     (is (invoke-result? init-result#))
+     (is (not= -1 (.indexOf (:out init-result#) (str ~dir))))
+     (is (= (:exit init-result#) 0))
+     (is (= (:err init-result#) ""))
+     ~@body))
+
 (deftest test-invoke
-  (let [repo-dir (str (create-temp-dir))
-        git-dir-flag (str "--git-dir=" repo-dir)
-        init-result (invoke default-git [git-dir-flag "init"])
-        rev-parse-result (invoke default-git [git-dir-flag "rev-parse"])]
-    (is (= (:exit init-result) 0))
-    (is (= (:err init-result) ""))
-    (is (not= -1 (.indexOf (:out init-result) repo-dir)))
-    (is (= rev-parse-result {:err "" :out "" :exit 0}))
-    (is (invoke-result? init-result))
-    (is (invoke-result? rev-parse-result))))
+  (with-temp-repo [repo-dir]
+    (let [git-dir-flag (git-dir-flag repo-dir)
+          rev-parse-result (invoke default-git [git-dir-flag "rev-parse"])]
+      (is (= rev-parse-result {:err "" :out "" :exit 0}))
+      (is (invoke-result? rev-parse-result)))))
+
+(deftest test-invoke-streams-empty-err
+  (with-temp-repo [repo-dir]
+    (let [[in out result]
+          (invoke-streams
+           default-git
+           [(git-dir-flag repo-dir) "hash-object" "-w" "--stdin"])]
+      (spit in "hello\n")
+      (is (not (realized? result)))
+      (.close in)
+      (is (= "ce013625030ba8dba906f756967f9e9ca394464a\n" (slurp out)))
+      (is (= {:err "" :exit 0}) @result))))
+
+(deftest test-invoke-streams-err
+  (with-temp-repo [repo-dir]
+    (let [[_ _ result]
+          (invoke-streams
+           default-git
+           [(git-dir-flag repo-dir) "cat-file" "-t" "1234567"])]
+      (is (= {:err "fatal: Not a valid object name 1234567\n" :exit 128}
+             @result)))))
 
 (deftest test-summary
   (let [err "[stderr contents]"
