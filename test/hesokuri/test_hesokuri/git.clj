@@ -69,32 +69,17 @@
        ["rev-parse"]
        '("checkout" "branch")))
 
-(defn git-dir-flag [dir]
-  (str "--git-dir=" dir))
-
-(defmacro with-temp-repo
-  [[dir] & body]
-  `(let [~dir (create-temp-dir)
-         init-result# (invoke default-git [(git-dir-flag ~dir) "init"])]
-     (is (invoke-result? init-result#))
-     (is (not= -1 (.indexOf (:out init-result#) (str ~dir))))
-     (is (= (:exit init-result#) 0))
-     (is (= (:err init-result#) ""))
-     ~@body))
-
 (deftest test-invoke
-  (with-temp-repo [repo-dir]
-    (let [git-dir-flag (git-dir-flag repo-dir)
-          rev-parse-result (invoke default-git [git-dir-flag "rev-parse"])]
+  (with-temp-repo [repo-dir git-dir-flag]
+    (let [rev-parse-result (invoke default-git [git-dir-flag "rev-parse"])]
       (is (= rev-parse-result {:err "" :out "" :exit 0}))
       (is (invoke-result? rev-parse-result)))))
 
 (deftest test-invoke-streams-empty-err
-  (with-temp-repo [repo-dir]
+  (with-temp-repo [repo-dir git-dir-flag]
     (let [[in out result]
           (invoke-streams
-           default-git
-           [(git-dir-flag repo-dir) "hash-object" "-w" "--stdin"])]
+           default-git [git-dir-flag "hash-object" "-w" "--stdin"])]
       (spit in "hello\n")
       (is (not (realized? result)))
       (.close in)
@@ -102,11 +87,10 @@
       (is (= {:err "" :exit 0}) @result))))
 
 (deftest test-invoke-streams-err
-  (with-temp-repo [repo-dir]
+  (with-temp-repo [repo-dir git-dir-flag]
     (let [[_ _ result]
           (invoke-streams
-           default-git
-           [(git-dir-flag repo-dir) "cat-file" "-t" "1234567"])]
+           default-git [git-dir-flag "cat-file" "-t" "1234567"])]
       (is (= {:err "fatal: Not a valid object name 1234567\n" :exit 128}
              @result)))))
 

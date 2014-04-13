@@ -13,7 +13,9 @@
 ; limitations under the License.
 
 (ns hesokuri.testing.temp
-  (:import [java.io File FileWriter]))
+  (:import [java.io File FileWriter])
+  (:require [hesokuri.git :as git])
+  (:use clojure.test))
 
 (defn create-temp-dir
   "Creates a temporary directory and returns a File pointing to its path."
@@ -34,3 +36,17 @@
     (.write stream (str contents))
     (.close stream)
     path))
+
+(defmacro with-temp-repo
+  "Creates a repo, binding the directory to the dir symbol and the --git-dir
+flag (to pass to git when operating on the repo) to the git-dir-flag symbol."
+  [[dir git-dir-flag] & body]
+  (let [git-dir-flag (or git-dir-flag (gensym "git-dir-flag"))]
+    `(let [~dir (create-temp-dir)
+           ~git-dir-flag (str "--git-dir=" ~dir)
+           init-result# (git/invoke git/default-git [~git-dir-flag "init"])]
+       (is (git/invoke-result? init-result#))
+       (is (not= -1 (.indexOf (:out init-result#) (str ~dir))))
+       (is (= (:exit init-result#) 0))
+       (is (= (:err init-result#) ""))
+       ~@body)))
