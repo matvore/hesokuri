@@ -14,6 +14,7 @@
 
 (ns hesokuri.test-hesokuri.repo
   (:use [clojure.java.io :only [file]]
+        [clojure.string :only [trim]]
         clojure.test
         hesokuri.repo
         hesokuri.testing.mock
@@ -33,6 +34,39 @@
 (def hash-e "e00000000000000000000000000000000000000e")
 (def hash-f "f00000000000000000000000000000000000000f")
 (def hash-g "0100000000000000000000000000000000000010")
+
+(deftest test-invoke-git-and-fast-forward-real-repo
+  (with-temp-repo [repo-dir git-dir-flag true]
+    (let [repo (init {:dir repo-dir})]
+      (is (= {:dir repo-dir :bare false :init true} repo))
+      (is (= (file repo-dir ".git") (git-dir repo)))
+      (is (.isDirectory (git-dir repo)))
+      (spit (file repo-dir "file1") "contents 1")
+      (let [[add-res-1] (invoke-git repo ["add" (str (file repo-dir "file1"))])
+            [commit-res-1] (invoke-git repo ["commit" "-m" "first commit"])
+            [rev-parse-res-1] (invoke-git repo ["rev-parse" "HEAD"])
+            commit-1-hash (trim (:out rev-parse-res-1))]
+        (is (= 0 (:exit add-res-1)))
+        (is (= "" (:err add-res-1)))
+        (is (= 0 (:exit commit-res-1)))
+        (is (= 0 (:exit rev-parse-res-1)))
+        (is (= "" (:err rev-parse-res-1)))
+        (is (full-hash? commit-1-hash))
+        (spit (file repo-dir "file2") "contents 2")
+        (let [[add-res-2]
+              (invoke-git repo ["add" (str (file repo-dir "file2"))])
+              [commit-res-2]
+              (invoke-git repo ["commit" "-m" "second commit"])
+              [rev-parse-res-2]
+              (invoke-git repo ["rev-parse" "HEAD"])
+              commit-2-hash
+              (trim (:out rev-parse-res-2))]
+          (is (= 0 (:exit rev-parse-res-2)))
+          (is (= "" (:err rev-parse-res-2)))
+          (is (full-hash? commit-2-hash))
+          (is (true? (fast-forward? repo commit-1-hash commit-2-hash :equal)))
+          (is (not
+               (fast-forward? repo commit-2-hash commit-1-hash :equal))))))))
 
 (deftest test-fast-forward
   (let [sh-result (fn [output] (repeat 10 {:out output :exit 0}))

@@ -17,7 +17,8 @@
   have logic that is specific to Hesokuri, so it can be easily replaced with a
   more performant git access layer later. Currently it just shells out to 'git'
   on the command line)."
-  (:require [hesokuri.watcher :as watcher])
+  (:require [hesokuri.git :as git]
+            [hesokuri.watcher :as watcher])
   (:use [clojure.java.io :only [file]]
         [clojure.string :only [split trim]]
         clojure.tools.logging
@@ -56,12 +57,21 @@
        :bare (-> (file dir ".git") .isDirectory not)
        :init true))))
 
-(defn- git-dir
+(defn git-dir
   "Returns the git directory (.git) of the repo as a java.io.File object. If it
   is a bare repository, it is equal to the :dir value."
   [{:keys [dir bare init] :as repo}]
   {:pre [init]}
   (if bare dir (file dir ".git")))
+
+(defn invoke-git
+  "Invokes git with the given arguments, the correct --git-dir flag, and (if
+  applicable) the correct --work-tree flag. Uses git/invoke-with-summary."
+  [{:keys [dir bare] :as repo} args]
+  {:pre [(every? string? args)]}
+  (let [dir-flags (concat [(str "--git-dir=" (git-dir repo))]
+                          (if bare [] [(str "--work-tree=" dir)]))]
+    (git/invoke-with-summary git/default-git (concat dir-flags args))))
 
 (defn working-area-clean
   "Returns true if this repo's working area is clean, or it is bare. It is clean
