@@ -120,11 +120,14 @@
   branch is checked out."
   [repo]
   {:pre [(:init repo)]}
-  (let [head (trim (slurp (file (git-dir repo) "HEAD")))
-        local-branch-prefix "ref: refs/heads/"]
-    (if (.startsWith head local-branch-prefix)
-      (.substring head (count local-branch-prefix))
-      nil)))
+  (let [[{:keys [out exit]}]
+        (invoke-git repo ["rev-parse" "--symbolic-full-name" "HEAD"])
+        out (trim out)
+        local-branch-prefix "refs/heads/"]
+    (cond
+     (not (zero? exit)) nil
+     (not (.startsWith out local-branch-prefix)) nil
+     :else (.substring out (count local-branch-prefix)))))
 
 (defn delete-branch
   "Deletes the given branch. This method always returns nil. It does not throw

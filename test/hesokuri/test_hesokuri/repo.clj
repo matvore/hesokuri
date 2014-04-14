@@ -181,15 +181,22 @@
       (is (= 0 (rename-branch repo "new-master" "work" true)))
       (is (= #{"work" "work2"} (.keySet (branches repo)))))))
 
+(deftest test-checked-out-branch-new-repo
+  (with-temp-repo [repo-dir git-dir-flag true]
+    (let [repo (init {:dir repo-dir})]
+      (is (nil? (checked-out-branch repo))))))
+
 (deftest test-checked-out-branch
-  (are [head-file result]
-       (let [git-dir (create-temp-dir)
-             repo {:init true :bare true :dir (file git-dir)}]
-         (spit (file git-dir "HEAD") head-file)
-         (is (= result (checked-out-branch repo))))
-       "ref: refs/heads/foo" "foo"
-       "ref: not-local-branch" nil
-       "ref: refs/heads/bar" "bar"))
+  (are [git-invoke-result result]
+       (let [repo {:init true :bare false :dir (file "/fake-repo")}
+             invoke-git (mock {[repo ["rev-parse" "--symbolic-full-name" "HEAD"]]
+                               [[git-invoke-result "summary"]]})]
+         (with-redefs [hesokuri.repo/invoke-git invoke-git]
+           (is (= result (checked-out-branch repo)))))
+       {:out "refs/heads/foo\n" :err "" :exit 0} "foo"
+       {:out "not-local-branch\n" :err "" :exit 0} nil
+       {:out "refs/heads/bar\n" :err "" :exit 0} "bar"
+       {:out "refs/heads/master\n" :err "" :exit 128} nil))
 
 (deftest test-branch-and-hash-list
   (are [branch-output expected]
