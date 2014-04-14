@@ -17,30 +17,6 @@
         clojure.tools.logging)
   (:require clojure.java.shell))
 
-;;; TODO(matvore): Delete these sh functions, and refactor users of them to use
-;;; the functionality of the hesokuri.git namespace.
-
-(defn ^:dynamic *print-for-sh*
-  [args stderr stdout]
-  (infof "execute: %s\nstderr:\n%sstdout:\n%s" args stderr stdout))
-
-(def ^:dynamic *sh* clojure.java.shell/sh)
-
-(defn sh-print-when
-  "Runs the command-line given in args using clojure.java.shell/sh. Returns
-  the exit code. If the 'print-when' argument (a function) returns truthy when
-  passed the result of sh, it prints out the stderr and stdout of the process to
-  this process' stderr and stdout."
-  [print-when & args]
-  (let [result (apply *sh* args)]
-    (when (print-when result)
-      (*print-for-sh* args (:err result) (:out result)))
-    (:exit result)))
-
-(defn sh-print
-  [& args]
-  (apply sh-print-when (constantly true) args))
-
 (defmacro letmap
   "A macro that behaves like let, creating temporary bindings for variables, and
   also creates a map containing the bindings. An abbreviated form is supplied

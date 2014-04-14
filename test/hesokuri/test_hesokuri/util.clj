@@ -17,58 +17,6 @@
         hesokuri.util
         hesokuri.testing.mock))
 
-(defmacro sh-print-tests
-  [& body]
-  `(let [result# (atom {})
-
-         ~'with-printed
-         (fn [func# args#]
-           (swap! result# #(dissoc % :printed :return))
-           (let [return# (apply func# args#)]
-             (swap! result# #(assoc % :return return#))))]
-     (binding [*sh* #(if (< %1 %2)
-                       {:exit 1 :err "err" :out "out"}
-                       {:exit 0
-                        :err (format "err: %d" (- %1 %2))
-                        :out (format "out: %d" (- %1 %2))})
-
-               *print-for-sh*
-               (fn [args# stderr# stdout#]
-                 (swap! result# #(assoc % :printed {:args args#
-                                                    :stderr stderr#
-                                                    :stdout stdout#})))]
-       ~@body)))
-
-(deftest test-sh-print-when
-  (sh-print-tests
-   (are [args exp-return exp-stderr exp-stdout]
-        (= (with-printed sh-print-when args)
-           {:return exp-return
-            :printed {:args (rest args)
-                      :stderr exp-stderr
-                      :stdout exp-stdout}})
-        [(constantly true) 5 4] 0 "err: 1" "out: 1"
-        [(constantly true) 5 6] 1 "err" "out"
-        [#(= (:exit %) 0) 1 0] 0 "err: 1" "out: 1"
-        [#(= (:exit %) 1) 0 1] 1 "err" "out")
-   (are [args exp-return]
-        (= (with-printed sh-print-when args) {:return exp-return})
-        [(constantly false) 5 4] 0
-        [(constantly false) 5 6] 1
-        [#(= (:exit %) 0) 0 1] 1
-        [#(= (:exit %) 1) 1 0] 0)))
-
-(deftest test-sh-print
-  (sh-print-tests
-   (are [args exp-return exp-stderr exp-stdout]
-        (= (with-printed sh-print args)
-           {:return exp-return
-            :printed {:args args
-                      :stderr exp-stderr
-                      :stdout exp-stdout}})
-        [5 4] 0 "err: 1" "out: 1"
-        [5 6] 1 "err" "out")))
-
 (defn- sane-at [at]
   (is (= {:file String
           :line Integer

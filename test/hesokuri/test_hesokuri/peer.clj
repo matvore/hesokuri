@@ -17,7 +17,8 @@
         clojure.test
         hesokuri.testing.mock
         hesokuri.util)
-  (:require [hesokuri.peer :as peer]
+  (:require [hesokuri.git :as git]
+            [hesokuri.peer :as peer]
             [hesokuri.peer-repo :as peer-repo]))
 
 (def ^:dynamic peer-repo {:host "repohost" :path "/repopath"})
@@ -50,7 +51,8 @@
                   current-time-millis
                   (mock {[] [(+ 46 (peer/default :minimum-retry-interval))]})
 
-                  sh-print (constantly 0)]
+                  git/invoke
+                  (constantly {:exit 0 :out "mock out\n" :err "mock err\n"})]
       (let [peer (push peer)]
         (is (= "hash" (get-in peer
                               [:pushed [(:dir local-repo) "branch-name"]])))
@@ -63,7 +65,8 @@
                   current-time-millis
                   (mock {[] [(+ 46 (peer/default :minimum-retry-interval))]})
 
-                  sh-print (constantly 1)]
+                  git/invoke
+                  (constantly {:exit 1 :out "mock out\n" :err "mock err\n"})]
       (let [peer (push peer)]
         (is (= {} (peer :pushed)))
         (is (nil? (peer :last-fail-ping-time)))))))

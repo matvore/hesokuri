@@ -21,12 +21,6 @@
         hesokuri.testing.temp
         hesokuri.util))
 
-(defn ff? [src-dir from-hash to-hash when-equal]
-  (fast-forward? {:dir src-dir :bare false :init true}
-                 from-hash
-                 to-hash
-                 when-equal))
-
 (def hash-a "a00000000000000000000000000000000000000a")
 (def hash-b "b00000000000000000000000000000000000000b")
 (def hash-c "c00000000000000000000000000000000000000c")
@@ -69,21 +63,22 @@
                (fast-forward? repo commit-2-hash commit-1-hash :equal))))))))
 
 (deftest test-fast-forward
-  (let [sh-result (fn [output] (repeat 10 {:out output :exit 0}))
-        sh (mock {["git" "merge-base" hash-a hash-b :dir "/srcdir"]
-                  (sh-result hash-c)
-                  ["git" "merge-base" hash-b hash-a :dir "/srcdir"]
-                  (sh-result hash-c)
-                  ["git" "merge-base" hash-d hash-e :dir "/srcdir"]
-                  (sh-result hash-e)
-                  ["git" "merge-base" hash-e hash-d :dir "/srcdir"]
-                  (sh-result hash-e)
-                  ["git" "merge-base" hash-f hash-g :dir "/srcdir"]
-                  (sh-result hash-f)})]
-    (binding [*sh* sh]
+  (let [repo {:dir "/srcdir" :bare false :init true}
+        git-result (fn [output] (repeat 10 {:err "" :out output :exit 0}))
+        invoke-git (mock {[repo ["merge-base" hash-a hash-b]]
+                          [(git-result hash-c)]
+                          [repo ["merge-base" hash-b hash-a]]
+                          [(git-result hash-c)]
+                          [repo ["merge-base" hash-d hash-e]]
+                          [(git-result hash-e)]
+                          [repo ["merge-base" hash-e hash-d]]
+                          [(git-result hash-e)]
+                          [repo ["merge-base" hash-f hash-g]]
+                          [(git-result hash-f)]})]
+    (with-redefs [hesokuri.repo/invoke-git invoke-git]
       (are [from-hash to-hash when-equal res]
            (= (boolean res)
-              (boolean (ff? "/srcdir" from-hash to-hash when-equal)))
+              (boolean (fast-forward? repo from-hash to-hash when-equal)))
            hash-a hash-b nil false
            hash-b hash-a nil false
            hash-d hash-d true true
@@ -141,16 +136,19 @@
                  (branches repo))))))))
 
 (deftest test-delete-branch
-  (let [sh-invocations (atom [])
-        sh (fn [& args]
-             (swap! sh-invocations #(conj % args))
-             nil)]
-    (binding [*sh* sh]
-      (delete-branch {:dir "repodir" :init true} "byebye")
-      (delete-branch {:dir "repodir2" :init true} "ohnooo" true)
-      (is (= [["git" "branch" "-d" "byebye" :dir "repodir"]
-              ["git" "branch" "-D" "ohnooo" :dir "repodir2"]]
-             @sh-invocations)))))
+  (let [git-invocations (atom [])
+        invoke-git (fn [& args]
+                     (swap! git-invocations #(conj % args))
+                     [{:exit 1 :out "" :err ""} "summary"])
+        repo-1 {:dir "repodir" :init true}
+        repo-2 {:dir "repodir2" :init true}]
+    (with-redefs [hesokuri.repo/invoke-git invoke-git
+                  hesokuri.repo/log (fn [[{:keys [exit]}]] exit)]
+      (delete-branch repo-1 "byebye")
+      (delete-branch repo-2 "ohnooo" true)
+      (is (= [[repo-1 ["branch" "-d" "byebye"]]
+              [repo-2 ["branch" "-D" "ohnooo"]]]
+             @git-invocations)))))
 
 (deftest test-hard-reset
   (with-temp-repo [repo-dir git-dir-flag true]
@@ -222,3 +220,20 @@
        ["invalid-branch invalidhash desc\n"
         "valid-branch dddddddddddddddddddddddddddddddddddddddd"]
        [["valid-branch" "dddddddddddddddddddddddddddddddddddddddd"]]))
+
+(deftest test-push-to-branch
+  (let [repo {:dir (file "/srcdir") :init true}
+        test-peer "test-peer-repo"
+        local-ref "test-local-ref"
+        remote-branch "test-remote-branch"
+        from-to-ref (str local-ref ":refs/heads/" remote-branch)
+        invoke-git (mock {[repo ["push" test-peer from-to-ref "-f"]]
+                          [[{:exit 42 :err "" :out ""} ""]]
+
+                          [repo ["push" test-peer from-to-ref]]
+                          [[{:exit 44 :err "" :out ""} ""]]})]
+    (with-redefs [hesokuri.repo/invoke-git invoke-git
+                  hesokuri.repo/log (comp :exit first)]
+      (is (= 42 (push-to-branch repo test-peer local-ref remote-branch true)))
+      (is (= 44 (push-to-branch repo test-peer local-ref remote-branch
+                                false))))))

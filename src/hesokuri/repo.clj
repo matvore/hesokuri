@@ -18,10 +18,10 @@
   more performant git access layer later. Currently it just shells out to 'git'
   on the command line)."
   (:require [hesokuri.git :as git]
-            [hesokuri.watcher :as watcher])
+            [hesokuri.watcher :as watcher]
+            clojure.tools.logging)
   (:use [clojure.java.io :only [file]]
         [clojure.string :only [split trim]]
-        clojure.tools.logging
         hesokuri.util))
 
 (defn hex-char?
@@ -50,7 +50,7 @@
   (cond
    init self
    :else
-   (let [init-result (*sh* "git" "init" (str dir))]
+   (let [init-result (git/invoke git/default-git ["init" (str dir)])]
      (when-not (zero? (:exit init-result))
        (throw (java.io.IOException. (str "Failed to init repo: " init-result))))
      (assoc self
@@ -73,13 +73,22 @@
                           (if bare [] [(str "--work-tree=" dir)]))]
     (git/invoke-with-summary git/default-git (concat dir-flags args))))
 
+(defn- log
+  "Takes the result of invoke-git, logs the summary, and returns the exit code."
+  [invoke-git-result]
+  (let [[{:keys [exit]} summary] invoke-git-result]
+    (if (zero? exit)
+      (clojure.tools.logging/info summary)
+      (clojure.tools.logging/warn summary))
+    exit))
+
 (defn working-area-clean
   "Returns true if this repo's working area is clean, or it is bare. It is clean
   if there are no untracked files, unstaged changes, or uncommitted changes."
-  [{:keys [bare dir init]}]
+  [{:keys [bare init] :as repo}]
   {:pre [init]}
   (or bare
-      (let [status (*sh* "git" "status" "--porcelain" :dir dir)]
+      (let [[status] (invoke-git repo ["status" "--porcelain"])]
         (and (= 0 (:exit status))
              (= "" (:out status))))))
 
@@ -96,18 +105,14 @@
 
 (defn branches
   "Returns a map of refs/heads branches to their hashes."
-  [{:keys [dir init]}]
+  [{:keys [dir init] :as repo}]
   {:pre [init]}
-  (let [{:keys [err out exit]}
-        (*sh* "git" "branch" "-v" "--no-abbrev" :dir dir)]
+  (let [res-sum (invoke-git repo ["branch" "-v" "--no-abbrev"])
+        [{:keys [out exit]}] res-sum]
     ;; git-branch can return error even though some branches were read
     ;; correctly, so if there was an error just log a warning and try to parse
     ;; the output anyway.
-    (when (not= 0 exit)
-      (warnf (str "git-branch returned error in %s, exit code %d:\n"
-                  "stdout:\n%s"
-                  "stderr:\n%s")
-                dir exit out err))
+    (when (not= 0 exit) (clojure.tools.logging/warn (second res-sum)))
     (into {} (branch-and-hash-list out))))
 
 (defn checked-out-branch
@@ -126,46 +131,46 @@
   an exception if the branch delete failed. 'force' indicates that -D will be
   used to delete the branch, which means it will succeed even if the branch is
   not yet merged to its upstream branch."
-  [{:keys [dir init]} branch-name & [force]]
+  [{:keys [init] :as repo} branch-name & [force]]
   {:pre [(string? branch-name) init]}
-  (sh-print-when #(= (:exit %) 0)
-                 "git" "branch" (if force "-D" "-d") branch-name :dir dir)
+  (log (invoke-git repo ["branch" (if force "-D" "-d") branch-name]))
   nil)
 
 (defn hard-reset
   "Performs a hard reset to the given ref. Returns 0 for success, non-zero for
   failure."
-  [{:keys [dir init]} ref]
+  [{:keys [init] :as repo} ref]
   {:pre [(string? ref) init]}
-  (sh-print "git" "reset" "--hard" ref :dir dir))
+  (log (invoke-git repo ["reset" "--hard" ref])))
 
 (defn rename-branch
   "Renames the given branch, allowing overwrites if specified. Returns 0 for
   success, non-zero for failure."
-  [{:keys [dir init]} from to allow-overwrite]
+  [{:keys [init] :as repo} from to allow-overwrite]
   {:pre [(string? from) (string? to) init]}
-  (sh-print "git" "branch" (if allow-overwrite "-M" "-m") from to :dir dir))
+  (log (invoke-git repo ["branch" (if allow-overwrite "-M" "-m") from to])))
 
 (defn fast-forward?
   "Returns true iff the second hash is a fast-forward of the first hash. When
   the hashes are the same, returns when-equal."
-  [{:keys [dir init]} from-hash to-hash when-equal]
+  [{:keys [dir init] :as repo} from-hash to-hash when-equal]
   {:pre [(full-hash? from-hash) (full-hash? to-hash) init]}
   (if (= from-hash to-hash)
     when-equal
-    (-> (*sh* "git" "merge-base" from-hash to-hash :dir dir)
+    (-> (invoke-git repo ["merge-base" from-hash to-hash])
+        first
         :out
         trim
         (= from-hash))))
 
 (defn push-to-branch
   "Performs a push. Returns 0 for success, non-zero for failure."
-  [{:keys [dir init]} peer-repo local-ref remote-branch allow-non-ff]
-  {:pre [(string? peer-repo) (string? local-ref) (string? remote-branch) init]}
-  (apply sh-print "git" "push" peer-repo
-         (str local-ref ":refs/heads/" remote-branch)
-         (concat (if allow-non-ff ["-f"] [])
-                 [:dir dir])))
+  [repo peer-repo local-ref remote-branch allow-non-ff]
+  {:pre [(string? peer-repo) (string? local-ref) (string? remote-branch)
+         (:init repo)]}
+  (log (invoke-git repo `("push" ~peer-repo
+                          ~(str local-ref ":refs/heads/" remote-branch)
+                          ~@(if allow-non-ff ["-f"] [])))))
 
 (defn watch-refs-heads-dir
   "Sets up a watcher for the refs/heads directory and returns an object like
