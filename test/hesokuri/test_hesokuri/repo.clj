@@ -90,6 +90,56 @@
            hash-d hash-e nil false
            hash-e hash-d nil true))))
 
+(deftest test-working-area-clean-bare
+  (is (working-area-clean {:dir (file "/ignored") :bare true :init true})))
+
+(deftest test-working-area-clean-real-repo
+  (with-temp-repo [repo-dir git-dir-flag true]
+    (let [repo (init {:dir repo-dir})]
+      (is (working-area-clean repo))
+      (spit (file repo-dir "file1") "contents 1")
+      (is (not (working-area-clean repo)))
+      (invoke-git repo ["add" (str (file repo-dir "file1"))])
+      (is (not (working-area-clean repo)))
+      (invoke-git repo ["commit" "-m" "commit"])
+      (is (working-area-clean repo)))))
+
+(deftest test-branches-and-delete-branch-real-repo
+  (with-temp-repo [repo-dir git-dir-flag true]
+    (let [repo (init {:dir repo-dir})]
+      (is (= {} (branches repo)))
+      (spit (file repo-dir "file1") "contents 1")
+      (invoke-git repo ["add" (str (file repo-dir "file1"))])
+      (is (= {} (branches repo)))
+      (invoke-git repo ["commit" "-m" "commit"])
+      (let [first-commit-hash
+            (-> (invoke-git repo ["rev-parse" "HEAD"]) first :out trim)]
+        (is (= {"master" first-commit-hash} (branches repo)))
+        (invoke-git repo ["checkout" "-b" "work"])
+        (is (= {"master" first-commit-hash
+                "work" first-commit-hash}
+               (branches repo)))
+        (spit (file repo-dir "file2") "contents 2")
+        (invoke-git repo ["add" (str (file repo-dir "file2"))])
+        (invoke-git repo ["commit" "-m" "commit 2"])
+        (let [second-commit-hash
+              (-> (invoke-git repo ["rev-parse" "HEAD"]) first :out trim)]
+          (is (= {"master" first-commit-hash
+                  "work" second-commit-hash}
+                 (branches repo)))
+          (invoke-git repo ["checkout" "master"])
+          (delete-branch repo "work")
+          (is (= {"master" first-commit-hash
+                  "work" second-commit-hash}
+                 (branches repo)))
+          (delete-branch repo "work" true)
+          (is (= {"master" first-commit-hash}
+                 (branches repo)))
+          (invoke-git repo ["checkout" "-b" "work2"])
+          (delete-branch repo "master")
+          (is (= {"work2" first-commit-hash}
+                 (branches repo))))))))
+
 (deftest test-delete-branch
   (let [sh-invocations (atom [])
         sh (fn [& args]
@@ -101,6 +151,37 @@
       (is (= [["git" "branch" "-d" "byebye" :dir "repodir"]
               ["git" "branch" "-D" "ohnooo" :dir "repodir2"]]
              @sh-invocations)))))
+
+(deftest test-hard-reset
+  (with-temp-repo [repo-dir git-dir-flag true]
+    (let [repo (init {:dir repo-dir})
+          created-file (file repo-dir "file1")]
+      (spit created-file "contents 1")
+      (invoke-git repo ["add" (str created-file)])
+      (invoke-git repo ["commit" "-m" "commit"])
+      (spit created-file "contents 2")
+      (is (= 0 (hard-reset repo "HEAD")))
+      (is (= "contents 1" (slurp created-file)))
+      (is (= 0 (hard-reset repo "HEAD")))
+      (is (= "contents 1" (slurp created-file))))))
+
+(deftest test-checked-out-branch-and-rename-branch-real-repo
+  (with-temp-repo [repo-dir git-dir-flag true]
+    (let [repo (init {:dir repo-dir})]
+      (spit (file repo-dir "file1") "contents 1")
+      (invoke-git repo ["add" (str (file repo-dir "file1"))])
+      (invoke-git repo ["commit" "-m" "commit"])
+      (is (= "master" (checked-out-branch repo)))
+      (invoke-git repo ["checkout" "-b" "work"])
+      (is (= "work" (checked-out-branch repo)))
+      (invoke-git repo ["checkout" "-b" "work2"])
+      (is (= "work2" (checked-out-branch repo)))
+      (is (= 0 (rename-branch repo "master" "new-master" false)))
+      (is (= #{"new-master" "work" "work2"} (.keySet (branches repo))))
+      (is (not= 0 (rename-branch repo "new-master" "work" false)))
+      (is (= #{"new-master" "work" "work2"} (.keySet (branches repo))))
+      (is (= 0 (rename-branch repo "new-master" "work" true)))
+      (is (= #{"work" "work2"} (.keySet (branches repo)))))))
 
 (deftest test-checked-out-branch
   (are [head-file result]
