@@ -29,6 +29,27 @@
 (def hash-f "f00000000000000000000000000000000000000f")
 (def hash-g "0100000000000000000000000000000000000010")
 
+(deftest test-init-existing-bare-repo
+  (with-temp-repo [repo-dir git-dir-flag false]
+    (let [repo (init {:dir repo-dir})]
+      (is (= {:dir repo-dir :init true :bare true} repo))
+      (is (not (.isDirectory (file repo-dir ".git")))))))
+
+(deftest test-init-create-bare-repo
+  (let [repo-dir (create-temp-dir)]
+    (let [repo (init {:dir repo-dir :bare true})]
+      (is (= {:dir repo-dir :init true :bare true} repo))
+      (is (not (.isDirectory (file repo-dir ".git"))))
+      (is (.isFile (file repo-dir "HEAD"))))))
+
+(deftest test-init-create-non-bare-repo
+  (let [repo-dir (create-temp-dir)]
+    (let [repo (init {:dir repo-dir})]
+      (is (= {:dir repo-dir :bare false :init true} repo))
+      (is (.isDirectory (file repo-dir ".git")))
+      (is (= {:exit 0 :out "" :err ""}
+             (first (invoke-git repo ["rev-parse"])))))))
+
 (deftest test-invoke-git-and-fast-forward-real-repo
   (with-temp-repo [repo-dir git-dir-flag true]
     (let [repo (init {:dir repo-dir})]

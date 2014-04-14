@@ -46,16 +46,23 @@
 
 (defn init
   "Initializes the repository if it does not exist. Returns a new repo object."
-  [{:keys [dir init] :as self}]
+  [{:keys [dir init bare] :as self}]
   (cond
    init self
    :else
-   (let [init-result (git/invoke git/default-git ["init" (str dir)])]
-     (when-not (zero? (:exit init-result))
-       (throw (java.io.IOException. (str "Failed to init repo: " init-result))))
-     (assoc self
-       :bare (-> (file dir ".git") .isDirectory not)
-       :init true))))
+   (let [existing-bare
+         (-> (git/invoke git/default-git [(str "--git-dir=" dir) "rev-parse"])
+             :exit
+             zero?)]
+     (if existing-bare
+       (assoc self :bare true :init true)
+       (let [init-args `["init" ~@(if bare ["--bare"] []) ~(str dir)]
+             res-sum (git/invoke-with-summary git/default-git init-args)]
+         (when-not (zero? (:exit (first res-sum)))
+           (throw (java.io.IOException. (second res-sum))))
+         (assoc self
+           :bare (boolean bare)
+           :init true))))))
 
 (defn git-dir
   "Returns the git directory (.git) of the repo as a java.io.File object. If it
