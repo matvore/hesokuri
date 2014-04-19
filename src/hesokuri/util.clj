@@ -135,3 +135,20 @@
   "Invokes a callback constructed by the cb macro, passing the given arguments."
   [cb & args]
   (-> cb :fn (apply args)))
+
+(defn serialize
+  "Serializes value, returns a byte array. Taken from
+http://stackoverflow.com/questions/7701634/efficient-binary-serialization-for-clojure-java"
+  [v]
+  (let [buff (java.io.ByteArrayOutputStream. 1024)]
+    (with-open [dos (java.io.ObjectOutputStream. buff)]
+      (.writeObject dos v))
+    (.toByteArray buff)))
+
+(defn deserialize
+  "Accepts a byte array, returns deserialized value. Taken from
+http://stackoverflow.com/questions/7701634/efficient-binary-serialization-for-clojure-java"
+  [bytes]
+  (with-open [dis (java.io.ObjectInputStream.
+                   (java.io.ByteArrayInputStream. bytes))]
+    (.readObject dis)))

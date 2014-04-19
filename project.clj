@@ -22,6 +22,7 @@
                  [hiccup "1.0.4"]
                  [lib-noir "0.7.0"]
                  [net.java.dev.jna/jna "3.2.3"]
+                 [org.apache.sshd/sshd-core "0.10.1"]
                  [org.clojure/clojure "1.6.0"]
                  [org.clojure/tools.logging "0.2.6"]
                  [ring/ring-core "1.2.0"]
