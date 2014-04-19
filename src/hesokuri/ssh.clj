@@ -60,7 +60,7 @@ corresponding to a Hesokuri SSH channel.
       (.setServerKeyVerifier
        (reify org.apache.sshd.client.ServerKeyVerifier
          (verifyServerKey [_ _ _ server-key]
-           (known-server-key? server-key))))
+           (boolean (known-server-key? server-key)))))
       (.setKeyPairProvider (rsa-key-pair-provider key-pair))
       (.start))
     (let [connect-future (.awaitUninterruptibly (.connect client host port))]
