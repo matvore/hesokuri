@@ -39,12 +39,12 @@
 
         server
         (listen-connect server-port server-key-pair
-                        #{(.getPublic client-key-pair)}
+                        (partial = (.getPublic client-key-pair))
                         new-connection-fn)
 
         client-channel
         (connect-to "127.0.0.1" server-port client-key-pair
-                    #{(.getPublic server-key-pair)})
+                    (partial = (.getPublic server-key-pair)))
 
         [client-in client-out client-err] (open-channel-pipes client-channel)]
     (spit client-in "stdin from client" :encoding "UTF-8")
