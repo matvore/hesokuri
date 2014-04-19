@@ -22,6 +22,15 @@
     (.close socket)
     port))
 
+(defn read-line [input-stream]
+  (let [result (new StringBuilder)]
+    (loop []
+      (let [c (.read input-stream)]
+        (if (#{-1 (int \newline)} c)
+          (str result)
+          (do (.append result (char c))
+              (recur)))))))
+
 (deftest connect-std-streams
   (let [server-port (free-port)
         client-key-pair (new-key-pair)
@@ -30,12 +39,11 @@
 
         new-connection-fn
         (fn [in out err]
-          (let [in (slurp in)]
+          (let [in (read-line in)]
             (swap! received-from-client (constantly in)))
-          (spit out "stdout from server")
-          (.close out)
-          (spit err "stderr from server")
-          (.close err))
+          (.close in)
+          (spit out "stdout from server\n")
+          (spit err "stderr from server\n"))
 
         server
         (listen-connect server-port server-key-pair
@@ -47,9 +55,9 @@
                     (partial = (.getPublic server-key-pair)))
 
         [client-in client-out client-err] (open-channel-pipes client-channel)]
-    (spit client-in "stdin from client" :encoding "UTF-8")
-    (is (= "stdout from server" (slurp client-out :encoding "UTF-8")))
-    (is (= "stderr from server" (slurp client-err :encoding "UTF-8")))
-    (.awaitUninterruptibly (.close client-channel))
+    (spit client-in "stdin from client\n" :encoding "UTF-8")
+    (is (= "stdout from server" (read-line client-out)))
+    (is (= "stderr from server" (read-line client-err)))
+    (.awaitUninterruptibly (.close client-channel true))
     (is (= "stdin from client" @received-from-client))
     (.stop server)))

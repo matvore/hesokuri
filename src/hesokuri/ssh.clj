@@ -27,24 +27,33 @@ public/private key pairs only. All keys use RSA algorithm."
       (getKeyTypes [_] "ssh-rsa")
       (loadKey [_ type] (type-map type)))))
 
+(comment (defn open-channel-pipes [channel]
+           {:pre [channel]}
+           (let [result [(new PipedOutputStream)
+                         (new PipedInputStream)
+                         (new PipedInputStream)]
+                 pipe-ends [(new PipedInputStream)
+                            (new PipedOutputStream)
+                            (new PipedOutputStream)]]
+             (doseq [index (range 3)]
+               (.connect (result index) (pipe-ends index)))
+             (doto channel
+               (.setIn (pipe-ends 0))
+               (.setOut (pipe-ends 1))
+               (.setErr (pipe-ends 2)))
+             (let [open-future (-> channel .open .awaitUninterruptibly)]
+               (if-not (.isOpened open-future)
+                 (throw (.getException open-future))
+                 result)))))
+
 (defn open-channel-pipes [channel]
   {:pre [channel]}
-  (let [result [(new PipedOutputStream)
-                (new PipedInputStream)
-                (new PipedInputStream)]
-        pipe-ends [(new PipedInputStream)
-                   (new PipedOutputStream)
-                   (new PipedOutputStream)]]
-    (doseq [index (range 3)]
-      (.connect (result index) (pipe-ends index)))
-    (doto channel
-      (.setIn (pipe-ends 0))
-      (.setOut (pipe-ends 1))
-      (.setErr (pipe-ends 2)))
-    (let [open-future (-> channel .open .awaitUninterruptibly)]
-      (if-not (.isOpened open-future)
-        (throw (.getException open-future))
-        result))))
+  (let [open-future (-> channel .open .awaitUninterruptibly)]
+    (if-not (.isOpened open-future)
+      (throw (.getException open-future))
+      [(.getInvertedIn channel)
+       (.getInvertedOut channel)
+       (.getInvertedErr channel)])))
 
 (defn connect-to
   "Tries to connect to a peer with SSH authentication. This machine acts as the
@@ -67,7 +76,8 @@ corresponding to a Hesokuri SSH channel.
               auth-future (.awaitUninterruptibly
                            (.authPublicKey session "hesokuri_user" key-pair))]
           (if-not (.isSuccess auth-future)
-            (throw (.getException auth-future))
+            (throw (or (.getException auth-future)
+                       (new RuntimeException "Could not authenticate")))
             (.createChannel session
                             org.apache.sshd.ClientChannel/CHANNEL_SUBSYSTEM
                             "hesokuri")))))))
