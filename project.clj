@@ -26,6 +26,7 @@
                  [org.clojure/clojure "1.6.0"]
                  [org.clojure/tools.logging "0.2.6"]
                  [ring/ring-core "1.2.0"]
-                 [ring/ring-jetty-adapter "1.2.0"]]
+                 [ring/ring-jetty-adapter "1.2.0"]
+                 [org.slf4j/slf4j-jdk14 "1.7.6"]]
   :java-source-paths ["third_party/barbarywatchservice/src"]
   :main hesokuri.main)
