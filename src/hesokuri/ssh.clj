@@ -42,12 +42,9 @@ public/private key pairs only. All keys use RSA algorithm."
       (.setOut (pipe-ends 1))
       (.setErr (pipe-ends 2)))
     (let [open-future (-> channel .open .awaitUninterruptibly)]
-      (if (.isOpened open-future) result (throw (.getException open-future))))))
-
-;; (comment auth-future (.awaitUninterruptibly ; TODO: do we need this???
-;;                                     (.authPublicKey session "hesokuri_user" key-pair)))
-          ;; (when true ; (.isSuccess auth-future)
-          ;;   (.createChannel session "hesokuri-channel"))
+      (if-not (.isOpened open-future)
+        (throw (.getException open-future))
+        result))))
 
 (defn connect-to
   "Tries to connect to a peer with SSH authentication. This machine acts as the
@@ -64,11 +61,16 @@ corresponding to a Hesokuri SSH channel.
       (.setKeyPairProvider (rsa-key-pair-provider key-pair))
       (.start))
     (let [connect-future (.awaitUninterruptibly (.connect client host port))]
-      (if (.isConnected connect-future)
-        (let [session (.getSession connect-future)]
-          (.createChannel session org.apache.sshd.ClientChannel/CHANNEL_SUBSYSTEM "hesokuri"))
-
-        (throw (.getException connect-future))))))
+      (if-not (.isConnected connect-future)
+        (throw (.getException connect-future))
+        (let [session (.getSession connect-future)
+              auth-future (.awaitUninterruptibly
+                           (.authPublicKey session "hesokuri_user" key-pair))]
+          (if-not (.isSuccess auth-future)
+            (throw (.getException auth-future))
+            (.createChannel session
+                            org.apache.sshd.ClientChannel/CHANNEL_SUBSYSTEM
+                            "hesokuri")))))))
 
 (defn listen-connect
   "Accepts incoming Hesokuri connections. new-connection-fn is a function that
