@@ -85,22 +85,23 @@ server.
     (.setPublickeyAuthenticator
      (reify org.apache.sshd.server.PublickeyAuthenticator
        (authenticate [_ _ client-key _] (known-client-key? client-key))))
-    (.setCommandFactory
-     (reify org.apache.sshd.server.CommandFactory
-       (createCommand [_ _]
-         (let [streams (atom {})]
-           (reify org.apache.sshd.server.Command
-             (destroy [_] nil)
-             (setErrorStream [_ err]
-               (swap! streams #(assoc % :err err)))
-             (setExitCallback [_ _] nil)
-             (setInputStream [_ in]
-               (swap! streams #(assoc % :in in)))
-             (setOutputStream [_ out]
-               (swap! streams #(assoc % :out out)))
-             (start [_ _]
-               (new-connection-fn (:in @streams)
-                                  (:out @streams)
-                                  (:err @streams))))))))
+    (.setSubsystemFactories
+     [(reify org.apache.sshd.common.NamedFactory
+        (getName [_] "hesokuri")
+        (create [_]
+          (let [streams (atom {})]
+            (reify org.apache.sshd.server.Command
+              (destroy [_] nil)
+              (setErrorStream [_ err]
+                (swap! streams #(assoc % :err err)))
+              (setExitCallback [_ _] nil)
+              (setInputStream [_ in]
+                (swap! streams #(assoc % :in in)))
+              (setOutputStream [_ out]
+                (swap! streams #(assoc % :out out)))
+              (start [_ _]
+                (new-connection-fn (:in @streams)
+                                   (:out @streams)
+                                   (:err @streams)))))))])
     (.setKeyPairProvider (rsa-key-pair-provider key-pair))
     (.start)))
