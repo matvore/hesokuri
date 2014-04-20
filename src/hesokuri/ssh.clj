@@ -33,7 +33,7 @@ public/private key pairs only. All keys use RSA algorithm."
 
 (defn connect-to
   "Tries to connect to a peer with SSH authentication. This machine acts as the
-SSH client. Returns an unopened instance of org.apache.sshd.ClientChannel
+SSH client. Returns an already-opened instance of org.apache.sshd.ClientChannel
 corresponding to a Hesokuri SSH channel. Returns nil if any error occurred.
 "
   [host port key-pair known-server-key?]
