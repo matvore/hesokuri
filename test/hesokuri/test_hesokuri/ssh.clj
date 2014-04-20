@@ -54,7 +54,7 @@ the trailing newline."
         (connect-to "127.0.0.1" server-port client-key-pair
                     (partial = (.getPublic server-key-pair)))
 
-        [_ client-out client-err] (open-channel-pipes client-channel)]
+        [_ client-out client-err] (channel-streams client-channel)]
     (is (= "stdout from server" (read-line-stream client-out)))
     (is (= "stderr from server" (read-line-stream client-err)))
     (.close client-channel false)
@@ -80,7 +80,7 @@ the trailing newline."
         (connect-to "172.0.0.1" server-port client-key-pair
                     (partial = (.getPublic server-key-pair)))
 
-        [client-in] (open-channel-pipes client-channel)]
+        [client-in] (channel-streams client-channel)]
     (spit client-in "stdin from client\n")
     (is (= "stdin from client" @read-from-stdin))
     (.close client-channel false)

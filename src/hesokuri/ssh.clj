@@ -26,14 +26,10 @@ public/private key pairs only. All keys use RSA algorithm."
       (getKeyTypes [_] "ssh-rsa")
       (loadKey [_ type] (type-map type)))))
 
-(defn open-channel-pipes [channel]
-  {:pre [channel]}
-  (let [open-future (-> channel .open .awaitUninterruptibly)]
-    (if-not (.isOpened open-future)
-      (throw (.getException open-future))
-      [(.getInvertedIn channel)
-       (.getInvertedOut channel)
-       (.getInvertedErr channel)])))
+(defn channel-streams [channel]
+  [(.getInvertedIn channel)
+   (.getInvertedOut channel)
+   (.getInvertedErr channel)])
 
 (defn connect-to
   "Tries to connect to a peer with SSH authentication. This machine acts as the
@@ -58,9 +54,15 @@ corresponding to a Hesokuri SSH channel.
           (if-not (.isSuccess auth-future)
             (throw (or (.getException auth-future)
                        (new RuntimeException "Could not authenticate")))
-            (.createChannel session
-                            org.apache.sshd.ClientChannel/CHANNEL_SUBSYSTEM
-                            "hesokuri")))))))
+            (let [channel
+                  (.createChannel
+                   session
+                   org.apache.sshd.ClientChannel/CHANNEL_SUBSYSTEM
+                   "hesokuri")
+                  open-future (-> channel .open .awaitUninterruptibly)]
+              (if-not (.isOpened open-future)
+                (throw (.getException open-future))
+                channel))))))))
 
 (defn listen-connect
   "Accepts incoming Hesokuri connections. new-connection-fn is a function that
