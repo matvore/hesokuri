@@ -38,7 +38,6 @@ the trailing newline."
   (let [server-port (free-port)
         client-key-pair (new-key-pair)
         server-key-pair (new-key-pair)
-        received-from-client (promise)
 
         new-connection-fn
         (fn [in out err]
