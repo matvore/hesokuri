@@ -34,10 +34,17 @@ public/private key pairs only. All keys use RSA algorithm."
 (defn connect-to
   "Tries to connect to a peer with SSH authentication. This machine acts as the
 SSH client. Returns an unopened instance of org.apache.sshd.ClientChannel
-corresponding to a Hesokuri SSH channel.
+corresponding to a Hesokuri SSH channel. Returns nil if any error occurred.
 "
   [host port key-pair known-server-key?]
-  (let [client (org.apache.sshd.SshClient/setUpDefaultClient)]
+  (let [client (org.apache.sshd.SshClient/setUpDefaultClient)
+        connect-future (delay (.awaitUninterruptibly
+                               (.connect client host port)))
+        session (delay (.getSession @connect-future))
+        channel (delay (.createChannel
+                        @session
+                        org.apache.sshd.ClientChannel/CHANNEL_SUBSYSTEM
+                        "hesokuri"))]
     (doto client
       (.setServerKeyVerifier
        (reify org.apache.sshd.client.ServerKeyVerifier
@@ -45,24 +52,11 @@ corresponding to a Hesokuri SSH channel.
            (boolean (known-server-key? server-key)))))
       (.setKeyPairProvider (rsa-key-pair-provider key-pair))
       (.start))
-    (let [connect-future (.awaitUninterruptibly (.connect client host port))]
-      (if-not (.isConnected connect-future)
-        (throw (.getException connect-future))
-        (let [session (.getSession connect-future)
-              auth-future (.awaitUninterruptibly
-                           (.authPublicKey session "hesokuri_user" key-pair))]
-          (if-not (.isSuccess auth-future)
-            (throw (or (.getException auth-future)
-                       (new RuntimeException "Could not authenticate")))
-            (let [channel
-                  (.createChannel
-                   session
-                   org.apache.sshd.ClientChannel/CHANNEL_SUBSYSTEM
-                   "hesokuri")
-                  open-future (-> channel .open .awaitUninterruptibly)]
-              (if-not (.isOpened open-future)
-                (throw (.getException open-future))
-                channel))))))))
+    (when (and (.isConnected @connect-future)
+               (.isSuccess (.awaitUninterruptibly
+                            (.authPublicKey @session "hesokuri_user" key-pair)))
+               (.isOpened (-> @channel .open .awaitUninterruptibly)))
+       @channel)))
 
 (defn listen-connect
   "Accepts incoming Hesokuri connections. new-connection-fn is a function that
