@@ -40,7 +40,7 @@ the trailing newline."
         server-key-pair (new-key-pair)
 
         new-connection-fn
-        (fn [in out err]
+        (fn [_ out err]
           (spit out "stdout from server\n")
           (spit err "stderr from server\n")
           0)
@@ -54,8 +54,34 @@ the trailing newline."
         (connect-to "127.0.0.1" server-port client-key-pair
                     (partial = (.getPublic server-key-pair)))
 
-        [client-in client-out client-err] (open-channel-pipes client-channel)]
+        [_ client-out client-err] (open-channel-pipes client-channel)]
     (is (= "stdout from server" (read-line-stream client-out)))
     (is (= "stderr from server" (read-line-stream client-err)))
+    (.close client-channel false)
+    (.stop server)))
+
+(deftest connect-stdin
+  (let [server-port (free-port)
+        client-key-pair (new-key-pair)
+        server-key-pair (new-key-pair)
+        read-from-stdin (promise)
+
+        new-connection-fn
+        (fn [in _ _]
+          (deliver read-from-stdin (read-line-stream in))
+          0)
+
+        server
+        (listen-connect server-port server-key-pair
+                        (partial = (.getPublic client-key-pair))
+                        new-connection-fn)
+
+        client-channel
+        (connect-to "172.0.0.1" server-port client-key-pair
+                    (partial = (.getPublic server-key-pair)))
+
+        [client-in] (open-channel-pipes client-channel)]
+    (spit client-in "stdin from client\n")
+    (is (= "stdin from client" @read-from-stdin))
     (.close client-channel false)
     (.stop server)))
