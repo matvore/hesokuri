@@ -35,58 +35,57 @@ the trailing newline."
           (do (.append result (char c))
               (recur)))))))
 
+(defmacro with-connection [[new-connection-fn] & body]
+  `(let [new-connection-fn# ~new-connection-fn
+         server-port# (free-port)
+         client-key-pair# (new-key-pair)
+         server-key-pair# (new-key-pair)
+
+         server#
+         (listen-connect server-port# server-key-pair#
+                         (partial = (.getPublic client-key-pair#))
+                         new-connection-fn#)
+
+         client-channel#
+         (connect-to "127.0.0.1" server-port# client-key-pair#
+                     (partial = (.getPublic server-key-pair#)))
+
+         [~'client-in ~'client-out ~'client-err]
+         (channel-streams client-channel#)]
+     (try
+       ~@body
+       (finally
+         (.close client-channel# false)
+         (.stop server#)))))
+
 (deftest connect-stdout-stderr
-  (let [server-port (free-port)
-        client-key-pair (new-key-pair)
-        server-key-pair (new-key-pair)
-
-        new-connection-fn
-        (fn [_ out err]
-          (spit out "stdout from server\n")
-          (spit err "stderr from server\n")
-          0)
-
-        server
-        (listen-connect server-port server-key-pair
-                        (partial = (.getPublic client-key-pair))
-                        new-connection-fn)
-
-        client-channel
-        (connect-to "127.0.0.1" server-port client-key-pair
-                    (partial = (.getPublic server-key-pair)))
-
-        [_ client-out client-err] (channel-streams client-channel)]
+  (with-connection
+    [(fn [_ out err]
+       (spit out "stdout from server\n")
+       (spit err "stderr from server\n")
+       0)]
     (is (= "stdout from server" (read-line-stream client-out)))
-    (is (= "stderr from server" (read-line-stream client-err)))
-    (.close client-channel false)
-    (.stop server)))
+    (is (= "stderr from server" (read-line-stream client-err)))))
 
 (deftest connect-stdin
-  (let [server-port (free-port)
-        client-key-pair (new-key-pair)
-        server-key-pair (new-key-pair)
-        read-from-stdin (promise)
+  (let [read-from-stdin (promise)]
+    (with-connection
+      [(fn [in _ _]
+         (deliver read-from-stdin (read-line-stream in))
+         0)]
+      (spit client-in "stdin from client\n")
+      (is (= "stdin from client" @read-from-stdin)))))
 
-        new-connection-fn
-        (fn [in _ _]
-          (info "read line...")
-          (deliver read-from-stdin (read-line-stream in))
-          (info "done in server")
-          0)
-
-        server
-        (listen-connect server-port server-key-pair
-                        (partial = (.getPublic client-key-pair))
-                        new-connection-fn)
-
-        client-channel
-        (connect-to "127.0.0.1" server-port client-key-pair
-                    (partial = (.getPublic server-key-pair)))
-
-        [client-in] (channel-streams client-channel)]
-    (spit client-in "stdin from client\n")
-    (info "wait on promise...")
-    (is (= "stdin from client" @read-from-stdin))
-    (info "close client channel...")
-    (.close client-channel false)
-    (.stop server)))
+(deftest connect-stdin-one-char
+  (let [read-char (promise)]
+    (with-connection
+      [(fn [in _ _]
+         (info "read character...")
+         (deliver read-char (.read in))
+         (info "done in server")
+         0)]
+      (.write client-in 42)
+      (.flush client-in)
+      (info "wait on promise...")
+      (is (= 42 @read-char))
+      (info "done in client"))))
