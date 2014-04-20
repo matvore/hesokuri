@@ -14,6 +14,7 @@
 
 (ns hesokuri.test-hesokuri.ssh
   (:use clojure.test
+        clojure.tools.logging
         hesokuri.ssh))
 
 (defn free-port []
@@ -68,7 +69,9 @@ the trailing newline."
 
         new-connection-fn
         (fn [in _ _]
+          (info "read line...")
           (deliver read-from-stdin (read-line-stream in))
+          (info "done in server")
           0)
 
         server
@@ -77,11 +80,13 @@ the trailing newline."
                         new-connection-fn)
 
         client-channel
-        (connect-to "172.0.0.1" server-port client-key-pair
+        (connect-to "127.0.0.1" server-port client-key-pair
                     (partial = (.getPublic server-key-pair)))
 
         [client-in] (channel-streams client-channel)]
     (spit client-in "stdin from client\n")
+    (info "wait on promise...")
     (is (= "stdin from client" @read-from-stdin))
+    (info "close client channel...")
     (.close client-channel false)
     (.stop server)))
