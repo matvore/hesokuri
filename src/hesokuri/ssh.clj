@@ -15,8 +15,7 @@
 (ns hesokuri.ssh
   "Module for transferring data over SSH. Authentication is done with
 public/private key pairs only. All keys use RSA algorithm."
-  (:import [java.io PipedInputStream PipedOutputStream])
-  (:use hesokuri.util))
+  (:import [java.io PipedInputStream PipedOutputStream]))
 
 (defn new-key-pair []
   (.genKeyPair (java.security.KeyPairGenerator/getInstance "rsa")))
@@ -26,25 +25,6 @@ public/private key pairs only. All keys use RSA algorithm."
     (reify org.apache.sshd.common.KeyPairProvider
       (getKeyTypes [_] "ssh-rsa")
       (loadKey [_ type] (type-map type)))))
-
-(comment (defn open-channel-pipes [channel]
-           {:pre [channel]}
-           (let [result [(new PipedOutputStream)
-                         (new PipedInputStream)
-                         (new PipedInputStream)]
-                 pipe-ends [(new PipedInputStream)
-                            (new PipedOutputStream)
-                            (new PipedOutputStream)]]
-             (doseq [index (range 3)]
-               (.connect (result index) (pipe-ends index)))
-             (doto channel
-               (.setIn (pipe-ends 0))
-               (.setOut (pipe-ends 1))
-               (.setErr (pipe-ends 2)))
-             (let [open-future (-> channel .open .awaitUninterruptibly)]
-               (if-not (.isOpened open-future)
-                 (throw (.getException open-future))
-                 result)))))
 
 (defn open-channel-pipes [channel]
   {:pre [channel]}
@@ -88,6 +68,7 @@ takes these arguments in this order:
   1. InputStream corresponding to stdin
   2. OutputStream corresponding to stdout
   3. OutputStream corresponding to stderr
+And returns the exit value as an integer (i.e. 0 for success).
 Returns the org.apache.sshd.SshServer instance, which can be used to stop the
 server.
 "
@@ -106,14 +87,15 @@ server.
               (destroy [_] nil)
               (setErrorStream [_ err]
                 (swap! streams #(assoc % :err err)))
-              (setExitCallback [_ _] nil)
+              (setExitCallback [_ callback]
+                (swap! streams #(assoc % :exit callback)))
               (setInputStream [_ in]
                 (swap! streams #(assoc % :in in)))
               (setOutputStream [_ out]
                 (swap! streams #(assoc % :out out)))
               (start [_ _]
-                (new-connection-fn (:in @streams)
-                                   (:out @streams)
-                                   (:err @streams)))))))])
+                (let [{:keys [in out err exit]} @streams
+                      exit-value (new-connection-fn in out err)]
+                  (.onExit exit exit-value)))))))])
     (.setKeyPairProvider (rsa-key-pair-provider key-pair))
     (.start)))

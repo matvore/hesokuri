@@ -22,7 +22,10 @@
     (.close socket)
     port))
 
-(defn read-line-stream [input-stream]
+(defn read-line-stream
+  "Reads a line from the given java.io.InputStream and returns a String without
+the trailing newline."
+  [input-stream]
   (let [result (new StringBuilder)]
     (loop []
       (let [c (.read input-stream)]
@@ -31,19 +34,17 @@
           (do (.append result (char c))
               (recur)))))))
 
-(deftest connect-std-streams
+(deftest connect-stdout-stderr
   (let [server-port (free-port)
         client-key-pair (new-key-pair)
         server-key-pair (new-key-pair)
-        received-from-client (atom nil)
+        received-from-client (promise)
 
         new-connection-fn
         (fn [in out err]
-          (let [in (read-line-stream in)]
-            (swap! received-from-client (constantly in)))
-          (.close in)
           (spit out "stdout from server\n")
-          (spit err "stderr from server\n"))
+          (spit err "stderr from server\n")
+          0)
 
         server
         (listen-connect server-port server-key-pair
@@ -55,9 +56,7 @@
                     (partial = (.getPublic server-key-pair)))
 
         [client-in client-out client-err] (open-channel-pipes client-channel)]
-    (spit client-in "stdin from client\n" :encoding "UTF-8")
     (is (= "stdout from server" (read-line-stream client-out)))
     (is (= "stderr from server" (read-line-stream client-err)))
-    (.awaitUninterruptibly (.close client-channel true))
-    (is (= "stdin from client" @received-from-client))
+    (.close client-channel false)
     (.stop server)))
