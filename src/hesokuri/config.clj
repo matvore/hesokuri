@@ -13,23 +13,13 @@
 ; limitations under the License.
 
 (ns hesokuri.config
-  (:require [hesokuri.discovery-dir-def :as discovery-dir-def]
-            [hesokuri.source-def :as source-def]
+  (:require [hesokuri.source-def :as source-def]
             [hesokuri.util :as util]
             [hesokuri.validation :as validation]))
 
 (defn source-defs
   [config]
   (if (map? config) (:sources config) config))
-
-(defn discovery-dir-defs
-  "Returns the discovery dirs in the given config. For the legacy config format,
-  this is always an empty vector. For the normal config format, this is the
-  :discovery-dirs entry, and is a vector of any number of discovery-dir-def
-  values, defined in the discovery-dir-def module."
-  [config]
-  (or (and (map? config) (:discovery-dirs config))
-      []))
 
 (defn- round-trip-validation-error
   [data]
@@ -59,7 +49,4 @@
      [(validation/for-vector "source def"
                              source-def/validation
                              (source-defs config))
-      (validation/for-vector "discovery dir def"
-                             discovery-dir-def/validation
-                             (discovery-dir-defs config))
       (round-trip-validation-error config)])))

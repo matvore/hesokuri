@@ -26,17 +26,6 @@
        {:sources "bar", :comment "baz"} "bar"
        ["foo" "bar"] ["foo" "bar"]))
 
-(deftest test-discovery-dir-defs
-  (are [config result]
-       (is (= result (discovery-dir-defs config)))
-
-       {} []
-       [] []
-       [{"foo", "/path"} {"bar" "/path"}] []
-       {:discovery-dirs nil} []
-       {:discovery-dirs []} []
-       {:discovery-dirs [1 2 3]} [1 2 3]))
-
 (deftest test-round-trip-validation-error
   (are [data okay substrings]
        (validation-is-correct
