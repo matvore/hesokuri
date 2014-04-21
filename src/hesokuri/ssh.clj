@@ -90,8 +90,8 @@ server.
               (setOutputStream [_ out]
                 (swap! streams #(assoc % :out out)))
               (start [_ _]
-                (let [{:keys [in out err exit]} @streams
-                      exit-value (new-connection-fn in out err)]
-                  (.onExit exit exit-value)))))))])
+                (let [{:keys [in out err exit]} @streams]
+                  (future
+                    (.onExit exit (new-connection-fn in out err)))))))))])
     (.setKeyPairProvider (rsa-key-pair-provider key-pair))
     (.start)))
