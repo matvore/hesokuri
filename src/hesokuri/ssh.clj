@@ -41,10 +41,7 @@ corresponding to a Hesokuri SSH channel. Returns nil if any error occurred.
         connect-future (delay (.awaitUninterruptibly
                                (.connect client host port)))
         session (delay (.getSession @connect-future))
-        channel (delay (.createChannel
-                        @session
-                        org.apache.sshd.ClientChannel/CHANNEL_SUBSYSTEM
-                        "hesokuri"))]
+        channel (delay (.createShellChannel @session))]
     (doto client
       (.setServerKeyVerifier
        (reify org.apache.sshd.client.ServerKeyVerifier
@@ -74,24 +71,23 @@ server.
     (.setPublickeyAuthenticator
      (reify org.apache.sshd.server.PublickeyAuthenticator
        (authenticate [_ _ client-key _] (known-client-key? client-key))))
-    (.setSubsystemFactories
-     [(reify org.apache.sshd.common.NamedFactory
-        (getName [_] "hesokuri")
-        (create [_]
-          (let [streams (atom {})]
-            (reify org.apache.sshd.server.Command
-              (destroy [_] nil)
-              (setErrorStream [_ err]
-                (swap! streams #(assoc % :err err)))
-              (setExitCallback [_ callback]
-                (swap! streams #(assoc % :exit callback)))
-              (setInputStream [_ in]
-                (swap! streams #(assoc % :in in)))
-              (setOutputStream [_ out]
-                (swap! streams #(assoc % :out out)))
-              (start [_ _]
-                (let [{:keys [in out err exit]} @streams]
-                  (future
-                    (.onExit exit (new-connection-fn in out err)))))))))])
+    (.setShellFactory
+     (reify org.apache.sshd.common.Factory
+       (create [_]
+         (let [streams (atom {})]
+           (reify org.apache.sshd.server.Command
+             (destroy [_] nil)
+             (setErrorStream [_ err]
+               (swap! streams #(assoc % :err err)))
+             (setExitCallback [_ callback]
+               (swap! streams #(assoc % :exit callback)))
+             (setInputStream [_ in]
+               (swap! streams #(assoc % :in in)))
+             (setOutputStream [_ out]
+               (swap! streams #(assoc % :out out)))
+             (start [_ _]
+               (let [{:keys [in out err exit]} @streams]
+                 (future
+                   (.onExit exit (new-connection-fn in out err))))))))))
     (.setKeyPairProvider (rsa-key-pair-provider key-pair))
     (.start)))
