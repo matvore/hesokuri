@@ -80,12 +80,8 @@ the trailing newline."
   (let [read-char (promise)]
     (with-connection
       [(fn [in _ _]
-         (info "read character...")
          (deliver read-char (.read in))
-         (info "done in server")
          0)]
       (.write client-in 42)
       (.flush client-in)
-      (info "wait on promise...")
-      (is (= 42 @read-char))
-      (info "done in client"))))
+      (is (= 42 @read-char)))))
