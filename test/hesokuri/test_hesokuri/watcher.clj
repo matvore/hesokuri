@@ -16,54 +16,51 @@
   (:use [clojure.java.io :only [file]]
         clojure.test
         hesokuri.testing.temp
-        hesokuri.testing.waiting
         hesokuri.util
         hesokuri.watcher))
 
 (deftest test-for-dir
-  (let [changed-files (atom clojure.lang.PersistentQueue/EMPTY)
-        temp-dir (create-temp-dir)
-        watcher (for-dir temp-dir (cb [changed-files] [path]
-                                      (swap! changed-files #(conj % path))))
+  (let [temp-dir (create-temp-dir)]
+    (spit (file temp-dir "file3") "initial contents")
+    (spit (file temp-dir "file4") "initial contents")
+    (let [change-promises {"file1" (promise)
+                           "file2" (promise)
+                           "dir" (promise)
+                           "file3" (promise)
+                           "file4" (promise)}
+          watcher (for-dir temp-dir (cb [change-promises] [path]
+                                        (let [p (change-promises (str path))]
+                                          (when-not (realized? p)
+                                            (deliver p true)))))]
+      (Thread/sleep 1000)
 
-        wait-for-change
-        (fn [filename]
-          (or (wait-for #(= (peek @changed-files) (file filename)))
-              (throw (IllegalStateException.
-                      (str "changed files: " (seq @changed-files)))))
-          (swap! changed-files pop))]
-    (Thread/sleep 1000)
+      (spit (file temp-dir "file1") "new file #1")
+      @(change-promises "file1")
 
-    (spit (file temp-dir "file1") "new file #1")
-    (wait-for-change "file1")
+      (spit (file temp-dir "file2") "new file #2")
+      @(change-promises "file2")
 
-    (spit (file temp-dir "file2") "new file #2")
-    (wait-for-change "file2")
+      (is (->> "dir" (file temp-dir) .mkdir))
+      @(change-promises "dir")
 
-    (is (->> "dir" (file temp-dir) .mkdir))
-    (wait-for-change "dir")
+      (spit (file temp-dir "file3") "42" :append true)
+      @(change-promises "file3")
 
-    (spit (file temp-dir "file1") "42" :append true)
-    (wait-for-change "file1")
-
-    (spit (file temp-dir "file2") "1011" :append true)
-    (wait-for-change "file2")
-
-    (Thread/sleep 100)
-    (is (= [] @changed-files))))
+      (spit (file temp-dir "file4") "1011" :append true)
+      @(change-promises "file4"))))
 
 (deftest test-for-file
-  (let [changed-file-count (atom 0)
+  (let [changed-promise (promise)
         temp-dir (create-temp-dir)
         watcher (for-file (file temp-dir "foo")
-                          (cb [changed-file-count] []
-                              (swap! changed-file-count inc)))
-        wait-for-change
-        (fn [] (is (wait-for #(> @changed-file-count 0))))]
+                          (cb [changed-promise] []
+                              (if (realized? changed-promise)
+                                (throw (IllegalStateException.
+                                        "file changed twice"))
+                                (deliver changed-promise true))))]
     (Thread/sleep 1000)
 
     (->> "foo" (file temp-dir) .createNewFile)
-    (wait-for-change)
+    @changed-promise
 
-    (Thread/sleep 100)
-    (is (= 1 @changed-file-count))))
+    (Thread/sleep 100)))
