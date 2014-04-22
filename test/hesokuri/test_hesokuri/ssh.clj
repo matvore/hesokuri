@@ -35,6 +35,11 @@ the trailing newline."
           (do (.append result (char c))
               (recur)))))))
 
+(deftest test-new-key-pair-is-pair-of-rsa-keys
+  (let [pair (new-key-pair)]
+    (is (= "RSA" (.getAlgorithm (.getPublic pair))))
+    (is (= "RSA" (.getAlgorithm (.getPrivate pair))))))
+
 (defmacro with-connection [[new-connection-fn] & body]
   `(let [new-connection-fn# ~new-connection-fn
          server-port# (free-port)
