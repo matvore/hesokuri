@@ -37,6 +37,10 @@ with the address used to access the peer (we may want to make this more flexible
 later, allowing multiple addresses or allowing that the name is mnemonic in
 cases where the address is an IP or something arbitrary.)
 
+When a repo {path} is referred to, this is the path using '/' as the path
+component separator, even if it is in the context of a peer that does not use
+that as a path component separator.
+
 FOR EACH PEER
 -------------
 
