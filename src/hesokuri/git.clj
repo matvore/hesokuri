@@ -59,10 +59,10 @@ elements: the type as a String (e.g. 100644, or tree-entry-dir), the name of the
 entry (e.g. README.md) and a Hash object corresponding to the hash. If an entry
 could not be read due to EOF at any point during the read, returns nil."
   [in]
-  (let [[type-file-str delim] (read-to in zero?)
+  (let [[type-file-str term] (read-until in zero?)
         type-and-file (split type-file-str #" " 2)
         [hash lack] (read-hash in)]
-    (when (and (not= -1 delim)
+    (when (and (not= -1 term)
                (zero? lack))
       (concat type-and-file [hash]))))
 
