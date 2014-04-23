@@ -20,6 +20,21 @@ to Hesokuri logic."
   (:use [clojure.string :only [join split]]
         hesokuri.util))
 
+(defprotocol Hash (hash-bytes [this]))
+
+(deftype ArrayBackedHash [b]
+  Hash (hash-bytes [_] b)
+  Object
+  (equals [_ other]
+    (and (satisfies? hesokuri.git/Hash other)
+         (java.util.Arrays/equals b (hash-bytes other))))
+  (toString [_]
+    (apply str (map #(format "%02x" (bit-and 0xff %)) b)))
+  (hashCode [_]
+    ;; Our data is already a "hash code"; just use the first four bytes for a
+    ;; smaller hash code.
+    (-> b java.nio.ByteBuffer/wrap .getInt)))
+
 (def tree-entry-dir
   "The number stored at the start of a tree entry pointing to a directory."
   "100644")
@@ -29,26 +44,27 @@ to Hesokuri logic."
   "40000")
 
 (defn read-hash
-  "Reads SHA1 hash bytes from an InputStream into a new byte array. Returns a
-sequence with at least two values: the byte[] containing the SHA1 hash bytes
-that were read, and the number of bytes lacking to make a complete hash (will
-be non-zero if EOF was reached before the end of the hash.)"
+  "Reads SHA1 hash bytes from an InputStream into a new object supporting the
+Hash protocol. Returns a sequence with at least two values: the Hash object
+containing the SHA1 hash bytes that were read, and the number of bytes lacking
+to make a complete hash (will be non-zero if EOF was reached before the end of
+the hash.)"
   [in]
   (let [result (byte-array 20)]
-    [result (- 20 (max 0 (.read in result)))]))
+    [(new ArrayBackedHash result) (- 20 (max 0 (.read in result)))]))
 
 (defn read-tree-entry
   "Reads an entry from a Git tree object. Returns a sequence with at least three
 elements: the type as a String (e.g. 100644, or tree-entry-dir), the name of the
-entry (e.g. README.md) and a byte array containing the hash. If an entry could
-not be read due to EOF at any point during the read, returns nil."
+entry (e.g. README.md) and a Hash object corresponding to the hash. If an entry
+could not be read due to EOF at any point during the read, returns nil."
   [in]
   (let [[type-file-str delim] (read-to in zero?)
         type-and-file (split type-file-str #" " 2)
-        [hash-bytes lack] (read-hash in)]
+        [hash lack] (read-hash in)]
     (when (and (not= -1 delim)
                (zero? lack))
-      (concat type-and-file [hash-bytes]))))
+      (concat type-and-file [hash]))))
 
 (defn read-tree
   "Reads all the entries from a Git tree object, and returns a lazy sequence.
