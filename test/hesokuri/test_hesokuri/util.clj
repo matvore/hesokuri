@@ -35,3 +35,20 @@
     (is (= 42 ((:fn result) 6 7)))
     (is (= 121 (cbinvoke result 11 11)))
     (sane-at (:at result))))
+
+(deftest test-read-until
+  (let [space? #{(int \space)}]
+    (are [src term? exp-str exp-term stream-rest]
+        (let [src-stream (new java.io.ByteArrayInputStream
+                              (.getBytes src "UTF-8"))
+              [actual-str actual-term] (read-until src-stream term?)]
+          (and (= exp-str actual-str)
+               (integer? actual-term)
+               (= (int exp-term) actual-term)
+               (= [stream-rest -1] (read-until src-stream))))
+      "foo " space? "foo" \space ""
+      "foo bar" space? "foo" \space "bar"
+      "" space? "" -1 ""
+      "foo" space? "foo" -1 ""
+      "foo bar" zero? "foo bar" -1 ""
+      "foo\u0000bar" zero? "foo" 0 "bar")))

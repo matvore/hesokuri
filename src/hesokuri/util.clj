@@ -142,7 +142,9 @@ java.io.InputStream. term? is a function that takes a byte as an int and
 returns truthy if it is a terminator. baos is a java.io.ByteArrayOutputStream to
 append the read bytes to. Returns a sequence with at least two elements: the
 conversion of baos to a string, and the terminator that was reached as an int
-(-1 for EOF)."
+(-1 for EOF).
+If term? is omitted, reads until EOF."
+  ([in] (read-until in (constantly false)))
   ([in term?] (read-until in term? (new java.io.ByteArrayOutputStream 128)))
   ([in term? baos]
      (let [b (.read in)]
