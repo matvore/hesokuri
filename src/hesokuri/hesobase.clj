@@ -23,13 +23,13 @@ Data is organized as a file system, rather than a single flat file. This makes
 the database more storage-efficient when updated frequently.
 
 The Hesobase has slightly different information from the original configuration
-file, but the objects (repo, peer) are the same. Each object corresponds to a
-directory:
+file, but the same kind of objects (repo, peer) are present. Each object
+is represented by a directory:
 
-/ # repo root
-/peer/ # contains all peers
+/            # repo root
+/peer/       # contains all peers
 /peer/{name} # contains information on peer named {name}
-/repo/ # contains all repos
+/repo/       # contains all repos
 /repo/{path} # contains information on repo at path {path}
 
 {name} and {path} are percent-encoded. The {name} of a peer corresponds exactly
@@ -51,6 +51,13 @@ In file called 'main'
 In file called 'key'
 A Java-serialized instance of the RSA public key
 (result of (.getPublic (hesokuri.ssh/new-keypair)))
+
+Empty files named 'repo/{path}'
+The {path} portion is percent-encoded, since we need to include directory
+separators in the name. The presence of the file indicates that the peer has a
+copy of the. This can some day be changed to a directory or a non-empty file to
+hold more information. This file allows the user to configure which repos appear
+on which peers.
 
 FOR EACH REPO
 -------------
