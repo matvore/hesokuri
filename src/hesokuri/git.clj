@@ -13,10 +13,51 @@
 ; limitations under the License.
 
 (ns hesokuri.git
-  "Module that facilitates invoking git."
+  "Module that facilitates invoking git, and other Git utility code not specific
+to Hesokuri logic."
   (:require clojure.java.io
             clojure.java.shell)
-  (:use [clojure.string :only [join]]))
+  (:use [clojure.string :only [join split]]
+        hesokuri.util))
+
+(def tree-entry-dir
+  "The number stored at the start of a tree entry pointing to a directory."
+  "100644")
+
+(def tree-entry-file
+  "The number stored at the start of a tree entry pointing to a file."
+  "40000")
+
+(defn read-hash
+  "Reads SHA1 hash bytes from an InputStream into a new byte array. Returns a
+sequence with at least two values: the byte[] containing the SHA1 hash bytes
+that were read, and the number of bytes lacking to make a complete hash (will
+be non-zero if EOF was reached before the end of the hash.)"
+  [in]
+  (let [result (byte-array 20)]
+    [result (- 20 (max 0 (.read in result)))]))
+
+(defn read-tree-entry
+  "Reads an entry from a Git tree object. Returns a sequence with at least three
+elements: the type as a String (e.g. 100644, or tree-entry-dir), the name of the
+entry (e.g. README.md) and a byte array containing the hash. If an entry could
+not be read due to EOF at any point during the read, returns nil."
+  [in]
+  (let [[type-file-str delim] (read-to in zero?)
+        type-and-file (split type-file-str #" " 2)
+        [hash-bytes lack] (read-hash in)]
+    (when (and (not= -1 delim)
+               (zero? lack))
+      (concat type-and-file [hash-bytes]))))
+
+(defn read-tree
+  "Reads all the entries from a Git tree object, and returns a lazy sequence.
+The InputStream should not be used for anything else after passing it to this
+function."
+  [in]
+  (lazy-seq (let [entry (read-tree-entry in)]
+              (when entry
+                (cons entry (read-tree in))))))
 
 (def default-git
   "A Git object which invokes the 'git' tool from the PATH."

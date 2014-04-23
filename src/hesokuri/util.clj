@@ -135,3 +135,18 @@
   "Invokes a callback constructed by the cb macro, passing the given arguments."
   [cb & args]
   (-> cb :fn (apply args)))
+
+(defn read-to
+  "Reads bytes into a String until a delimiter is reached. in is a
+java.io.InputStream. delim? is a function that takes a byte as an int and
+returns truthy if it is a delimiter. baos is a java.io.ByteArrayOutputStream to
+append the read bytes to. Returns a sequence with at least two elements: the
+conversion of baos to a string, and the delimiter that was reached as an int (-1
+for EOF)."
+  ([in delim?] (read-to in delim? (new java.io.ByteArrayOutputStream 128)))
+  ([in delim? baos]
+     (let [b (.read in)]
+       (if (or (= b -1) (delim? b))
+         [(.toString baos "UTF-8") b]
+         (do (.write baos b)
+             (recur in delim? baos))))))
