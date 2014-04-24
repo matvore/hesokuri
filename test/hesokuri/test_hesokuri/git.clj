@@ -16,7 +16,85 @@
   (:require clojure.java.io)
   (:use clojure.test
         hesokuri.git
-        hesokuri.testing.temp))
+        hesokuri.testing.temp)
+  (:import [hesokuri.git ArrayBackedHash]))
+
+(deftest test-ArrayBackedHash-toString
+  (is (= "a00000000000000000000000000000000000000b"
+         (-> (concat [0xa0] (repeat 18 0) [0x0b])
+             byte-array
+             ArrayBackedHash.
+             .toString))))
+
+(deftest test-ArrayBackedHash-hashCode
+  (is (= 0xabcdabcd
+         (-> (concat [0xab 0xcd 0xab 0xcd] (repeat 16 0xff))
+             byte-array
+             ArrayBackedHash.
+             .hashCode
+             (bit-and (long 0xffffffff))))))
+
+(defn cycle-bytes [b count] (byte-array (take count (cycle b))))
+(def cycle-bytes-hash (comp #(new ArrayBackedHash %) cycle-bytes))
+
+(deftest test-ArrayBackedHash-equals
+  (are [cyc1 cyc2 expect]
+      (= expect (= (cycle-bytes-hash cyc1 20) (cycle-bytes-hash cyc2 20)))
+    [0xa0 0xb0] [0xa0 0xb0] true
+    [0x88 0x77] [0x88 0x77 0x88] false
+    [0x88 0x77 0x88 0x77] [0x88 0x77 0x88 0x77 0x66] false))
+
+(defn byte-stream [bytes]
+  (new java.io.ByteArrayInputStream (byte-array bytes)))
+
+(deftest test-read-hash
+  (are [source-cycle source-count]
+      (let [source-bytes (cycle-bytes source-cycle source-count)
+            source-stream (byte-stream source-bytes)
+            next-byte (or (get source-bytes 20) -1)
+            [hash lack] (read-hash source-stream)
+
+            expected-bytes
+            (byte-array (take 20 (concat source-bytes (repeat 0))))]
+        (is (= (new ArrayBackedHash expected-bytes) hash))
+        (is (= (- 20 (min 20 (count source-bytes))) lack))
+        ;; Make sure read-hash does not read more bytes than needed.
+        (is (= next-byte (.read source-stream))))
+    [0] 0
+    [1] 20
+    [2 3 4] 21
+    [5 6 7] 19
+    [8 9] 10))
+
+(defn tree-entry-bytes [entry-type filename hash-cycle-bytes]
+  (concat (.getBytes (str entry-type " " filename "\u0000") "UTF-8")
+          (cycle-bytes hash-cycle-bytes 20)))
+
+(deftest test-read-tree-entry
+  (let [entry-bytes (tree-entry-bytes "12345" "filename" [0x01 0x02])]
+    (loop [source-len 0]
+      (let [source (byte-stream (take source-len entry-bytes))]
+        (if (< source-len (count entry-bytes))
+          (do (is (nil? (read-tree-entry source))
+                  (str "Read only first " source-len " bytes of entry"))
+              (recur (inc source-len)))
+          (is (= ["12345" "filename" (cycle-bytes-hash [1 2] 20)]
+                 (read-tree-entry source))))))))
+
+(deftest test-read-tree
+  (let [entry-1-bytes (tree-entry-bytes "1" "file1" [0x01 0x10])
+        entry-2-bytes (tree-entry-bytes "2" "file2" [0x02 0x20])
+        bytes (concat entry-1-bytes entry-2-bytes)
+        entries [(read-tree-entry (byte-stream entry-1-bytes))
+                 (read-tree-entry (byte-stream entry-2-bytes))]]
+    (are [entry-count byte-count]
+        (= (take entry-count entries)
+           (read-tree (byte-stream (take byte-count bytes))))
+      0 0
+      0 20
+      1 (count entry-1-bytes)
+      1 (+ 20 (count entry-2-bytes))
+      2 (+ (count entry-1-bytes) (count entry-2-bytes)))))
 
 (deftest test-default-git (is (git? default-git)))
 
