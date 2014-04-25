@@ -12,7 +12,7 @@
 ; See the License for the specific language governing permissions and
 ; limitations under the License.
 
-(ns hesokuri.test-hesokuri.source-def
+(ns hesokuri.source-def-test
   (:use clojure.test
         hesokuri.source-def))
 

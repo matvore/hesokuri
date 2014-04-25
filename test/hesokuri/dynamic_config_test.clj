@@ -12,7 +12,7 @@
 ; See the License for the specific language governing permissions and
 ; limitations under the License.
 
-(ns hesokuri.test-hesokuri.dynamic-config
+(ns hesokuri.dynamic-config-test
   (:import [java.io File])
   (:use clojure.test
         hesokuri.dynamic-config

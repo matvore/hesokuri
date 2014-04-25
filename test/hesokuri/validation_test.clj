@@ -12,7 +12,7 @@
 ; See the License for the specific language governing permissions and
 ; limitations under the License.
 
-(ns hesokuri.test-hesokuri.validation
+(ns hesokuri.validation-test
   (:use [clojure.string :only [split]]
         clojure.test
         hesokuri.validation))

@@ -12,7 +12,7 @@
 ; See the License for the specific language governing permissions and
 ; limitations under the License.
 
-(ns hesokuri.test-hesokuri.peer-repo
+(ns hesokuri.peer-repo-test
   (:use clojure.test
         hesokuri.peer-repo))
 

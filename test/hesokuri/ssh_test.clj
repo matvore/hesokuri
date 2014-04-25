@@ -12,7 +12,7 @@
 ; See the License for the specific language governing permissions and
 ; limitations under the License.
 
-(ns hesokuri.test-hesokuri.ssh
+(ns hesokuri.ssh-test
   (:use clojure.test
         clojure.tools.logging
         hesokuri.ssh))

@@ -12,7 +12,7 @@
 ; See the License for the specific language governing permissions and
 ; limitations under the License.
 
-(ns hesokuri.test-hesokuri.watcher
+(ns hesokuri.watcher-test
   (:use [clojure.java.io :only [file]]
         clojure.test
         hesokuri.testing.temp

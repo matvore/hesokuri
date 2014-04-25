@@ -12,15 +12,10 @@
 ; See the License for the specific language governing permissions and
 ; limitations under the License.
 
-(ns hesokuri.test-hesokuri.main
+(ns hesokuri.branch-test
   (:use clojure.test
-        hesokuri.util
-        hesokuri.main))
+        hesokuri.branch))
 
-(deftest test-config-file
-  (are [mock-env expected-config-file]
-       (with-redefs [getenv mock-env]
-         (is (= expected-config-file (#'hesokuri.main/config-file))))
-       {"HESOCFG" "foo"} "foo"
-       {"HESOCFG" "foo", "HOME" "should be ignored"} "foo"
-       {"HOME" "/home/fbar"} "/home/fbar/.hesocfg"))
+(deftest test-of
+  (is (= {:name "foo"} (of "foo"))
+      (= {:name "foo" :peer "bar"} (of "foo" "bar"))))

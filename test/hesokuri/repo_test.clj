@@ -12,7 +12,7 @@
 ; See the License for the specific language governing permissions and
 ; limitations under the License.
 
-(ns hesokuri.test-hesokuri.repo
+(ns hesokuri.repo-test
   (:use [clojure.java.io :only [file]]
         [clojure.string :only [trim]]
         clojure.test
