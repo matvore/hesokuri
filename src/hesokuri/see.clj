@@ -32,12 +32,28 @@
     (if (and (= kind ::agent) @error)
       [kind @error] [kind])))
 
+(defn printable-fn
+  "Turns a function into a map with more information than the typical
+pretty-print form for anonymous functions. For non-anonymous functions like
+those defined with defn, this changes the form slightly but does not add or
+remove any interesting information."
+  [expr]
+  (let [c (class expr)]
+    (when (isa? c clojure.lang.AFunction)
+      (into {:fn-class c}
+            (for [fld (.getDeclaredFields c)
+                  :when (not (.startsWith (.getName fld) "const__"))]
+              (do (.setAccessible fld true)
+                  [(.getName fld) (.get fld expr)]))))))
+
 (defn- shrink-with-paths
   [expr curr-path path-map]
   (let [previous-path (delay (path-map expr))
+        pr-fn (delay (printable-fn expr))
         new-path-map (delay (assoc path-map expr curr-path))]
     (cond
      @previous-path [@previous-path path-map]
+     @pr-fn (shrink-with-paths @pr-fn curr-path path-map)
 
      (box-kind expr)
      (let [[shrunk-value path-map]

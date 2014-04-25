@@ -17,24 +17,16 @@
         hesokuri.util
         hesokuri.testing.mock))
 
-(defn- sane-at [at]
-  (is (= {:file String
-          :line Integer
-          :column Integer}
-         (into {} (map (fn [[k v]] [k (class v)]) at)))))
-
 (deftest test-cb
   (let [x 10
         result (cb [x] [y] (+ x y))]
-    (is (= {:x 10} (:closure result)))
-    (is (= 7 ((:fn result) -3)))
-    (is (= 110 (cbinvoke result 100)))
-    (sane-at (:at result)))
+    (is (= 110
+           (cbinvoke result 100)
+           (result 100))))
   (let [result (cb [] [x y] (* x y))]
-    (is (= {} (:closure result)))
-    (is (= 42 ((:fn result) 6 7)))
-    (is (= 121 (cbinvoke result 11 11)))
-    (sane-at (:at result))))
+    (is (= 121
+           (cbinvoke result 11 11)
+           (result 11 11)))))
 
 (deftest test-read-until
   (let [space? #{(int \space)}]

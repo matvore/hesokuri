@@ -13,9 +13,8 @@
 ; limitations under the License.
 
 (ns hesokuri.util
-  (:use [clojure.string :only [trim]]
-        clojure.tools.logging)
-  (:require clojure.java.shell))
+  (:use clojure.tools.logging
+        [clojure.string :only [trim]]))
 
 (defmacro letmap
   "A macro that behaves like let, creating temporary bindings for variables, and
@@ -103,38 +102,14 @@
        nil)))
 
 (defmacro cb
-  "This lets us create maps which show all the information to interpret the
-  meaning of a function in a dump of application state.
-
-  For instance, when we have a function literal (fn [y] (+ x y)), the
-  representation of this function in a pretty-printed dump does not tell us the
-  value of x in the closure, or even where the function is defined in code.
-  However, if we use this macro, we get a map that indicates the location
-  of the function literal and the name and value of the variables in the
-  closure. For instance:
-
-  (let [x 10]
-    (cb [x] [y] (+ x y)))
-
-  will yield code like this:
-
-  {:fn (fn [y] (+ x y))
-   :closure {:x 10}
-   :at {:file \"source.clj\"
-        :line 213
-        :column 6}}"
-  [from-closure & fn-body]
-  (let [{:keys [line column]} (meta &form)]
-    `{:fn (fn ~@fn-body)
-      :closure (letmap [:keep ~from-closure])
-      :at {:file ~*file*
-           :line ~line
-           :column ~column}}))
+  "This just resolves to a plain anonymous function. Do not use in new code."
+  [_ & fn-tail]
+  `(fn ~@fn-tail))
 
 (defn cbinvoke
-  "Invokes a callback constructed by the cb macro, passing the given arguments."
+  "Do not use in new code."
   [cb & args]
-  (-> cb :fn (apply args)))
+  (apply cb args))
 
 (defn read-until
   "Reads bytes into a String until a terminator byte is reached. in is a

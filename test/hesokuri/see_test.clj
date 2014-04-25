@@ -16,6 +16,13 @@
   (:use clojure.test
         hesokuri.see))
 
+(deftest printable-fn-non-funcs
+  (are [expr]
+       (is (nil? (printable-fn expr)))
+       nil
+       1
+       {3 4}))
+
 (deftest test-shrink
   (are [expr expected-result]
        (is (= expected-result (shrink expr)))
@@ -30,6 +37,12 @@
        [[:hesokuri.see/atom [:foo]]
         [:hesokuri.see/path 0]
         [:hesokuri.see/path 0 :deref]]))
+
+(deftest test-shrink-fn
+  (let [x 42
+        shrunk (shrink (fn [y] (+ x y)))]
+    (is ((set (.values shrunk)) 42))
+    (is (contains? shrunk :fn-class))))
 
 (defn throw-exception [s e] (throw e) s)
 
