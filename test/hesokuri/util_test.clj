@@ -68,3 +68,9 @@
   (is (= [2 "?"] (vfn-fields exclaimer-??)))
   (is (= 'exclaimer (vfn-name exclaimer-??))))
 
+(deftest test-defnv-equality
+  (is (= (adder 1) (adder 1)))
+  (is (= (exclaimer 2 "?") exclaimer-??))
+  (is (= (adder 4) (adder (+ 2 2))))
+  (is (not= (adder 1) (adder 0)))
+  (is (not= (exclaimer 2 "!") exclaimer-??)))

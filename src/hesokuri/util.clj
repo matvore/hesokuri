@@ -137,4 +137,10 @@ If term? is omitted, reads until EOF."
      (proxy [clojure.lang.AFunction hesokuri.util.VFn] []
        (invoke ~args ~@body)
        (vfn_name [] '~name)
-       (vfn_fields [] ~fields))))
+       (vfn_fields [] ~fields)
+       (hashCode [] (.hashCode (.vfn_fields ~'this)))
+       (equals [o#]
+         (and (= (class ~'this)
+                 (class o#))
+              (= (vfn-fields ~'this)
+                 (vfn-fields o#)))))))
