@@ -33,51 +33,65 @@ is represented by a directory:
 /repo/{path} # contains information on repo at path {path}
 
 {name} and {path} are percent-encoded. The {name} of a peer corresponds exactly
-with the address used to access the peer (we may want to make this more flexible
-later, allowing multiple addresses or allowing that the name is mnemonic in
-cases where the address is an IP or something arbitrary.)
+with the address used to access the peer.
 
 When a repo {path} is referred to, this is the path using '/' as the path
 component separator, even if it is in the context of a peer that does not use
 that as a path component separator.
 
+When {name}, {path}, or {branch-name} appear in a directory or file name, it is
+percent-encoded.
+
 FOR EACH PEER
 -------------
 
-In file called 'main'
-:port int
-- The port on which the peer listens for Hesokuri connections.
-:repo-root string
-- The root path for all repositories. All repo paths are relative to this base.
-  The string is a Clojure string literal, e.g. \"foo/bar\", including the
-  quotes.
+In file called 'port'
+An integer indicating the port on which the peer listens for Hesokuri
+connections.
+
+In file called 'repo-root'
+The root path for all repositories, as a raw string. All repo paths are relative
+to this base.
 
 In file called 'key'
 A Java-serialized instance of the RSA public key
 (result of (.getPublic (hesokuri.ssh/new-keypair)))
 
 Empty files named 'repo/{path}'
-The {path} portion is percent-encoded, since we need to include directory
-separators in the name. The presence of the file indicates that the peer has a
-copy of the. This can some day be changed to a directory or a non-empty file to
-hold more information. This file allows the user to configure which repos appear
-on which peers.
+The presence of the file indicates that the peer has a copy of the repo. This
+file allows the user to configure which repos appear on which peers.
 
 FOR EACH REPO
 -------------
 
-In file called 'live-edit/only' (optional)
-List of branch names that are considered live edit branches. Any branch not
-listed here IS NOT live edit. Names are raw strings separated by a newline.
+Empty files called 'live-edit/only/{branch-name}' (optional)
+Indicates a branch is considered a live edit branch. Any branch not listed here
+IS NOT live edit.
 
-In file called 'live-edit/except' (optional)
+Empty files called 'live-edit/except/{branch-name}' (optional)
 List of branch names that are NOT considered live edit branches. Any branch not
-listed here IS a live edit branch. Names are raw strings separated by a newline.
+listed here IS a live edit branch.
 
-In file called 'unwanted/{branch-name}' (optional)
-Binary sequence of SHAs, with no delimiters, sorted numerically. The meaning of
-each SHA: any branch where the SHA listed is a fast-forward of the branch's SHA
-should be deleted. It will probably be very common for each branch-name to only
-have a single SHA listed, however, by allowing multiple SHAs, you can later
-re-use the same branch name for newer work several times.
+The live-edit/only and live-edit/except directories cannot both exist for a single repo.
+
+Empty files called 'unwanted/{branch-name}/{hash}' (optional)
+The presence of such a file tells Hesokuri to delete any branch where the {hash}
+listed is a fast-forward or the same as the {branch-name}'s SHA. It will
+probably be very common for each branch-name to only have a single SHA listed,
+but by allowing multiple SHAs, you can later re-use the same branch name for
+newer work.
+
+FUTURE IMPROVEMENTS
+-------------------
+
+The name of the peer and its address are the same thing. Allow multiple
+addresses or allow the name to be mnemonic in cases where the address is an IP
+or something arbitrary.)
+***
+There are some instances of 'empty files.' Each empty file may some day be
+changed to a directory or a non-empty file to hold more information.
+***
+Merge conflicts that cannot be resolved automatically should be summarized in
+some kind of log in the repo, so in the off-chance it happens, the user can
+recover.
 ")
