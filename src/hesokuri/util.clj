@@ -127,3 +127,7 @@ If term? is omitted, reads until EOF."
          [(.toString baos "UTF-8") b]
          (do (.write baos b)
              (recur in term? baos))))))
+
+(defmacro defnv [name fields args & body]
+  `(do (defn base-fn# ~(into fields args) ~@body)
+       (defn ~name ~fields (partial base-fn# ~@fields))))

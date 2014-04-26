@@ -44,3 +44,13 @@
       "foo" space? "foo" -1 ""
       "foo bar" zero? "foo bar" -1 ""
       "foo\u0000bar" zero? "foo" 0 "bar")))
+
+(defnv adder [value] [another-num]
+  (+ value another-num))
+
+(deftest test-defnv-invocation
+  (let [adder-4 (adder 4)
+        adder-0 (adder 0)]
+    (is (= 4 (adder-4 0)))
+    (is (= 44 (adder-0 44)))
+    (is (= 55 (adder-4 51)))))
