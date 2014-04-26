@@ -48,9 +48,23 @@
 (defnv adder [value] [another-num]
   (+ value another-num))
 
+(defnv exclaimer [bangs mark] [phrase]
+  (apply str phrase (repeat bangs mark)))
+
+(def adder-4 (adder 4))
+(def adder-0 (adder 0))
+(def exclaimer-?? (exclaimer 2 "?"))
+
 (deftest test-defnv-invocation
-  (let [adder-4 (adder 4)
-        adder-0 (adder 0)]
-    (is (= 4 (adder-4 0)))
-    (is (= 44 (adder-0 44)))
-    (is (= 55 (adder-4 51)))))
+  (is (= 4 (adder-4 0)))
+  (is (= 44 (adder-0 44)))
+  (is (= 55 (adder-4 51)))
+  (is (= "Hello??" (exclaimer-?? "Hello"))))
+
+(deftest test-defnv-fields-and-name
+  (is (= 'adder (vfn-name adder-4)))
+  (is (= [0] (vfn-fields adder-0)))
+  (is (= [4] (vfn-fields adder-4)))
+  (is (= [2 "?"] (vfn-fields exclaimer-??)))
+  (is (= 'exclaimer (vfn-name exclaimer-??))))
+

@@ -128,6 +128,13 @@ If term? is omitted, reads until EOF."
          (do (.write baos b)
              (recur in term? baos))))))
 
+(defprotocol VFn
+  (vfn-name [this])
+  (vfn-fields [this]))
+
 (defmacro defnv [name fields args & body]
-  `(do (defn base-fn# ~(into fields args) ~@body)
-       (defn ~name ~fields (partial base-fn# ~@fields))))
+  `(defn ~name ~fields
+     (proxy [clojure.lang.AFunction hesokuri.util.VFn] []
+       (invoke ~args ~@body)
+       (vfn_name [] '~name)
+       (vfn_fields [] ~fields))))
