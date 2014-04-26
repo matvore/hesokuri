@@ -35,11 +35,11 @@
              (bit-and (long 0xffffffff))))))
 
 (defn cycle-bytes [b count] (byte-array (take count (cycle b))))
-(def cycle-bytes-hash (comp #(new ArrayBackedHash %) cycle-bytes))
+(defn cycle-bytes-hash [b] (new ArrayBackedHash (cycle-bytes b 20)))
 
 (deftest test-ArrayBackedHash-equals
   (are [cyc1 cyc2 expect]
-      (= expect (= (cycle-bytes-hash cyc1 20) (cycle-bytes-hash cyc2 20)))
+      (= expect (= (cycle-bytes-hash cyc1) (cycle-bytes-hash cyc2)))
     [0xa0 0xb0] [0xa0 0xb0] true
     [0x88 0x77] [0x88 0x77 0x88] false
     [0x88 0x77 0x88 0x77] [0x88 0x77 0x88 0x77 0x66] false))
@@ -78,13 +78,14 @@
           (do (is (nil? (read-tree-entry source))
                   (str "Read only first " source-len " bytes of entry"))
               (recur (inc source-len)))
-          (is (= ["12345" "filename" (cycle-bytes-hash [1 2] 20)]
+          (is (= ["12345" "filename" (cycle-bytes-hash [1 2])]
                  (read-tree-entry source))))))))
 
+(def entry-1-bytes (tree-entry-bytes "1" "file1" [0x01 0x10]))
+(def entry-2-bytes (tree-entry-bytes "2" "file2" [0x02 0x20]))
+
 (deftest test-read-tree
-  (let [entry-1-bytes (tree-entry-bytes "1" "file1" [0x01 0x10])
-        entry-2-bytes (tree-entry-bytes "2" "file2" [0x02 0x20])
-        bytes (concat entry-1-bytes entry-2-bytes)
+  (let [bytes (concat entry-1-bytes entry-2-bytes)
         entries [(read-tree-entry (byte-stream entry-1-bytes))
                  (read-tree-entry (byte-stream entry-2-bytes))]]
     (are [entry-count byte-count]
@@ -95,6 +96,14 @@
       1 (count entry-1-bytes)
       1 (+ 20 (count entry-2-bytes))
       2 (+ (count entry-1-bytes) (count entry-2-bytes)))))
+
+(deftest test-write-tree-entry
+  (are [expected-bytes entry]
+       (let [baos (new java.io.ByteArrayOutputStream)]
+         (write-tree-entry baos entry)
+         (is (= expected-bytes (into [] (.toByteArray baos)))))
+       entry-1-bytes ["1" "file1" (cycle-bytes-hash [0x01 0x10])]
+       entry-2-bytes ["2" "file2" (cycle-bytes-hash [0x02 0x20])]))
 
 (deftest test-default-git (is (git? default-git)))
 

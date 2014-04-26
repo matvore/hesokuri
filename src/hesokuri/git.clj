@@ -75,6 +75,17 @@ function."
               (when entry
                 (cons entry (read-tree in))))))
 
+(defn write-tree-entry
+  "Write a tree entry to an output stream."
+  [^java.io.OutputStream out [type name sha]]
+  (doto out
+    (.write (.getBytes type "UTF-8"))
+    (.write (int \space))
+    (.write (.getBytes name "UTF-8"))
+    (.write 0)
+    (.write (hash-bytes sha)))
+  nil)
+
 (def default-git
   "A Git object which invokes the 'git' tool from the PATH."
   {:path "git"})
