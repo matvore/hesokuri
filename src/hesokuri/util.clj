@@ -138,9 +138,11 @@ If term? is omitted, reads until EOF."
        (invoke ~args ~@body)
        (vfn_name [] '~name)
        (vfn_fields [] ~fields)
-       (hashCode [] (.hashCode (.vfn_fields ~'this)))
+       (toString [] (.toString (cons '~name ~fields)))
+       (hashCode [] (.hashCode ~fields))
        (equals [o#]
-         (and (= (class ~'this)
-                 (class o#))
-              (= (vfn-fields ~'this)
-                 (vfn-fields o#)))))))
+         (and (= (class ~'this) (class o#))
+              (= ~fields (vfn-fields o#)))))))
+
+(defmethod print-method hesokuri.util.VFn [f w]
+  (print-method (cons (vfn-name f) (vfn-fields f)) w))

@@ -74,3 +74,16 @@
   (is (= (adder 4) (adder (+ 2 2))))
   (is (not= (adder 1) (adder 0)))
   (is (not= (exclaimer 2 "!") exclaimer-??)))
+
+(deftest test-defnv-print-method
+  (are [expected vfn]
+       (let [w (new java.io.StringWriter)]
+         (print-method vfn w)
+         (= expected (str w)))
+       "(adder 0)" adder-0
+       "(adder 4)" adder-4
+       "(exclaimer 2 \"?\")" exclaimer-??))
+
+(deftest test-defvn-satisfies-VFn-protocol
+  (is (satisfies? VFn adder-0))
+  (is (satisfies? VFn exclaimer-??)))
