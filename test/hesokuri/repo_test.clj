@@ -13,6 +13,7 @@
 ; limitations under the License.
 
 (ns hesokuri.repo-test
+  (:require [hesokuri.git :as git])
   (:use [clojure.java.io :only [file]]
         [clojure.string :only [trim]]
         clojure.test
@@ -66,7 +67,7 @@
         (is (= 0 (:exit commit-res-1)))
         (is (= 0 (:exit rev-parse-res-1)))
         (is (= "" (:err rev-parse-res-1)))
-        (is (full-hash? commit-1-hash))
+        (is (git/full-hash? commit-1-hash))
         (spit (file repo-dir "file2") "contents 2")
         (let [[add-res-2]
               (invoke-git repo ["add" (str (file repo-dir "file2"))])
@@ -78,7 +79,7 @@
               (trim (:out rev-parse-res-2))]
           (is (= 0 (:exit rev-parse-res-2)))
           (is (= "" (:err rev-parse-res-2)))
-          (is (full-hash? commit-2-hash))
+          (is (git/full-hash? commit-2-hash))
           (is (true? (fast-forward? repo commit-1-hash commit-2-hash :equal)))
           (is (not
                (fast-forward? repo commit-2-hash commit-1-hash :equal))))))))

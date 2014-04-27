@@ -19,6 +19,27 @@
         hesokuri.testing.temp)
   (:import [hesokuri.git ArrayBackedHash]))
 
+(defn cycle-bytes [b count] (byte-array (take count (cycle b))))
+(defn cycle-bytes-hash [b] (new ArrayBackedHash (cycle-bytes b 20)))
+
+(deftest test-hex-char-val
+  (are [ch exp] (= exp (hex-char-val ch))
+       \space nil
+       0 nil
+       \0 0
+       \5 5
+       \9 9
+       \a 10
+       \f 15))
+
+(deftest test-full-hash
+  (are [hash exp] (is (= exp (full-hash? hash)))
+       "a00000000000000000000000000000000000000b" true
+       "a00000000000000000000000000000000000000" false
+       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" false
+       "                                        " false
+       "1234123412341234123412341234123412341234" true))
+
 (deftest test-ArrayBackedHash-toString
   (is (= "a00000000000000000000000000000000000000b"
          (-> (concat [0xa0] (repeat 18 0) [0x0b])
@@ -33,9 +54,6 @@
              ArrayBackedHash.
              .hashCode
              (bit-and (long 0xffffffff))))))
-
-(defn cycle-bytes [b count] (byte-array (take count (cycle b))))
-(defn cycle-bytes-hash [b] (new ArrayBackedHash (cycle-bytes b 20)))
 
 (deftest test-ArrayBackedHash-equals
   (are [cyc1 cyc2 expect]
@@ -65,6 +83,34 @@
     [2 3 4] 21
     [5 6 7] 19
     [8 9] 10))
+
+(deftest test-parse-hash
+  (let [chars (cycle [\a \0 \5 \f \b \9 \2 \8 \7])
+        parsed-bytes (cycle [0xa0 0x5f 0xb9 0x28 0x7a 0x05 0xfb 0x92 0x87])]
+    (are [length trailing res-bytes]
+      (let [chars (map int (concat (take length chars) trailing))
+            stream (byte-stream chars)
+            used-chars (min 40 length)
+            res (->> (repeat 0)
+                     (concat (map int res-bytes))
+                     (take 20)
+                     (map unchecked-byte)
+                     byte-array
+                     ArrayBackedHash.)
+            lacking (- 40 used-chars)
+            term (nth chars used-chars -1)
+            remaining (nth chars (+ 1 used-chars) -1)]
+        (is (= [res lacking term] (parse-hash stream)))
+        (is (= remaining (.read stream))))
+      0 [\space] []
+      1 [\space] [0xa0]
+      10 [0 \a] (take 5 parsed-bytes)
+      21 [\A \b] (concat (take 10 parsed-bytes) [0x50])
+      30 [] (take 15 parsed-bytes)
+      35 [\A \A] (concat (take 17 parsed-bytes) [0x80])
+      40 [] (take 20 parsed-bytes)
+      40 [\K] (take 20 parsed-bytes)
+      41 [] (take 20 parsed-bytes))))
 
 (defn tree-entry-bytes [entry-type filename hash-cycle-bytes]
   (concat (.getBytes (str entry-type " " filename "\u0000") "UTF-8")

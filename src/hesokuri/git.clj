@@ -20,6 +20,23 @@ to Hesokuri logic."
   (:use [clojure.string :only [join split]]
         hesokuri.util))
 
+(defn hex-char-val
+  "Returns the integral value of a hex digit for c in the range of 0-9 or a-f.
+Returns nil for non hex characters and capitalized hex characters (A-F)."
+  [c]
+  (let [c (int c)]
+    (cond
+     (<= (int \0) c (int \9)) (- c (int \0))
+     (<= (int \a) c (int \f)) (-> c (- (int \a)) (+ 10))
+     :else nil)))
+
+(defn full-hash?
+  "Returns true iff the given string looks like a full, valid hash. It does not
+  have to actually exist in any repo."
+  [s]
+  (and (= (count s) 40)
+       (every? hex-char-val s)))
+
 (defprotocol Hash (hash-bytes [this]))
 
 (deftype ArrayBackedHash [b]
@@ -52,6 +69,26 @@ the hash.)"
   [in]
   (let [result (byte-array 20)]
     [(new ArrayBackedHash result) (- 20 (max 0 (.read in result)))]))
+
+(defn parse-hash
+  "Reads a SHA1 in ASCII hex form from the given InputStream. Returns a sequence
+with at least three values: the Hash object read, the number of characters
+lacking to make a complete hash, and a value indicating the character following
+the hash (-1 for EOF)."
+  ([in] (parse-hash in (byte-array 20) 0))
+  ([^java.io.InputStream in #^bytes barray barray-dex]
+     (if (= barray-dex 20)
+       [(new ArrayBackedHash barray) 0 (.read in)]
+       (let [c1 (.read in)
+             c1v (hex-char-val c1)
+             c2 (if c1v (.read in) \0)
+             c2v (hex-char-val c2)]
+         (aset barray barray-dex (unchecked-byte (+ (* 16 (or c1v 0))
+                                                    (or c2v 0))))
+         (cond
+          (not c1v) [(new ArrayBackedHash barray) (- 40 (* 2 barray-dex)) c1]
+          (not c2v) [(new ArrayBackedHash barray) (- 39 (* 2 barray-dex)) c2]
+          :else (recur in barray (inc barray-dex)))))))
 
 (defn read-tree-entry
   "Reads an entry from a Git tree object. Returns a sequence with at least three

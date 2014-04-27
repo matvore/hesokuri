@@ -24,21 +24,6 @@
         [clojure.string :only [split trim]]
         hesokuri.util))
 
-(defn hex-char?
-  "Returns true iff the given character is a hexadecimal character: 0-9 or a-f.
-  Returns false for capitalized hex characters (A-F)."
-  [c]
-  (let [c (int c)]
-    (or (and (>= c (int \a)) (<= c (int \f)))
-        (and (>= c (int \0)) (<= c (int \9))))))
-
-(defn full-hash?
-  "Returns true iff the given string looks like a full, valid hash. It does not
-  have to actually exist in any repo."
-  [s]
-  (and (= (count s) 40)
-       (every? hex-char? s)))
-
 (defn with-dir
   "Returns a repo object that operates through the git command-line tool."
   [dir]
@@ -107,7 +92,7 @@
   (for [line (-> output trim (split #"\n+"))
         :let [unmarked (if (.startsWith line "*") (.substring line 1) line)
               [name hash] (-> unmarked trim (split #" +" 3))]
-        :when (and (full-hash? hash) (not= name ""))]
+        :when (and (git/full-hash? hash) (not= name ""))]
     [name hash]))
 
 (defn branches
@@ -164,7 +149,7 @@
   "Returns true iff the second hash is a fast-forward of the first hash. When
   the hashes are the same, returns when-equal."
   [{:keys [dir init] :as repo} from-hash to-hash when-equal]
-  {:pre [(full-hash? from-hash) (full-hash? to-hash) init]}
+  {:pre [(git/full-hash? from-hash) (git/full-hash? to-hash) init]}
   (if (= from-hash to-hash)
     when-equal
     (-> (invoke-git repo ["merge-base" from-hash to-hash])
