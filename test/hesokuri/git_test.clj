@@ -232,7 +232,7 @@
        {:exit 0 :out "a" :err "b"}
        {:exit -1 :out "" :err " "}))
 
-(deftest test-args-false
+(deftest test-args?-false
   (are [x] (not (args? x))
        0
        {}
@@ -240,7 +240,7 @@
        [:a :b]
        [" " nil]))
 
-(deftest test-args-true
+(deftest test-args?-true
   (are [x] (args? x)
        '()
        (lazy-seq ["a" "b" "c"])
@@ -248,6 +248,10 @@
        ["init"]
        ["rev-parse"]
        '("checkout" "branch")))
+
+(deftest test-args
+  (is (= ["--git-dir=foodir" "a" "b" "c"]
+         (args "foodir" ["a" "b" "c"]))))
 
 (deftest test-invoke
   (with-temp-repo [repo-dir git-dir-flag]

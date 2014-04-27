@@ -36,7 +36,7 @@
    init self
    :else
    (let [existing-bare
-         (-> (git/invoke git/default-git [(str "--git-dir=" dir) "rev-parse"])
+         (-> (git/invoke git/default-git (git/args dir ["rev-parse"]))
              :exit
              zero?)]
      (if existing-bare
@@ -61,9 +61,8 @@
   applicable) the correct --work-tree flag. Uses git/invoke-with-summary."
   [{:keys [dir bare] :as repo} args]
   {:pre [(every? string? args)]}
-  (let [dir-flags (concat [(str "--git-dir=" (git-dir repo))]
-                          (if bare [] [(str "--work-tree=" dir)]))]
-    (git/invoke-with-summary git/default-git (concat dir-flags args))))
+  (let [args (concat (if bare [] [(str "--work-tree=" dir)]) args)]
+    (git/invoke-with-summary git/default-git (git/args (git-dir repo) args))))
 
 (defn- log
   "Takes the result of invoke-git, logs the summary, and returns the exit code."

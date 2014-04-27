@@ -190,6 +190,11 @@ nothing to do with whether the result indicates a successful invocation."
            (list? x))
        (every? string? x)))
 
+(defn args
+  "Helper for building arguments when invoking git."
+  [git-dir args]
+  (cons (str "--git-dir=" git-dir) args))
+
 (defn invoke
   "Invokes git with the given arguments, and returns a value in the same form as
 clojure.java.shell/sh. 'git' is the Git object to use. 'args' is a sequence of
