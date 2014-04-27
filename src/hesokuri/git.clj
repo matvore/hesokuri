@@ -52,14 +52,6 @@ Returns nil for non hex characters and capitalized hex characters (A-F)."
     ;; smaller hash code.
     (-> b java.nio.ByteBuffer/wrap .getInt)))
 
-(def tree-entry-dir
-  "The number stored at the start of a tree entry pointing to a directory."
-  "100644")
-
-(def tree-entry-file
-  "The number stored at the start of a tree entry pointing to a file."
-  "40000")
-
 (defn read-hash
   "Reads SHA1 hash bytes from an InputStream into a new object supporting the
 Hash protocol. Returns a sequence with at least two values: the Hash object
@@ -92,9 +84,10 @@ the hash (-1 for EOF)."
 
 (defn read-tree-entry
   "Reads an entry from a Git tree object. Returns a sequence with at least three
-elements: the type as a String (e.g. 100644, or tree-entry-dir), the name of the
-entry (e.g. README.md) and a Hash object corresponding to the hash. If an entry
-could not be read due to EOF at any point during the read, returns nil."
+elements: the type as a String (e.g. '100644', which is a file with the
+permission bits set to 644), the name of the entry (e.g. README.md) and a Hash
+object corresponding to the hash. If an entry could not be read due to EOF at
+any point during the read, returns nil."
   [in]
   (let [[type-file-str term] (read-until in zero?)
         type-and-file (split type-file-str #" " 2)
