@@ -151,6 +151,24 @@
        entry-1-bytes ["1" "file1" (cycle-bytes-hash [0x01 0x10])]
        entry-2-bytes ["2" "file2" (cycle-bytes-hash [0x02 0x20])]))
 
+(deftest test-read-commit
+  (let [hash-1 (cycle-bytes-hash [1 2 3])
+        hash-2 (cycle-bytes-hash [4 5 6])
+        person "John Doe <jdoe@google.com> 1398561813 -0700"
+        msg "heading\n\ndetails"]
+    (is (= [["tree" hash-1]
+            ["parent" hash-2]
+            ["author" person]
+            ["committer" person]
+            [:msg msg]]
+           (read-commit (new java.io.ByteArrayInputStream
+                             (.getBytes (str "tree " hash-1 "\n"
+                                             "parent " hash-2 "\n"
+                                             "author " person "\n"
+                                             "committer " person "\n\n"
+                                             msg)
+                                        "UTF-8")))))))
+
 (deftest test-default-git (is (git? default-git)))
 
 (deftest test-git-false

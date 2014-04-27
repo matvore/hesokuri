@@ -123,6 +123,36 @@ function."
     (.write (hash-bytes sha)))
   nil)
 
+(defn read-commit
+  "Reads commit information lazily from the given InputStream. Returns a lazyseq
+Where each element is a sequence with at least two elements: the key and the
+value. They are returned in the same order they appear in the commit. The possible
+keys/values are:
+KEY           VALUE
+\"tree\"      Hash
+\"parent\"    Hash
+\"author\"    exact String containing author name and time
+\"committer\" same as above, but for committer
+:msg          String containing commit message
+"
+  [^java.io.InputStream in]
+  (lazy-seq
+   (let [nl (int \newline)
+         sp (int \space)
+         [name nt] (read-until in #{sp nl})]
+     (cond
+      (= [name nt] ["" nl])
+      [(lazy-cat [:msg] [(first (read-until in))])]
+
+      (= nt sp)
+      (if (#{"parent" "tree"} name)
+        (let [[hash lack ht] (parse-hash in)]
+          (when (= [lack ht] [0 nl])
+            (cons [name hash] (read-commit in))))
+        (let [[value vt] (read-until in #{nl})]
+          (when (= vt nl)
+            (cons [name value] (read-commit in)))))))))
+
 (def default-git
   "A Git object which invokes the 'git' tool from the PATH."
   {:path "git"})
