@@ -156,18 +156,32 @@
         hash-2 (cycle-bytes-hash [4 5 6])
         person "John Doe <jdoe@google.com> 1398561813 -0700"
         msg "heading\n\ndetails"]
-    (is (= [["tree" hash-1]
-            ["parent" hash-2]
-            ["author" person]
-            ["committer" person]
-            [:msg msg]]
-           (read-commit (new java.io.ByteArrayInputStream
-                             (.getBytes (str "tree " hash-1 "\n"
-                                             "parent " hash-2 "\n"
-                                             "author " person "\n"
-                                             "committer " person "\n\n"
-                                             msg)
-                                        "UTF-8")))))))
+    (are [result commit-text]
+      (is (= result (-> (apply str commit-text)
+                        (.getBytes "UTF-8")
+                        java.io.ByteArrayInputStream.
+                        read-commit)))
+      [["tree" hash-1]
+       ["parent" hash-2]
+       ["author" person]
+       ["committer" person]
+       [:msg msg]]
+      ["tree " hash-1 "\n"
+       "parent " hash-2 "\n"
+       "author " person "\n"
+       "committer " person "\n\n"
+       msg]
+
+      [["tree" hash-1]]
+      ["tree " hash-1 "\n"
+       "parent " "01234"]
+
+      [["tree" hash-1]]
+      ["tree " hash-1 "\n"
+       "parent"]
+
+      []
+      [])))
 
 (deftest test-default-git (is (git? default-git)))
 
