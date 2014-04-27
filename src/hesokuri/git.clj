@@ -18,7 +18,11 @@ to Hesokuri logic."
   (:require clojure.java.io
             clojure.java.shell)
   (:use [clojure.string :only [join split]]
+        clojure.tools.logging
         hesokuri.util))
+
+(declare args
+         invoke-with-summary)
 
 (defn hex-char-val
   "Returns the integral value of a hex digit for c in the range of 0-9 or a-f.
@@ -81,6 +85,17 @@ the hash (-1 for EOF)."
           (not c1v) [(new ArrayBackedHash barray) (- 40 (* 2 barray-dex)) c1]
           (not c2v) [(new ArrayBackedHash barray) (- 39 (* 2 barray-dex)) c2]
           :else (recur in barray (inc barray-dex)))))))
+
+(defn read-blob
+  "Reads a blob as a String. Returns nil if any error occurred."
+  [git git-dir blob-hash]
+  (let [[{:keys [exit err out]} :as res-sum]
+        (invoke-with-summary
+         git (args git-dir ["cat-file" "blob" (str blob-hash)]))]
+    (if (and (zero? exit) (empty? err))
+      out
+      (do (error (second res-sum))
+          nil))))
 
 (defn read-tree-entry
   "Reads an entry from a Git tree object. Returns a sequence with at least three

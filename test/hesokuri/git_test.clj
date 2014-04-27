@@ -19,6 +19,8 @@
         hesokuri.testing.temp)
   (:import [hesokuri.git ArrayBackedHash]))
 
+(def pretend-hash "aaaaaaaaaabbbbbbbbbbccccccccccffffffffff")
+
 (defn cycle-bytes [b count] (byte-array (take count (cycle b))))
 (defn cycle-bytes-hash [b] (new ArrayBackedHash (cycle-bytes b 20)))
 
@@ -38,7 +40,8 @@
        "a00000000000000000000000000000000000000" false
        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" false
        "                                        " false
-       "1234123412341234123412341234123412341234" true))
+       "1234123412341234123412341234123412341234" true
+       pretend-hash true))
 
 (deftest test-ArrayBackedHash-toString
   (is (= "a00000000000000000000000000000000000000b"
@@ -111,6 +114,21 @@
       40 [] (take 20 parsed-bytes)
       40 [\K] (take 20 parsed-bytes)
       41 [] (take 20 parsed-bytes))))
+
+(deftest read-blob-error
+  (with-temp-repo [git-dir]
+    (is (full-hash? pretend-hash))
+    (is (nil? (read-blob default-git git-dir pretend-hash)))))
+
+(deftest read-blob-success
+  (with-temp-repo [git-dir]
+    (let [[stdin stdout finish]
+          (invoke-streams default-git
+                          (args git-dir ["hash-object" "-w" "--stdin"]))
+          hash (do (spit stdin "hello Git")
+                   (clojure.string/trim (slurp stdout)))]
+      (is (= {:exit 0 :err ""} @finish))
+      (is (= "hello Git" (read-blob default-git git-dir hash))))))
 
 (defn tree-entry-bytes [entry-type filename hash-cycle-bytes]
   (concat (.getBytes (str entry-type " " filename "\u0000") "UTF-8")
