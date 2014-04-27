@@ -127,3 +127,11 @@ If term? is omitted, reads until EOF."
          [(.toString baos "UTF-8") b]
          (do (.write baos b)
              (recur in term? baos))))))
+
+(defn write-bytes
+  "Writes the UTF-8 bytes of a string to the given OutputStream."
+  [^java.io.OutputStream out s]
+  (doto (new java.io.OutputStreamWriter out "UTF-8")
+    (.write s 0 (count s))
+    (.flush))
+  nil)

@@ -44,3 +44,15 @@
       "foo" space? "foo" -1 ""
       "foo bar" zero? "foo bar" -1 ""
       "foo\u0000bar" zero? "foo" 0 "bar")))
+
+(deftest test-write-bytes
+  (are [s by]
+    (= (seq (concat (.getBytes s "UTF-8") by))
+       (let [baos (new java.io.ByteArrayOutputStream)]
+         (write-bytes baos s)
+         (.write baos (byte-array by))
+         (seq (.toByteArray baos))))
+    "abc" []
+    "abc" [1 2 3]
+    "" []
+    "" [4 5]))

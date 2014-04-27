@@ -116,9 +116,9 @@ function."
   "Write a tree entry to an output stream."
   [^java.io.OutputStream out [type name sha]]
   (doto out
-    (.write (.getBytes type "UTF-8"))
+    (write-bytes type)
     (.write (int \space))
-    (.write (.getBytes name "UTF-8"))
+    (write-bytes name)
     (.write 0)
     (.write (hash-bytes sha)))
   nil)
@@ -152,6 +152,22 @@ KEY           VALUE
         (let [[value vt] (read-until in #{nl})]
           (when (= vt nl)
             (cons [name value] (read-commit in)))))))))
+
+(defn write-commit-entry
+  "Writes a single commit entry to the given OutputStream. A commit entry is a
+name and a value and corresponds to the names and values returned by
+read-commit."
+  [^java.io.OutputStream out [name value]]
+  (do (if (= :msg name)
+        (doto out
+          (.write (int \newline))
+          (write-bytes value))
+        (doto out
+          (write-bytes name)
+          (.write (int \space))
+          (write-bytes (str value))
+          (.write (int \newline))))
+      nil))
 
 (def default-git
   "A Git object which invokes the 'git' tool from the PATH."

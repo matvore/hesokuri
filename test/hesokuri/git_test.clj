@@ -151,10 +151,11 @@
        entry-1-bytes ["1" "file1" (cycle-bytes-hash [0x01 0x10])]
        entry-2-bytes ["2" "file2" (cycle-bytes-hash [0x02 0x20])]))
 
+(def person "John Doe <jdoe@google.com> 1398561813 -0700")
+
 (deftest test-read-commit
   (let [hash-1 (cycle-bytes-hash [1 2 3])
         hash-2 (cycle-bytes-hash [4 5 6])
-        person "John Doe <jdoe@google.com> 1398561813 -0700"
         msg "heading\n\ndetails"]
     (are [result commit-text]
       (is (= result (-> (apply str commit-text)
@@ -182,6 +183,20 @@
 
       []
       [])))
+
+(defn commit-entry-string [e]
+  (let [baos (new java.io.ByteArrayOutputStream)]
+    (write-commit-entry baos e)
+    (new String (.toByteArray baos) "UTF-8")))
+
+(deftest test-write-commit-entry
+  (let [hash-1 (cycle-bytes-hash [1 2 3])]
+    (is (= "\nmsg title\n\ndetails"
+           (commit-entry-string [:msg "msg title\n\ndetails"])))
+    (is (= (str "parent " hash-1 "\n")
+           (commit-entry-string ["parent" hash-1])))
+    (is (= (str "author " person "\n")
+           (commit-entry-string ["author" person])))))
 
 (deftest test-default-git (is (git? default-git)))
 
