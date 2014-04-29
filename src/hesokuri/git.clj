@@ -34,27 +34,39 @@ Returns nil for non hex characters and capitalized hex characters (A-F)."
      (<= (int \a) c (int \f)) (-> c (- (int \a)) (+ 10))
      :else nil)))
 
-(defn full-hash?
-  "Returns true iff the given string looks like a full, valid hash. It does not
-  have to actually exist in any repo."
-  [s]
-  (and (= (count s) 40)
-       (every? hex-char-val s)))
-
-(defprotocol Hash (hash-bytes [this]))
+(defprotocol Hash
+  (write-binary-hash [this ^java.io.OutputStream out]
+    "Writes the raw binary representation of this hash to the given
+OutputStream.")
+  (full-hash? [this]
+    "Indicates whether the data structure backing this hash is the correct size
+and formatted correctly."))
 
 (deftype ArrayBackedHash [b]
-  Hash (hash-bytes [_] b)
+  Hash
+  (write-binary-hash [_ out] (.write out b))
+  (full-hash? [_] (= (count b) 20))
   Object
-  (equals [_ other]
-    (and (satisfies? hesokuri.git/Hash other)
-         (java.util.Arrays/equals b (hash-bytes other))))
+  (equals [o1 o2]
+    (and (= (class o1) (class o2))
+         (= (str o1) (str o2))))
   (toString [_]
     (apply str (map #(format "%02x" (bit-and 0xff %)) b)))
   (hashCode [_]
     ;; Our data is already a "hash code"; just use the first four bytes for a
     ;; smaller hash code.
     (-> b java.nio.ByteBuffer/wrap .getInt)))
+
+(extend-type String
+  Hash
+  (write-binary-hash [s ^java.io.OutputStream out]
+    (doseq [[c1 c2] (partition 2 s)
+            :let [c1v (hex-char-val c1)
+                  c2v (hex-char-val c2)]]
+      (.write out (unchecked-byte (+ (* 16 c1v) c2v)))))
+  (full-hash? [s]
+    (and (= (count s) 40)
+         (every? hex-char-val s))))
 
 (defn read-hash
   "Reads SHA1 hash bytes from an InputStream into a new object supporting the
@@ -65,26 +77,6 @@ the hash.)"
   [in]
   (let [result (byte-array 20)]
     [(new ArrayBackedHash result) (- 20 (max 0 (.read in result)))]))
-
-(defn parse-hash
-  "Reads a SHA1 in ASCII hex form from the given InputStream. Returns a sequence
-with at least three values: the Hash object read, the number of characters
-lacking to make a complete hash, and a value indicating the character following
-the hash (-1 for EOF)."
-  ([in] (parse-hash in (byte-array 20) 0))
-  ([^java.io.InputStream in #^bytes barray barray-dex]
-     (if (= barray-dex 20)
-       [(new ArrayBackedHash barray) 0 (.read in)]
-       (let [c1 (.read in)
-             c1v (hex-char-val c1)
-             c2 (if c1v (.read in) \0)
-             c2v (hex-char-val c2)]
-         (aset barray barray-dex (unchecked-byte (+ (* 16 (or c1v 0))
-                                                    (or c2v 0))))
-         (cond
-          (not c1v) [(new ArrayBackedHash barray) (- 40 (* 2 barray-dex)) c1]
-          (not c2v) [(new ArrayBackedHash barray) (- 39 (* 2 barray-dex)) c2]
-          :else (recur in barray (inc barray-dex)))))))
 
 (defn read-blob
   "Reads a blob as a String. Returns nil if any error occurred."
@@ -127,9 +119,8 @@ function."
     (write-bytes type)
     (.write (int \space))
     (write-bytes name)
-    (.write 0)
-    (.write (hash-bytes sha)))
-  nil)
+    (.write 0))
+  (write-binary-hash sha out))
 
 (defn read-commit
   "Reads commit information lazily from the given InputStream. Returns a lazyseq
@@ -153,13 +144,9 @@ KEY           VALUE
       [(lazy-cat [:msg] [(first (read-until in))])]
 
       (= nt sp)
-      (if (#{"parent" "tree"} name)
-        (let [[hash lack ht] (parse-hash in)]
-          (when (= [lack ht] [0 nl])
-            (cons [name hash] (read-commit in))))
-        (let [[value vt] (read-until in #{nl})]
-          (when (= vt nl)
-            (cons [name value] (read-commit in)))))))))
+      (let [[value vt] (read-until in #{nl})]
+        (when (= vt nl)
+          (cons [name value] (read-commit in))))))))
 
 (defn write-commit-entry
   "Writes a single commit entry to the given OutputStream. A commit entry is a

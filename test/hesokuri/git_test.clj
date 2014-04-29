@@ -87,33 +87,24 @@
     [5 6 7] 19
     [8 9] 10))
 
-(deftest test-parse-hash
+(deftest test-String-Hash-write-binary-hash
   (let [chars (cycle [\a \0 \5 \f \b \9 \2 \8 \7])
         parsed-bytes (cycle [0xa0 0x5f 0xb9 0x28 0x7a 0x05 0xfb 0x92 0x87])]
-    (are [length trailing res-bytes]
-      (let [chars (map int (concat (take length chars) trailing))
-            stream (byte-stream chars)
-            used-chars (min 40 length)
-            res (->> (repeat 0)
-                     (concat (map int res-bytes))
-                     (take 20)
-                     (map unchecked-byte)
-                     byte-array
-                     ArrayBackedHash.)
-            lacking (- 40 used-chars)
-            term (nth chars used-chars -1)
-            remaining (nth chars (+ 1 used-chars) -1)]
-        (is (= [res lacking term] (parse-hash stream)))
-        (is (= remaining (.read stream))))
-      0 [\space] []
-      1 [\space] [0xa0]
-      10 [0 \a] (take 5 parsed-bytes)
-      21 [\A \b] (concat (take 10 parsed-bytes) [0x50])
-      30 [] (take 15 parsed-bytes)
-      35 [\A \A] (concat (take 17 parsed-bytes) [0x80])
-      40 [] (take 20 parsed-bytes)
-      40 [\K] (take 20 parsed-bytes)
-      41 [] (take 20 parsed-bytes))))
+    (are [length]
+      (let [expected (map unchecked-byte (take (quot length 2) parsed-bytes))
+            hash-str (apply str (take length chars))
+            baos (new java.io.ByteArrayOutputStream)
+            actual (do (write-binary-hash hash-str baos)
+                       (into [] (.toByteArray baos)))]
+        (= expected actual))
+      0
+      1
+      10
+      21
+      30
+      35
+      40
+      41)))
 
 (deftest read-blob-error
   (with-temp-repo [git-dir]
@@ -172,8 +163,8 @@
 (def person "John Doe <jdoe@google.com> 1398561813 -0700")
 
 (deftest test-read-commit
-  (let [hash-1 (cycle-bytes-hash [1 2 3])
-        hash-2 (cycle-bytes-hash [4 5 6])
+  (let [hash-1 (str (cycle-bytes-hash [1 2 3]))
+        hash-2 (str (cycle-bytes-hash [4 5 6]))
         msg "heading\n\ndetails"]
     (are [result commit-text]
       (is (= result (-> (apply str commit-text)

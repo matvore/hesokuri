@@ -91,7 +91,7 @@
   (for [line (-> output trim (split #"\n+"))
         :let [unmarked (if (.startsWith line "*") (.substring line 1) line)
               [name hash] (-> unmarked trim (split #" +" 3))]
-        :when (and (git/full-hash? hash) (not= name ""))]
+        :when (and hash (git/full-hash? hash) (not= name ""))]
     [name hash]))
 
 (defn branches
