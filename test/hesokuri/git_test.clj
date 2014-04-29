@@ -109,17 +109,17 @@
 (deftest read-blob-error
   (with-temp-repo [git-dir]
     (is (full-hash? pretend-hash))
-    (is (nil? (read-blob default-git git-dir pretend-hash)))))
+    (is (nil? (read-blob "git" git-dir pretend-hash)))))
 
 (deftest read-blob-success
   (with-temp-repo [git-dir]
     (let [[stdin stdout finish]
-          (invoke-streams default-git
+          (invoke-streams "git"
                           (args git-dir ["hash-object" "-w" "--stdin"]))
           hash (do (spit stdin "hello Git")
                    (clojure.string/trim (slurp stdout)))]
       (is (= {:exit 0 :err ""} @finish))
-      (is (= "hello Git" (read-blob default-git git-dir hash))))))
+      (is (= "hello Git" (read-blob "git" git-dir hash))))))
 
 (defn tree-entry-bytes [entry-type filename hash-cycle-bytes]
   (concat (.getBytes (str entry-type " " filename "\u0000") "UTF-8")
@@ -207,23 +207,6 @@
     (is (= (str "author " person "\n")
            (commit-entry-string ["author" person])))))
 
-(deftest test-default-git (is (git? default-git)))
-
-(deftest test-git-false
-  (are [x] (not (git? x))
-       42
-       "git"
-       {}
-       {:not-path "git"}
-       {:path 100}
-       {:path ""}
-       {:path "git" :extra-key "not allowed"}))
-
-(deftest test-git-true
-  (are [x] (git? x)
-       {:path "git"}
-       {:path "/home/jdoe/bin/my-git"}))
-
 (deftest test-invoke-result-false
   (are [x] (not (invoke-result? x))
        ""
@@ -264,15 +247,14 @@
 
 (deftest test-invoke
   (with-temp-repo [repo-dir git-dir-flag]
-    (let [rev-parse-result (invoke default-git [git-dir-flag "rev-parse"])]
+    (let [rev-parse-result (invoke "git" [git-dir-flag "rev-parse"])]
       (is (= rev-parse-result {:err "" :out "" :exit 0}))
       (is (invoke-result? rev-parse-result)))))
 
 (deftest test-invoke-streams-empty-err
   (with-temp-repo [repo-dir git-dir-flag]
     (let [[in out result]
-          (invoke-streams
-           default-git [git-dir-flag "hash-object" "-w" "--stdin"])]
+          (invoke-streams "git" [git-dir-flag "hash-object" "-w" "--stdin"])]
       (spit in "hello\n")
       (is (not (realized? result)))
       (.close in)
@@ -282,8 +264,7 @@
 (deftest test-invoke-streams-err
   (with-temp-repo [repo-dir git-dir-flag]
     (let [[_ _ result]
-          (invoke-streams
-           default-git [git-dir-flag "cat-file" "-t" "1234567"])]
+          (invoke-streams "git" [git-dir-flag "cat-file" "-t" "1234567"])]
       (is (= {:err "fatal: Not a valid object name 1234567\n" :exit 128}
              @result)))))
 
@@ -297,7 +278,7 @@
       (is (not= -1 (.indexOf result substr)) substr))))
 
 (deftest test-invoke-with-summary
-  (let [result (invoke-with-summary default-git ["--version"])]
+  (let [result (invoke-with-summary "git" ["--version"])]
     (is (invoke-result? (first result)))
     (is (string? (second result)))
     (is (= 2 (count result)))))

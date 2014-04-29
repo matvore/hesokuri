@@ -36,13 +36,13 @@
    init self
    :else
    (let [existing-bare
-         (-> (git/invoke git/default-git (git/args dir ["rev-parse"]))
+         (-> (git/invoke "git" (git/args dir ["rev-parse"]))
              :exit
              zero?)]
      (if existing-bare
        (assoc self :bare true :init true)
        (let [init-args `["init" ~@(if bare ["--bare"] []) ~(str dir)]
-             res-sum (git/invoke-with-summary git/default-git init-args)]
+             res-sum (git/invoke-with-summary "git" init-args)]
          (when-not (zero? (:exit (first res-sum)))
            (throw (java.io.IOException. (second res-sum))))
          (assoc self
@@ -62,7 +62,7 @@
   [{:keys [dir bare] :as repo} args]
   {:pre [(every? string? args)]}
   (let [args (concat (if bare [] [(str "--work-tree=" dir)]) args)]
-    (git/invoke-with-summary git/default-git (git/args (git-dir repo) args))))
+    (git/invoke-with-summary "git" (git/args (git-dir repo) args))))
 
 (defn- log
   "Takes the result of invoke-git, logs the summary, and returns the exit code."

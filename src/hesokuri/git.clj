@@ -164,18 +164,6 @@ read-commit."
           (.write (int \newline))))
       nil))
 
-(def default-git
-  "A Git object which invokes the 'git' tool from the PATH."
-  {:path "git"})
-
-(defn git?
-  "Returns true iff x is a valid git object."
-  [x]
-  (and (map? x)
-       (= 1 (count x))
-       (string? (:path x))
-       (not (empty? (:path x)))))
-
 (defn invoke-result?
   "Returns true iff x is a valid result of a call to invoke. Note that this has
 nothing to do with whether the result indicates a successful invocation."
@@ -202,8 +190,8 @@ nothing to do with whether the result indicates a successful invocation."
 clojure.java.shell/sh. 'git' is the Git object to use. 'args' is a sequence of
 strings to pass to git."
   [git args]
-  {:pre [(args? args) (git? git)]}
-  (apply clojure.java.shell/sh (:path git) args))
+  {:pre [(args? args)]}
+  (apply clojure.java.shell/sh git args))
 
 (defn invoke-streams
   "Invokes git with the given arguments. The semantics of the arguments are
@@ -213,8 +201,8 @@ corresponding to stdout, and a future that will realize when the process
 terminates. The future is a map with two keys: :exit and :err, whose values
 correspond to the values of the same keys in the invoke return value."
   [git args]
-  {:pre [(args? args) (git? git)]}
-  (let [process (new ProcessBuilder (into [(:path git)] args))]
+  {:pre [(args? args)]}
+  (let [process (new ProcessBuilder (into [git] args))]
     (doto process
       (.redirectInput java.lang.ProcessBuilder$Redirect/PIPE)
       (.redirectOutput java.lang.ProcessBuilder$Redirect/PIPE)
@@ -240,6 +228,6 @@ correspond to the values of the same keys in the invoke return value."
 followed by a string which is the summary. The summary part of the sequence is
 lazy."
   [git args]
-  {:pre [(git? git) (args? args)]}
+  {:pre [(args? args)]}
   (let [result (invoke git args)]
     (cons result (lazy-seq [(summary args result)]))))
