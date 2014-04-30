@@ -135,3 +135,13 @@ If term? is omitted, reads until EOF."
     (.write s 0 (count s))
     (.flush))
   nil)
+
+(defmacro let-open
+  "Works similar to let, but after the bindings vector, takes a vector of
+symbols that will be closed after body is executed."
+  [let-bindings closeables & body]
+  `(let ~@let-bindings
+     (try
+       ~@body
+       (finally ~@(for [c closeables]
+                    `(.close ~c))))))
