@@ -196,10 +196,11 @@ strings to pass to git."
 (defn invoke-streams
   "Invokes git with the given arguments. The semantics of the arguments are
 identical to the invoke function. The return value is a sequence of at least
-three elements: an OutputStream corresponding to stdin, an InputStream
-corresponding to stdout, and a future that will realize when the process
-terminates. The future is a map with two keys: :exit and :err, whose values
-correspond to the values of the same keys in the invoke return value."
+four elements: an OutputStream corresponding to stdin, an InputStream
+corresponding to stdout, a future that will realize when the process
+terminates, and the summary as a string. The future is a map with two keys:
+:exit and :err, whose values correspond to the values of the same keys in the
+invoke return value. The summary part of the returned sequence is lazy."
   [git args]
   {:pre [(args? args)]}
   (let [process (new ProcessBuilder (into [git] args))]
@@ -207,13 +208,29 @@ correspond to the values of the same keys in the invoke return value."
       (.redirectInput java.lang.ProcessBuilder$Redirect/PIPE)
       (.redirectOutput java.lang.ProcessBuilder$Redirect/PIPE)
       (.redirectError java.lang.ProcessBuilder$Redirect/PIPE))
-    (let [process (.start process)]
-      [(.getOutputStream process)
-       (.getInputStream process)
-       (future
-         (let [stderr (slurp (.getErrorStream process))]
-           {:exit (.waitFor process)
-            :err stderr}))])))
+    (let [process (.start process)
+          finish (future
+                   (let [stderr (slurp (.getErrorStream process))]
+                     {:exit (.waitFor process)
+                      :err stderr}))]
+      (concat
+       [(.getOutputStream process)
+        (.getInputStream process)
+        finish]
+       (lazy-seq [(let [{:keys [err exit]} @finish]
+                    (format "execute: %s %s\nstderr:\n%sexit: %d\n"
+                            git (join " " args) err exit))])))))
+
+(defn if-error
+  "Calls a function if the result of invoke-streams indicates an error. A
+non-empty stderr or a non-zero exit code indicate error. The function (f) is
+called with a single argument: a human-readable summary of the invoke-streams
+result. If f is called, if-error returns whatever f returns. If f is not called,
+if-error returns nil."
+  [[_ _ finish :as invoke-streams-res] f]
+  (let [{:keys [err exit]} @finish]
+    (when (or (not= 0 exit) (not (empty? err)))
+      (f (nth invoke-streams-res 3)))))
 
 (defn summary
   "Returns a user-readable summary of the result of 'invoke' as a string."

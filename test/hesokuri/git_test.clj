@@ -253,20 +253,37 @@
 
 (deftest test-invoke-streams-empty-err
   (with-temp-repo [repo-dir git-dir-flag]
-    (let [[in out result]
+    (let [[in out finish :as result]
           (invoke-streams "git" [git-dir-flag "hash-object" "-w" "--stdin"])]
       (spit in "hello\n")
-      (is (not (realized? result)))
+      (is (not (realized? finish)))
       (.close in)
       (is (= "ce013625030ba8dba906f756967f9e9ca394464a\n" (slurp out)))
-      (is (= {:err "" :exit 0}) @result))))
+      (is (= {:err "" :exit 0}) @finish)
+      (is (= (str "execute: git " git-dir-flag
+                  " hash-object -w --stdin\nstderr:\nexit: 0"))
+          (nth result 3)))))
 
 (deftest test-invoke-streams-err
   (with-temp-repo [repo-dir git-dir-flag]
-    (let [[_ _ result]
-          (invoke-streams "git" [git-dir-flag "cat-file" "-t" "1234567"])]
-      (is (= {:err "fatal: Not a valid object name 1234567\n" :exit 128}
-             @result)))))
+    (let [[_ _ result summary]
+          (invoke-streams "git" [git-dir-flag "cat-file" "-t" "1234567"])
+          err "fatal: Not a valid object name 1234567\n"]
+      (is (= {:err err :exit 128} @result))
+      (is (= (str "execute: git " git-dir-flag " cat-file -t 1234567\nstderr:\n"
+                  err "exit: 128\n")
+             summary)))))
+
+(deftest test-if-error
+  (let [invoke-res (fn [exit err]
+                     [nil nil (future {:exit exit :err err}) "summary"])]
+    (is (= "summary+extra"
+           (if-error (invoke-res 13 "stderr") #(str % "+extra"))))
+    (is (= 42 (if-error (invoke-res 0 "stderr") (constantly 42))))
+    (is (= 42 (if-error (invoke-res 13 "") (constantly 42))))
+    (is (nil? (if-error (invoke-res 0 "")
+                        (fn [_] (throw (IllegalStateException.
+                                        "Should not get here."))))))))
 
 (deftest test-summary
   (let [err "[stderr contents]"
