@@ -31,22 +31,33 @@ Closeables and Exceptions that have occurred. For information on implementing a
 function that supports transactions, (i.e. receives a transaction as an argument
 and uses it to report events), see the open, close, and error functions in this
 namespace. These functions should all be called with swap!. For information on
-consuming an API that uses transactions, see the transact function.")
+consuming an API that uses transactions, see the transact function.
+
+If any events are sent to the transaction after it is finished (i.e. after
+transact has returned), then the events will behave very simply: open and close
+events are ignored, but Closeables will still actually be closed, and errors are
+thrown with (throw). This is also what happens if you use a transaction that is
+(atom nil), which you can do if you are in the REPL. This is more flexible. If
+you accidentally read using the transaction after transact returns, you may not
+notice, but this is easy to avoid: simply don't return anything from transact
+except for metadata about your completed commit.")
 
 (defn open
   "Adds a closeable to the list of not-yet-closed items."
   [{:keys [opened] :as trans} closeable]
-  (assoc trans :opened (conj opened closeable)))
+  (when trans (assoc trans :opened (conj opened closeable))))
 
 (defn close
   "Closes the given closeable in the given transaction. This function will
 call the close method on Closeable itself."
   [{:keys [opened errors-promise errors] :as trans} closeable]
   (.close closeable)
-  (let [opened (disj opened closeable)]
-    (when (and errors-promise (empty? opened))
-      (deliver errors-promise errors))
-    (assoc trans :opened opened)))
+  (when trans
+    (let [opened (disj opened closeable)]
+      (if (and errors-promise (empty? opened))
+        (do (deliver errors-promise errors)
+            nil)
+        (assoc trans :opened opened)))))
 
 (defn with-closeables
   "Runs the given function f with some Closeables open in the given transaction.
@@ -66,6 +77,7 @@ already closed. This will also close the remaining ones immediately if exception
 is truthy. (The exception argument indicates what caused the trans-fn to
 terminate abruptly, if applicable.)"
   [{:keys [opened errors] :as trans} errors-promise exception]
+  {:pre [trans]}
   (cond
    exception (do (doseq [closeable opened]
                    (.close closeable))
@@ -78,7 +90,7 @@ terminate abruptly, if applicable.)"
 (defn error
   "Reports an error to the given transaction. The error should be a Throwable."
   [{:keys [errors-promise errors] :as trans} error]
-  (if (and errors-promise (realized? errors-promise))
+  (if (not trans)
     (throw error)
     (assoc trans :errors (conj errors error))))
 

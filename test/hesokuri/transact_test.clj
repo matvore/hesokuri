@@ -73,13 +73,30 @@
                                   (finish errors-promise nil))]
                     [(boolean (realized? errors-promise))
                      (count (:opened trans))
-                     (dissoc (close trans opened) :errors-promise)
+                     (close trans opened)
                      @errors-promise]))]
     (are [e]
       (= [false
           1
-          {:opened #{}, :errors (if e [e] [])}
+          nil
           (if e [e] [])]
          (results e))
       some-error
       nil)))
+
+(deftest test-open-for-nil-trans
+  (is (nil? (open nil "foo"))))
+
+(deftest test-close-for-nil-trans
+  (let [closed (atom #{})
+        opened-1 (closeable closed 1)]
+    (is (nil? (close nil opened-1)))
+    (is (= #{1} @closed))))
+
+(deftest test-error-throws-for-nil-trans
+  (try
+    (error nil (Exception. "expected"))
+    (throw (Exception. "should have thrown"))
+    (catch Exception e
+      (is (= "expected" (.getMessage e))))))
+
