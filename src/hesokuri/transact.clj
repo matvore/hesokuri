@@ -48,6 +48,17 @@ call the close method on Closeable itself."
       (deliver errors-promise errors))
     (assoc trans :opened opened)))
 
+(defn with-closeables
+  "Runs the given function f with some Closeables open in the given transaction.
+This automatically invokes open and close on the transaction before and after
+invoking the function. The return value of with-closeables is the return of f.
+Note this function should not be called with swap!."
+  [trans-atom closeables f]
+  (swap! trans-atom (partial reduce #(open %1 %2)) closeables)
+  (try (f)
+       (finally
+         (swap! trans-atom (partial reduce #(close %1 %2)) closeables))))
+
 (defn finish
   "Considers the transaction finished. Will deliver the promise specified by
 errors-promise once all Closeables have been closed, or immediately if they are

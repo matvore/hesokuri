@@ -30,13 +30,15 @@
                        (swap! trans error e)
                        42))))))
 
+(defn closeable [closed-atom index]
+  (reify
+    java.io.Closeable
+    (close [_] (swap! closed-atom #(conj % index)))))
+
 (deftest test-has-error-and-has-open-and-throws-exception
   (let [closed (atom #{})
-        closeable (fn [i] (reify
-                            java.io.Closeable
-                            (close [_] (swap! closed #(conj % i)))))
-        opened-1 (closeable 1)
-        opened-2 (closeable 2)
+        opened-1 (closeable closed 1)
+        opened-2 (closeable closed 2)
         error-1 (Exception. "1")
         error-2 (Exception. "2")
         res (transact
@@ -48,6 +50,17 @@
                (throw error-2)))]
     (is (= [nil [error-1 error-2]] res))
     (is (= #{1 2} @closed))))
+
+(deftest test-with-closeables-closes-after-invoke
+  (let [closed (atom #{})
+        opened-1 (closeable closed 1)
+        opened-2 (closeable closed 2)
+        res (transact
+             (fn [trans]
+               (with-closeables trans [opened-1 opened-2]
+                 (fn [] [42 (:opened @trans)]))))]
+    (is (= #{1 2} @closed))
+    (is (= [[42 #{opened-1 opened-2}] []] res))))
 
 (deftest test-close-after-finish
   (let [some-error (Exception. "error")
