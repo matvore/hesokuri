@@ -43,9 +43,7 @@ will not be read from the repository until it is accessed."
                    (when (= type "40000")
                      [(read-tree* git git-dir hash trans)]))))
         (lazy-seq (swap! trans transact/close stdout)
-                  (git/if-error cat-tree
-                                #(throw (ex-info "git failed to read tree."
-                                                 {:summary %})))
+                  (git/throw-if-error cat-tree)
                   nil)))))
 
 (defn write-tree*
@@ -70,9 +68,7 @@ of the tree that was written."
           (git/write-tree-entry stdin [type name new-hash])))
       (.close stdin)
       (first [(cstr/trim (slurp stdout))
-              (git/if-error cat-tree
-                            #(throw (ex-info "git failed to write tree."
-                                             {:summary %})))])
+              (git/throw-if-error cat-tree)])
       (finally (.close stdin)
                (.close stdout)))))
 

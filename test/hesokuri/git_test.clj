@@ -135,7 +135,8 @@
     (write-blob "git" (create-temp-dir) (.getBytes "asdf" "UTF-8"))
     (throw (ex-info "should have thrown" {}))
     (catch clojure.lang.ExceptionInfo e
-      (is (= (.getMessage e) "git failed to write blob.")))))
+      (is (not= -1 (.indexOf (.getMessage e) "hash-object -w --stdin")))
+      (is (not= -1 (.indexOf ((ex-data e) :err) "Not a git repository"))))))
 
 (defn tree-entry-bytes [entry-type filename hash-cycle-bytes]
   (concat (.getBytes (str entry-type " " filename "\u0000") "UTF-8")

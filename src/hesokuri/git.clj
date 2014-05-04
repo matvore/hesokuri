@@ -22,7 +22,7 @@ to Hesokuri logic."
         hesokuri.util))
 
 (declare args
-         if-error
+         throw-if-error
          invoke-streams
          invoke-with-summary)
 
@@ -105,9 +105,7 @@ clojure.java.io/IOFactory which is the blob data to be written."
       (clojure.java.io/copy in blob-in)
       (.close blob-in)
       (first [(trim (slurp blob-out))
-              (if-error hash-blob
-                        #(throw (ex-info "git failed to write blob."
-                                         {:summary %})))])
+              (throw-if-error hash-blob)])
       (finally (.close blob-in)
                (.close blob-out)))))
 
@@ -260,6 +258,13 @@ if-error returns nil."
   (let [{:keys [err exit]} @finish]
     (when (or (not= 0 exit) (not (empty? err)))
       (f (nth invoke-streams-res 3)))))
+
+(defn throw-if-error
+  "Similar to if-error, but rather than executing an arbitrary function on
+error, throws an ex-info whose message is the summary and the info map contains
+the exit code and stderr output entries from the invoke-streams promise map."
+  [[_ _ finish :as invoke-streams-res]]
+  (if-error invoke-streams-res #(throw (ex-info % @finish))))
 
 (defn summary
   "Returns a user-readable summary of the result of 'invoke' as a string."
