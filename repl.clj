@@ -48,23 +48,6 @@ will not be read from the repository until it is accessed."
                                                  {:summary %})))
                   nil)))))
 
-(defn write-blob
-  "Writes a blob to the given Git repository. in is an instance of
-clojure.java.io/IOFactory which is the blob data to be written."
-  [git git-dir in]
-  (let [cat-blob-args (git/args git-dir ["hash-object" "-w" "--stdin"])
-        [blob-in blob-out :as cat-blob]
-        (git/invoke-streams git cat-blob-args)]
-    (try
-      (cjio/copy in blob-in)
-      (.close blob-in)
-      (first [(cstr/trim (slurp blob-out))
-              (git/if-error cat-blob
-                            #(throw (ex-info "git failed to write blob."
-                                             {:summary %})))])
-      (finally (.close blob-in)
-               (.close blob-out)))))
-
 (defn write-tree*
   "Writes a tree into a Git repository. The tree is a structure similar to that
 returned by read-tree*, but for each blob or tree that must be updated, the hash
@@ -83,7 +66,7 @@ of the tree that was written."
               (cond
                hash hash
                (= type "40000") (write-tree* git git-dir replace)
-               :else (write-blob git git-dir replace))]
+               :else (git/write-blob git git-dir replace))]
           (git/write-tree-entry stdin [type name new-hash])))
       (.close stdin)
       (first [(cstr/trim (slurp stdout))

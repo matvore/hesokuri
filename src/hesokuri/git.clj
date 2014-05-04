@@ -17,11 +17,13 @@
 to Hesokuri logic."
   (:require clojure.java.io
             clojure.java.shell)
-  (:use [clojure.string :only [join split]]
+  (:use [clojure.string :only [join split trim]]
         clojure.tools.logging
         hesokuri.util))
 
 (declare args
+         if-error
+         invoke-streams
          invoke-with-summary)
 
 (defn hex-char-val
@@ -91,6 +93,23 @@ read."
       out
       (throw (ex-info "git failed to read the blob."
                       {:summary (second res-sum)})))))
+
+(defn write-blob
+  "Writes a blob to the given Git repository. in is an instance of
+clojure.java.io/IOFactory which is the blob data to be written."
+  [git git-dir in]
+  (let [hash-blob-args (args git-dir ["hash-object" "-w" "--stdin"])
+        [blob-in blob-out :as hash-blob]
+        (invoke-streams git hash-blob-args)]
+    (try
+      (clojure.java.io/copy in blob-in)
+      (.close blob-in)
+      (first [(trim (slurp blob-out))
+              (if-error hash-blob
+                        #(throw (ex-info "git failed to write blob."
+                                         {:summary %})))])
+      (finally (.close blob-in)
+               (.close blob-out)))))
 
 (defn read-tree-entry
   "Reads an entry from a Git tree object. Returns a sequence with at least three

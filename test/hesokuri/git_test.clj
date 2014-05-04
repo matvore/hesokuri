@@ -124,6 +124,19 @@
       (is (= {:exit 0 :err ""} @finish))
       (is (= "hello Git" (read-blob "git" git-dir hash))))))
 
+(deftest test-write-blob-success
+  (with-temp-repo [git-dir]
+    (let [blob-hash (write-blob "git" git-dir (.getBytes "asdf" "UTF-8"))]
+      (is (= "5e40c0877058c504203932e5136051cf3cd3519b" blob-hash))
+      (is (= "asdf" (read-blob "git" git-dir blob-hash))))))
+
+(deftest test-write-blob-failure
+  (try
+    (write-blob "git" (create-temp-dir) (.getBytes "asdf" "UTF-8"))
+    (throw (ex-info "should have thrown" {}))
+    (catch clojure.lang.ExceptionInfo e
+      (is (= (.getMessage e) "git failed to write blob.")))))
+
 (defn tree-entry-bytes [entry-type filename hash-cycle-bytes]
   (concat (.getBytes (str entry-type " " filename "\u0000") "UTF-8")
           (cycle-bytes hash-cycle-bytes 20)))
