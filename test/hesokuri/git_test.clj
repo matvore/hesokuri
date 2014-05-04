@@ -13,8 +13,10 @@
 ; limitations under the License.
 
 (ns hesokuri.git-test
-  (:require clojure.java.io)
-  (:use clojure.test
+  (:require clojure.java.io
+            [hesokuri.transact :as transact])
+  (:use [clojure.string :only [trim]]
+        clojure.test
         hesokuri.git
         hesokuri.testing.temp)
   (:import [clojure.lang ExceptionInfo]
@@ -175,6 +177,39 @@
       (thrown? ExceptionInfo (doall (do-read byte-count)))
       20
       (+ 20 (count entry-1-bytes)))))
+
+(defn binary-hash [hash]
+  (let [baos (java.io.ByteArrayOutputStream.)]
+    (write-binary-hash hash baos)
+    (ArrayBackedHash. (.toByteArray baos))))
+
+(deftest test-read-tree*
+  (with-temp-repo [git-dir]
+    (let [blob-1-hash (write-blob "git" git-dir (.getBytes "blob-1" "UTF-8"))
+          blob-2-hash (write-blob "git" git-dir (.getBytes "blob-2" "UTF-8"))
+          hash-args (args git-dir ["hash-object" "-w" "--stdin" "-t" "tree"])
+          [subt-in subt-out :as hash-subt] (invoke-streams "git" hash-args)
+          [tree-in tree-out :as hash-tree] (invoke-streams "git" hash-args)]
+      (future
+        (write-tree-entry subt-in ["100644" "subfoo" blob-1-hash])
+        (write-tree-entry subt-in ["100644" "subbar" blob-2-hash])
+        (.close subt-in))
+      (write-tree-entry tree-in ["100644" "foo" blob-1-hash])
+      (write-tree-entry tree-in ["100644" "bar" blob-2-hash])
+      (let [subt-hash (trim (slurp subt-out))]
+        (write-tree-entry tree-in ["40000" "subt" subt-hash])
+        (.close tree-in)
+        (let [tree-hash (trim (slurp tree-out))]
+          (throw-if-error hash-subt)
+          (throw-if-error hash-tree)
+          (transact/transact
+           (fn [trans]
+             (is (= [["100644" "foo" (binary-hash blob-1-hash)]
+                     ["100644" "bar" (binary-hash blob-2-hash)]
+                     ["40000" "subt" (binary-hash subt-hash)
+                      [["100644" "subfoo" (binary-hash blob-1-hash)]
+                       ["100644" "subbar" (binary-hash blob-2-hash)]]]]
+                    (read-tree* "git" git-dir tree-hash trans))))))))))
 
 (deftest test-write-tree-entry
   (are [expected-bytes entry]

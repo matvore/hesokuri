@@ -16,7 +16,8 @@
   "Module that facilitates invoking git, and other Git utility code not specific
 to Hesokuri logic."
   (:require clojure.java.io
-            clojure.java.shell)
+            clojure.java.shell
+            [hesokuri.transact :as transact])
   (:use [clojure.string :only [join split trim]]
         clojure.tools.logging
         hesokuri.util))
@@ -133,6 +134,26 @@ function."
   (lazy-seq (let [entry (read-tree-entry in)]
               (when entry
                 (cons entry (read-tree in))))))
+
+(defn read-tree*
+  "Reads a tree object recursively and lazily from a Git repository. Returns a
+sequence of tree entries similar to those returned by read-tree. However, each
+(sub)tree entry (the entry itself being a sequence) has at least one extra item:
+the result of read-tree* for that subtree. The value is in a lazy-seq, so it
+will not be read from the repository until it is accessed."
+  [git git-dir tree-hash trans]
+  (let [git-args (args git-dir ["cat-file" "tree" (str tree-hash)])
+        [_ stdout :as cat-tree] (invoke-streams git git-args)]
+    (swap! trans transact/open stdout)
+    (concat
+     (for [[type _ hash :as info] (read-tree stdout)]
+       (concat info
+               (lazy-seq
+                (when (= type "40000")
+                  [(read-tree* git git-dir hash trans)]))))
+     (lazy-seq (swap! trans transact/close stdout)
+               (throw-if-error cat-tree)
+               nil))))
 
 (defn write-tree-entry
   "Write a tree entry to an output stream."
@@ -282,3 +303,11 @@ lazy."
   {:pre [(args? args)]}
   (let [result (invoke git args)]
     (cons result (lazy-seq [(summary args result)]))))
+
+(comment
+  ;; Recursively read a tree at the given hash
+  (let [hash "a9ef38249198b290668ebfb2e29ca5d528a88661"]
+    (transact/transact
+     (fn [trans]
+       (clojure.pprint/pprint
+        (read-tree* "git" "/Users/matvore/hesokuri/.git" hash trans))))))

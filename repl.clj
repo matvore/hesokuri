@@ -25,27 +25,6 @@
 
 (use 'clojure.repl)
 
-(defn read-tree*
-  "Reads a tree object recursively and lazily from a Git repository. Returns a
-sequence of tree entries similar to those returned by read-tree. However, each
-(sub)tree entry (the entry itself being a sequence) has at least one extra item:
-the result of read-tree* for that subtree. The value is in a lazy-seq, so it
-will not be read from the repository until it is accessed."
-  ([git git-dir tree-hash] (read-tree* git git-dir tree-hash (atom nil)))
-  ([git git-dir tree-hash trans]
-     (let [git-args (git/args git-dir ["cat-file" "tree" (str tree-hash)])
-           [_ stdout :as cat-tree] (git/invoke-streams git git-args)]
-       (swap! trans transact/open stdout)
-       (concat
-        (for [[type _ hash :as info] (git/read-tree stdout)]
-          (concat info
-                  (lazy-seq
-                   (when (= type "40000")
-                     [(read-tree* git git-dir hash trans)]))))
-        (lazy-seq (swap! trans transact/close stdout)
-                  (git/throw-if-error cat-tree)
-                  nil)))))
-
 (defn write-tree*
   "Writes a tree into a Git repository. The tree is a structure similar to that
 returned by read-tree*, but for each blob or tree that must be updated, the hash
@@ -73,10 +52,6 @@ of the tree that was written."
                (.close stdout)))))
 
 (comment
-  ;; Recursively read a tree at the given hash
-  (let [hash "a9ef38249198b290668ebfb2e29ca5d528a88661"]
-    (pprint (read-tree* "git" "/Users/matvore/hesokuri/.git" hash)))
-
   (write-tree* "git" "/Users/matvore/hesokuri/.git"
                [["100644" "foo" nil (.getBytes "at top dir\n")]
                 ["40000" "bar" nil [["100644" "file" nil
