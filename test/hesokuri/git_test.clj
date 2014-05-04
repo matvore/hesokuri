@@ -17,7 +17,8 @@
   (:use clojure.test
         hesokuri.git
         hesokuri.testing.temp)
-  (:import [hesokuri.git ArrayBackedHash]))
+  (:import [clojure.lang ExceptionInfo]
+           [hesokuri.git ArrayBackedHash]))
 
 (def pretend-hash "aaaaaaaaaabbbbbbbbbbccccccccccffffffffff")
 
@@ -73,12 +74,14 @@
       (let [source-bytes (cycle-bytes source-cycle source-count)
             source-stream (byte-stream source-bytes)
             next-byte (or (get source-bytes 20) -1)
-            [hash lack] (read-hash source-stream)
+            do-read #(read-hash source-stream)
 
-            expected-bytes
-            (byte-array (take 20 (concat source-bytes (repeat 0))))]
-        (is (= (new ArrayBackedHash expected-bytes) hash))
-        (is (= (- 20 (min 20 (count source-bytes))) lack))
+            expected-hash
+            #(ArrayBackedHash.
+              (byte-array (take 20 (concat source-bytes (repeat 0)))))]
+        (if (< source-count 20)
+          (is (thrown? ExceptionInfo (do-read)))
+          (is (= (expected-hash) (do-read))))
         ;; Make sure read-hash does not read more bytes than needed.
         (is (= next-byte (.read source-stream))))
     [0] 0
@@ -109,7 +112,7 @@
 (deftest read-blob-error
   (with-temp-repo [git-dir]
     (is (full-hash? pretend-hash))
-    (is (nil? (read-blob "git" git-dir pretend-hash)))))
+    (is (thrown? ExceptionInfo (read-blob "git" git-dir pretend-hash)))))
 
 (deftest read-blob-success
   (with-temp-repo [git-dir]
@@ -128,13 +131,18 @@
 (deftest test-read-tree-entry
   (let [entry-bytes (tree-entry-bytes "12345" "filename" [0x01 0x02])]
     (loop [source-len 0]
-      (let [source (byte-stream (take source-len entry-bytes))]
-        (if (< source-len (count entry-bytes))
-          (do (is (nil? (read-tree-entry source))
-                  (str "Read only first " source-len " bytes of entry"))
-              (recur (inc source-len)))
-          (is (= ["12345" "filename" (cycle-bytes-hash [1 2])]
-                 (read-tree-entry source))))))))
+      (let [do-read
+            #(read-tree-entry (byte-stream (take source-len entry-bytes)))]
+        (cond
+         (zero? source-len) (is (nil? (do-read)))
+
+         (< source-len (count entry-bytes))
+         (do (is (thrown? ExceptionInfo (do-read))
+                 (str "Read only first " source-len " bytes of entry"))
+             (recur (inc source-len)))
+
+         :else (is (= ["12345" "filename" (cycle-bytes-hash [1 2])]
+                      (do-read))))))))
 
 (def entry-1-bytes (tree-entry-bytes "1" "file1" [0x01 0x10]))
 (def entry-2-bytes (tree-entry-bytes "2" "file2" [0x02 0x20]))
@@ -142,15 +150,17 @@
 (deftest test-read-tree
   (let [bytes (concat entry-1-bytes entry-2-bytes)
         entries [(read-tree-entry (byte-stream entry-1-bytes))
-                 (read-tree-entry (byte-stream entry-2-bytes))]]
+                 (read-tree-entry (byte-stream entry-2-bytes))]
+        do-read #(read-tree (byte-stream (take % bytes)))]
     (are [entry-count byte-count]
-        (= (take entry-count entries)
-           (read-tree (byte-stream (take byte-count bytes))))
+      (= (take entry-count entries) (do-read byte-count))
       0 0
-      0 20
       1 (count entry-1-bytes)
-      1 (+ 20 (count entry-2-bytes))
-      2 (+ (count entry-1-bytes) (count entry-2-bytes)))))
+      2 (+ (count entry-1-bytes) (count entry-2-bytes)))
+    (are [ex-info-map byte-count]
+      (thrown? ExceptionInfo (doall (do-read byte-count)))
+      20
+      (+ 20 (count entry-1-bytes)))))
 
 (deftest test-write-tree-entry
   (are [expected-bytes entry]
@@ -165,12 +175,14 @@
 (deftest test-read-commit
   (let [hash-1 (str (cycle-bytes-hash [1 2 3]))
         hash-2 (str (cycle-bytes-hash [4 5 6]))
-        msg "heading\n\ndetails"]
+        msg "heading\n\ndetails"
+        do-read #(-> (apply str %)
+                     (.getBytes "UTF-8")
+                     java.io.ByteArrayInputStream.
+                     read-commit
+                     doall)]
     (are [result commit-text]
-      (is (= result (-> (apply str commit-text)
-                        (.getBytes "UTF-8")
-                        java.io.ByteArrayInputStream.
-                        read-commit)))
+      (= result (do-read commit-text))
       [["tree" hash-1]
        ["parent" hash-2]
        ["author" person]
@@ -180,17 +192,15 @@
        "parent " hash-2 "\n"
        "author " person "\n"
        "committer " person "\n\n"
-       msg]
-
-      [["tree" hash-1]]
+       msg])
+    (are [commit-text]
+      (thrown? ExceptionInfo (do-read commit-text))
       ["tree " hash-1 "\n"
-       "parent " "01234"]
+       "parent 01234"]
 
-      [["tree" hash-1]]
       ["tree " hash-1 "\n"
        "parent"]
 
-      []
       [])))
 
 (defn commit-entry-string [e]

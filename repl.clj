@@ -43,27 +43,27 @@ will not be read from the repository until it is accessed."
                    (when (= type "40000")
                      [(read-tree* git git-dir hash trans)]))))
         (lazy-seq (swap! trans transact/close stdout)
-                  (git/if-error cat-tree #(swap! trans transact/error
-                                                 (java.io.IOException. %)))
+                  (git/if-error cat-tree
+                                #(throw (ex-info "git failed to read tree."
+                                                 {:summary %})))
                   nil)))))
 
 (defn write-blob
   "Writes a blob to the given Git repository. in is an instance of
 clojure.java.io/IOFactory which is the blob data to be written."
-  ([git git-dir in] (write-blob git git-dir in (atom nil)))
-  ([git git-dir in trans]
-     (let [cat-blob-args (git/args git-dir ["hash-object" "-w" "--stdin"])
-           [blob-in blob-out :as cat-blob]
-           (git/invoke-streams git cat-blob-args)]
-       (try
-         (transact/with-closeables trans
-           [blob-in blob-out]
-           (fn []
-             (cjio/copy in blob-in)
-             (.close blob-in)
-             (cstr/trim (slurp blob-out))))
-         (finally (git/if-error cat-blob #(swap! trans transact/error
-                                                 (java.io.IOException. %))))))))
+  [git git-dir in]
+  (let [cat-blob-args (git/args git-dir ["hash-object" "-w" "--stdin"])
+        [blob-in blob-out :as cat-blob]
+        (git/invoke-streams git cat-blob-args)]
+    (try
+      (cjio/copy in blob-in)
+      (.close blob-in)
+      (first [(cstr/trim (slurp blob-out))
+              (git/if-error cat-blob
+                            #(throw (ex-info "git failed to write blob."
+                                             {:summary %})))])
+      (finally (.close blob-in)
+               (.close blob-out)))))
 
 (defn write-tree*
   "Writes a tree into a Git repository. The tree is a structure similar to that
@@ -73,26 +73,25 @@ clojure.java.io/IOFactory instance is after the nil value. For each tree that
 must be updated, a the original tree structure (usually after the hash) has been
 replaced with a different one of the same format. This function returns the Hash
 of the tree that was written."
-  ([git git-dir tree] (write-tree* git git-dir tree (atom nil)))
-  ([git git-dir tree trans]
-     (let [cat-tree-args (git/args git-dir ["hash-object" "-w" "--stdin" "-t"
-                                            "tree"])
-           [stdin stdout :as cat-tree] (git/invoke-streams git cat-tree-args)]
-       (try
-         (transact/with-closeables trans
-           [stdin stdout]
-           (fn []
-             (doseq [[type name hash replace] tree]
-               (let [new-hash
-                     (cond
-                      hash hash
-                      (= type "40000") (write-tree* git git-dir replace trans)
-                      :else (write-blob git git-dir replace trans))]
-                 (git/write-tree-entry stdin [type name new-hash])))
-             (.close stdin)
-             (cstr/trim (slurp stdout))))
-         (finally (git/if-error cat-tree #(swap! trans transact/error
-                                                 (java.io.IOException. %))))))))
+  [git git-dir tree]
+  (let [cat-tree-args (git/args git-dir ["hash-object" "-w" "--stdin" "-t"
+                                         "tree"])
+        [stdin stdout :as cat-tree] (git/invoke-streams git cat-tree-args)]
+    (try
+      (doseq [[type name hash replace] tree]
+        (let [new-hash
+              (cond
+               hash hash
+               (= type "40000") (write-tree* git git-dir replace)
+               :else (write-blob git git-dir replace))]
+          (git/write-tree-entry stdin [type name new-hash])))
+      (.close stdin)
+      (first [(cstr/trim (slurp stdout))
+              (git/if-error cat-tree
+                            #(throw (ex-info "git failed to write tree."
+                                             {:summary %})))])
+      (finally (.close stdin)
+               (.close stdout)))))
 
 (comment
   ;; Recursively read a tree at the given hash

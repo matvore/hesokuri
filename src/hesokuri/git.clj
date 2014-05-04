@@ -70,38 +70,43 @@ and formatted correctly."))
 
 (defn read-hash
   "Reads SHA1 hash bytes from an InputStream into a new object supporting the
-Hash protocol. Returns a sequence with at least two values: the Hash object
-containing the SHA1 hash bytes that were read, and the number of bytes lacking
-to make a complete hash (will be non-zero if EOF was reached before the end of
-the hash.)"
+Hash protocol. Returns a Hash object containing the SHA1 hash bytes that were
+read. Throws an ex-info if the EOF was reached before a full hash could be
+read."
   [in]
-  (let [result (byte-array 20)]
-    [(new ArrayBackedHash result) (- 20 (max 0 (.read in result)))]))
+  (let [result (byte-array 20)
+        bytes-read (.read in result)]
+    (when (not= 20 bytes-read)
+      (throw (ex-info "Could not read a full hash."
+                      {:lack (- 20 (max 0 bytes-read))})))
+    (new ArrayBackedHash result)))
 
 (defn read-blob
-  "Reads a blob as a String. Returns nil if any error occurred."
+  "Reads a blob as a String."
   [git git-dir blob-hash]
   (let [[{:keys [exit err out]} :as res-sum]
         (invoke-with-summary
          git (args git-dir ["cat-file" "blob" (str blob-hash)]))]
     (if (and (zero? exit) (empty? err))
       out
-      (do (error (second res-sum))
-          nil))))
+      (throw (ex-info "git failed to read the blob."
+                      {:summary (second res-sum)})))))
 
 (defn read-tree-entry
   "Reads an entry from a Git tree object. Returns a sequence with at least three
 elements: the type as a String (e.g. '100644', which is a file with the
 permission bits set to 644), the name of the entry (e.g. README.md) and a Hash
-object corresponding to the hash. If an entry could not be read due to EOF at
-any point during the read, returns nil."
+object corresponding to the hash. If there are no entries left in the stream,
+returns nil."
   [in]
   (let [[type-file-str term] (read-until in zero?)
-        type-and-file (split type-file-str #" " 2)
-        [hash lack] (read-hash in)]
-    (when (and (not= -1 term)
-               (zero? lack))
-      (concat type-and-file [hash]))))
+        type-and-file (split type-file-str #" " 2)]
+    (cond
+     (= [type-file-str term] ["" -1]) nil
+     (= -1 term)
+     (throw (ex-info "Reached EOF while reading entry type and file name."
+                     {:type-and-file type-and-file}))
+     :else (conj type-and-file (read-hash in)))))
 
 (defn read-tree
   "Reads all the entries from a Git tree object, and returns a lazy sequence.
@@ -145,8 +150,13 @@ KEY           VALUE
 
       (= nt sp)
       (let [[value vt] (read-until in #{nl})]
-        (when (= vt nl)
-          (cons [name value] (read-commit in))))))))
+        (when (not= vt nl)
+          (throw (ex-info "Commit field does not end with newline."
+                          {:name name :value value :vt vt})))
+        (cons [name value] (read-commit in)))
+
+      :else (throw (ex-info "Unexpected pattern in commit field."
+                            {:name name :nt nt}))))))
 
 (defn write-commit-entry
   "Writes a single commit entry to the given OutputStream. A commit entry is a
