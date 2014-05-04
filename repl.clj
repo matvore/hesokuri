@@ -18,6 +18,7 @@
 ;;;; thoroughly unit tested.
 
 (require '[clojure.java.io :as cjio])
+(require '[clojure.reflect :as cref])
 (require '[clojure.string :as cstr])
 (require '[clojure.tools.logging :as ctl])
 (require '[hesokuri.git :as git])
