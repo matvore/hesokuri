@@ -265,7 +265,7 @@
   (with-temp-repo [repo-dir git-dir-flag]
     (let [[in out finish :as result]
           (invoke-streams "git" [git-dir-flag "hash-object" "-w" "--stdin"])]
-      (spit in "hello\n")
+      (.write in (.getBytes "hello\n" "UTF-8"))
       (is (not (realized? finish)))
       (.close in)
       (is (= "ce013625030ba8dba906f756967f9e9ca394464a\n" (slurp out)))
