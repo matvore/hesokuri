@@ -263,16 +263,31 @@
        "parent " hash-2 "\n"
        "author " person "\n"
        "committer " person "\n\n"
-       msg])
+       msg]
+
+      []
+      [])
     (are [commit-text]
       (thrown? ExceptionInfo (do-read commit-text))
       ["tree " hash-1 "\n"
        "parent 01234"]
 
       ["tree " hash-1 "\n"
-       "parent"]
+       "parent"])))
 
-      [])))
+(deftest test-read-commit-transact
+  (with-temp-repo [git-dir]
+    (transact/transact
+     (fn [trans]
+       (is (= 0 (count @trans)))
+       (let [c (read-commit git-dir pretend-hash trans)
+             err-substr (str "cat-file commit " pretend-hash)]
+         (is (= 1 (count @trans)))
+         (try
+           (doseq [e c] nil)
+           (throw (ex-info "should have thrown"))
+           (catch ExceptionInfo e
+             (is (not= -1 (.indexOf (.getMessage e) err-substr))))))))))
 
 (defn commit-entry-string [e]
   (let [baos (new java.io.ByteArrayOutputStream)]

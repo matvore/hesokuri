@@ -194,35 +194,53 @@ of the tree that was written."
                   (.close stdout))))))
 
 (defn read-commit
-  "Reads commit information lazily from the given InputStream. Returns a lazyseq
-Where each element is a sequence with at least two elements: the key and the
-value. They are returned in the same order they appear in the commit. The possible
-keys/values are:
+  "Reads commit information lazily from an InputStream or by invoking git.
+Returns a lazyseq where each element is a sequence with at least two elements:
+the key and the value. They are returned in the same order they appear in the
+commit. The possible keys/values are:
+
 KEY           VALUE
 \"tree\"      Hash
 \"parent\"    Hash
 \"author\"    exact String containing author name and time
 \"committer\" same as above, but for committer
 :msg          String containing commit message
-"
-  [^java.io.InputStream in]
-  (lazy-seq
-   (let [nl (int \newline)
-         sp (int \space)
-         [name nt] (read-until in #{sp nl})]
-     (cond
-      (= [name nt] ["" nl])
-      [(lazy-cat [:msg] [(first (read-until in))])]
 
-      (= nt sp)
-      (let [[value vt] (read-until in #{nl})]
-        (when (not= vt nl)
-          (throw (ex-info "Commit field does not end with newline."
-                          {:name name :value value :vt vt})))
-        (cons [name value] (read-commit in)))
+When invoked with an InputStream, this function only reads from the InputStream
+and returns an equivalent lazy-seq. When invoked with a git-dir and commit-hash,
+associates the read with a transaction so the stream will be closed
+automatically when the transaction is over, and checks for errors in the git
+process, and throws an ex-info if one is encountered."
+  ([git-dir commit-hash trans] (read-commit "git" git-dir commit-hash trans))
+  ([git git-dir commit-hash trans]
+     (let [cat-commit-args (args git-dir ["cat-file" "commit" commit-hash])
+           [_ stdout :as cat-commit] (invoke-streams git cat-commit-args)]
+       (swap! trans transact/open stdout)
+       (concat (read-commit stdout)
+               (lazy-seq (do (swap! trans transact/close stdout)
+                             (throw-if-error cat-commit)
+                             nil)))))
+  ([^java.io.InputStream in]
+     (lazy-seq
+      (let [nl (int \newline)
+            sp (int \space)
+            [name nt] (read-until in #{sp nl})]
+        (cond
+         (= [name nt] ["" -1])
+         nil
 
-      :else (throw (ex-info "Unexpected pattern in commit field."
-                            {:name name :nt nt}))))))
+         (= [name nt] ["" nl])
+         [(lazy-cat [:msg] [(first (read-until in))])]
+
+         (= nt sp)
+         (let [[value vt] (read-until in #{nl})]
+           (when (not= vt nl)
+             (throw (ex-info "Commit field does not end with newline."
+                             {:name name :value value :vt vt})))
+           (cons [name value] (read-commit in)))
+
+         :else (throw (ex-info "Unexpected pattern in commit field."
+                               {:name name :nt nt})))))))
 
 (defn write-commit-entry
   "Writes a single commit entry to the given OutputStream. A commit entry is a
