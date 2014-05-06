@@ -209,7 +209,7 @@
                      ["40000" "subt" (binary-hash subt-hash)
                       [["100644" "subfoo" (binary-hash blob-1-hash)]
                        ["100644" "subbar" (binary-hash blob-2-hash)]]]]
-                    (read-tree* "git" git-dir tree-hash trans))))))))))
+                    (read-tree* git-dir tree-hash trans))))))))))
 
 (deftest test-write-tree-entry
   (are [expected-bytes entry]
@@ -218,6 +218,28 @@
          (is (= expected-bytes (into [] (.toByteArray baos)))))
        entry-1-bytes ["1" "file1" (cycle-bytes-hash [0x01 0x10])]
        entry-2-bytes ["2" "file2" (cycle-bytes-hash [0x02 0x20])]))
+
+(deftest test-write-tree*
+  (with-temp-repo [git-dir]
+    (transact/transact
+     (fn [trans]
+       (let [hash-1 (binary-hash "582390cd4d97e31fa8749fd8b2748a7faaca0adc")
+             hash-2 (binary-hash "d63488fe511f63c7c746c15447ac3e08c31cc023")
+             hash-3 (binary-hash "d2cebd4f0a9e97a48a6139d09cafdb513ad8fee3")
+             at-top-dir (.getBytes "at top dir\n" "UTF-8")
+             in-dir (.getBytes "in dir\n" "UTF-8")
+             hash (write-tree* git-dir
+                               [["100644" "foo" nil at-top-dir]
+                                ["40000" "bar" nil [["100644" "file" nil
+                                                     in-dir]]]])]
+         (is (= "1fd6436bd031da537877d1531ac474a939e907fb" hash))
+         (is (= [["100644" "foo" hash-1]
+                 ["40000" "bar" hash-2
+                  [["100644" "file" hash-3]]]]
+                (read-tree* git-dir hash trans))))
+       (let [hash (write-tree* git-dir [])]
+         (is (= "4b825dc642cb6eb9a060e54bf8d69288fbee4904" hash))
+         (is (= [] (read-tree* git-dir hash trans))))))))
 
 (def person "John Doe <jdoe@google.com> 1398561813 -0700")
 

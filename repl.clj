@@ -25,35 +25,3 @@
 (require '[hesokuri.transact :as transact])
 
 (use 'clojure.repl)
-
-(defn write-tree*
-  "Writes a tree into a Git repository. The tree is a structure similar to that
-returned by read-tree*, but for each blob or tree that must be updated, the hash
-has been replaced with nil. For each blob that must be updated, a
-clojure.java.io/IOFactory instance is after the nil value. For each tree that
-must be updated, a the original tree structure (usually after the hash) has been
-replaced with a different one of the same format. This function returns the Hash
-of the tree that was written."
-  [git git-dir tree]
-  (let [cat-tree-args (git/args git-dir ["hash-object" "-w" "--stdin" "-t"
-                                         "tree"])
-        [stdin stdout :as cat-tree] (git/invoke-streams git cat-tree-args)]
-    (try
-      (doseq [[type name hash replace] tree]
-        (let [new-hash
-              (cond
-               hash hash
-               (= type "40000") (write-tree* git git-dir replace)
-               :else (git/write-blob git git-dir replace))]
-          (git/write-tree-entry stdin [type name new-hash])))
-      (.close stdin)
-      (first [(cstr/trim (slurp stdout))
-              (git/throw-if-error cat-tree)])
-      (finally (.close stdin)
-               (.close stdout)))))
-
-(comment
-  (write-tree* "git" "/Users/matvore/hesokuri/.git"
-               [["100644" "foo" nil (.getBytes "at top dir\n")]
-                ["40000" "bar" nil [["100644" "file" nil
-                                     (.getBytes "in dir\n")]]]]))

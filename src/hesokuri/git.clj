@@ -141,19 +141,20 @@ sequence of tree entries similar to those returned by read-tree. However, each
 (sub)tree entry (the entry itself being a sequence) has at least one extra item:
 the result of read-tree* for that subtree. The value is in a lazy-seq, so it
 will not be read from the repository until it is accessed."
-  [git git-dir tree-hash trans]
-  (let [git-args (args git-dir ["cat-file" "tree" (str tree-hash)])
-        [_ stdout :as cat-tree] (invoke-streams git git-args)]
-    (swap! trans transact/open stdout)
-    (concat
-     (for [[type _ hash :as info] (read-tree stdout)]
-       (concat info
-               (lazy-seq
-                (when (= type "40000")
-                  [(read-tree* git git-dir hash trans)]))))
-     (lazy-seq (swap! trans transact/close stdout)
-               (throw-if-error cat-tree)
-               nil))))
+  ([git-dir tree-hash trans] (read-tree* "git" git-dir tree-hash trans))
+  ([git git-dir tree-hash trans]
+     (let [git-args (args git-dir ["cat-file" "tree" (str tree-hash)])
+           [_ stdout :as cat-tree] (invoke-streams git git-args)]
+       (swap! trans transact/open stdout)
+       (concat
+        (for [[type _ hash :as info] (read-tree stdout)]
+          (concat info
+                  (lazy-seq
+                   (when (= type "40000")
+                     [(read-tree* git git-dir hash trans)]))))
+        (lazy-seq (swap! trans transact/close stdout)
+                  (throw-if-error cat-tree)
+                  nil)))))
 
 (defn write-tree-entry
   "Write a tree entry to an output stream."
@@ -164,6 +165,33 @@ will not be read from the repository until it is accessed."
     (write-bytes name)
     (.write 0))
   (write-binary-hash sha out))
+
+(defn write-tree*
+  "Writes a tree into a Git repository. The tree is a structure similar to that
+returned by read-tree*, but for each blob or tree that must be updated, the hash
+has been replaced with nil. For each blob that must be updated, a
+clojure.java.io/IOFactory instance is after the nil value. For each tree that
+must be updated, a the original tree structure (usually after the hash) has been
+replaced with a different one of the same format. This function returns the Hash
+of the tree that was written."
+  ([git-dir tree] (write-tree* "git" git-dir tree))
+  ([git git-dir tree]
+     (let [cat-tree-args (args git-dir ["hash-object" "-w" "--stdin" "-t"
+                                        "tree"])
+           [stdin stdout :as cat-tree] (invoke-streams git cat-tree-args)]
+       (try
+         (doseq [[type name hash replace] tree]
+           (let [new-hash
+                 (cond
+                  hash hash
+                  (= type "40000") (write-tree* git git-dir replace)
+                  :else (write-blob git git-dir replace))]
+             (write-tree-entry stdin [type name new-hash])))
+         (.close stdin)
+         (first [(trim (slurp stdout))
+                 (throw-if-error cat-tree)])
+         (finally (.close stdin)
+                  (.close stdout))))))
 
 (defn read-commit
   "Reads commit information lazily from the given InputStream. Returns a lazyseq
