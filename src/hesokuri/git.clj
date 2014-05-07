@@ -96,8 +96,9 @@ read."
                       {:summary (second res-sum)})))))
 
 (defn write-blob
-  "Writes a blob to the given Git repository. in is an instance of
-clojure.java.io/IOFactory which is the blob data to be written."
+  "Writes a blob to the given Git repository. in is passed as the first argument
+to clojure.java.io/copy to write the blob data, so it can be any type accepted
+by that function."
   [git git-dir in]
   (let [hash-blob-args (args git-dir ["hash-object" "-w" "--stdin"])
         [blob-in blob-out :as hash-blob]
@@ -166,15 +167,15 @@ will not be read from the repository until it is accessed."
     (.write 0))
   (write-binary-hash sha out))
 
-(defn write-tree*
+(defn write-tree
   "Writes a tree into a Git repository. The tree is a structure similar to that
 returned by read-tree*, but for each blob or tree that must be updated, the hash
-has been replaced with nil. For each blob that must be updated, a
-clojure.java.io/IOFactory instance is after the nil value. For each tree that
-must be updated, a the original tree structure (usually after the hash) has been
-replaced with a different one of the same format. This function returns the Hash
-of the tree that was written."
-  ([git-dir tree] (write-tree* "git" git-dir tree))
+has been replaced with nil. For each blob that must be updated, some value
+accepted by clojure.java.io/copy should be after the nil value. For each tree
+that must be updated, the original tree structure (usually after the hash) has
+been replaced with a different one of the same format. This function returns the
+Hash of the tree that was written."
+  ([git-dir tree] (write-tree "git" git-dir tree))
   ([git git-dir tree]
      (let [cat-tree-args (args git-dir ["hash-object" "-w" "--stdin" "-t"
                                         "tree"])
@@ -184,7 +185,7 @@ of the tree that was written."
            (let [new-hash
                  (cond
                   hash hash
-                  (= type "40000") (write-tree* git git-dir replace)
+                  (= type "40000") (write-tree git git-dir replace)
                   :else (write-blob git git-dir replace))]
              (write-tree-entry stdin [type name new-hash])))
          (.close stdin)

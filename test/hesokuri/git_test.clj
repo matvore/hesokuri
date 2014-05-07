@@ -13,7 +13,7 @@
 ; limitations under the License.
 
 (ns hesokuri.git-test
-  (:require clojure.java.io
+  (:require [clojure.java.io :as cjio]
             [hesokuri.transact :as transact])
   (:use [clojure.string :only [trim]]
         clojure.test
@@ -128,13 +128,13 @@
 
 (deftest test-write-blob-success
   (with-temp-repo [git-dir]
-    (let [blob-hash (write-blob "git" git-dir (.getBytes "asdf" "UTF-8"))]
+    (let [blob-hash (write-blob "git" git-dir "asdf")]
       (is (= "5e40c0877058c504203932e5136051cf3cd3519b" blob-hash))
       (is (= "asdf" (read-blob "git" git-dir blob-hash))))))
 
 (deftest test-write-blob-failure
   (try
-    (write-blob "git" (create-temp-dir) (.getBytes "asdf" "UTF-8"))
+    (write-blob "git" (create-temp-dir) "asdf")
     (throw (ex-info "should have thrown" {}))
     (catch clojure.lang.ExceptionInfo e
       (is (not= -1 (.indexOf (.getMessage e) "hash-object -w --stdin")))
@@ -185,8 +185,8 @@
 
 (deftest test-read-tree*
   (with-temp-repo [git-dir]
-    (let [blob-1-hash (write-blob "git" git-dir (.getBytes "blob-1" "UTF-8"))
-          blob-2-hash (write-blob "git" git-dir (.getBytes "blob-2" "UTF-8"))
+    (let [blob-1-hash (write-blob "git" git-dir "blob-1")
+          blob-2-hash (write-blob "git" git-dir "blob-2")
           hash-args (args git-dir ["hash-object" "-w" "--stdin" "-t" "tree"])
           [subt-in subt-out :as hash-subt] (invoke-streams "git" hash-args)
           [tree-in tree-out :as hash-tree] (invoke-streams "git" hash-args)]
@@ -219,25 +219,23 @@
        entry-1-bytes ["1" "file1" (cycle-bytes-hash [0x01 0x10])]
        entry-2-bytes ["2" "file2" (cycle-bytes-hash [0x02 0x20])]))
 
-(deftest test-write-tree*
+(deftest test-write-tree
   (with-temp-repo [git-dir]
     (transact/transact
      (fn [trans]
        (let [hash-1 (binary-hash "582390cd4d97e31fa8749fd8b2748a7faaca0adc")
              hash-2 (binary-hash "d63488fe511f63c7c746c15447ac3e08c31cc023")
              hash-3 (binary-hash "d2cebd4f0a9e97a48a6139d09cafdb513ad8fee3")
-             at-top-dir (.getBytes "at top dir\n" "UTF-8")
-             in-dir (.getBytes "in dir\n" "UTF-8")
-             hash (write-tree* git-dir
-                               [["100644" "foo" nil at-top-dir]
-                                ["40000" "bar" nil [["100644" "file" nil
-                                                     in-dir]]]])]
+             hash (write-tree git-dir
+                              [["100644" "foo" nil "at top dir\n"]
+                               ["40000" "bar" nil [["100644" "file" nil
+                                                     "in dir\n"]]]])]
          (is (= "1fd6436bd031da537877d1531ac474a939e907fb" hash))
          (is (= [["100644" "foo" hash-1]
                  ["40000" "bar" hash-2
                   [["100644" "file" hash-3]]]]
                 (read-tree* git-dir hash trans))))
-       (let [hash (write-tree* git-dir [])]
+       (let [hash (write-tree git-dir [])]
          (is (= "4b825dc642cb6eb9a060e54bf8d69288fbee4904" hash))
          (is (= [] (read-tree* git-dir hash trans))))))))
 
@@ -249,7 +247,7 @@
         msg "heading\n\ndetails"
         do-read #(-> (apply str %)
                      (.getBytes "UTF-8")
-                     java.io.ByteArrayInputStream.
+                     cjio/input-stream
                      read-commit
                      doall)]
     (are [result commit-text]
@@ -351,7 +349,7 @@
   (with-temp-repo [repo-dir git-dir-flag]
     (let [[in out finish :as result]
           (invoke-streams "git" [git-dir-flag "hash-object" "-w" "--stdin"])]
-      (.write in (.getBytes "hello\n" "UTF-8"))
+      (cjio/copy "hello\n" in)
       (is (not (realized? finish)))
       (.close in)
       (is (= "ce013625030ba8dba906f756967f9e9ca394464a\n" (slurp out)))
