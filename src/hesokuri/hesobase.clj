@@ -46,7 +46,7 @@ FOR EACH PEER
 -------------
 
 In file called 'port'
-An integer indicating the port on which the peer listens for Hesokuri
+A plain-text integer indicating the port on which the peer listens for Hesokuri
 connections.
 
 In file called 'repo-root'
