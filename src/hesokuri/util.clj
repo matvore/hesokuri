@@ -13,6 +13,7 @@
 ; limitations under the License.
 
 (ns hesokuri.util
+  (:require [clojure.java.io :as cjio])
   (:use clojure.tools.logging
         [clojure.string :only [trim]]))
 
@@ -135,3 +136,13 @@ If term? is omitted, reads until EOF."
     (.write s 0 (count s))
     (.flush))
   nil)
+
+;;; An implementation of clojure.java.io/IOFactory that supplies the bytes of the
+;;; String representation of a value.
+(defrecord StrBytes [s]
+  cjio/IOFactory
+  (make-input-stream [x opts]
+    (java.io.ByteArrayInputStream. (.getBytes (str s) "UTF-8")))
+  (make-reader [x opts]
+    (java.io.StringReader. (str s))))
+
