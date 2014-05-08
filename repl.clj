@@ -22,6 +22,28 @@
 (require '[clojure.string :as cstr])
 (require '[clojure.tools.logging :as ctl])
 (require '[hesokuri.git :as git])
+(require '[hesokuri.hesobase :as hesobase])
+(require '[hesokuri.ssh :as ssh])
 (require '[hesokuri.transact :as transact])
+(require '[ring.util.io :as ruio])
+(import '[java.io ObjectOutputStream OutputStream])
 
 (use 'clojure.repl)
+
+(defn public-key
+  "Coerces the given key to a java.security.PublicKey."
+  [key]
+  (cond
+   (instance? java.security.PublicKey key) key
+   (instance? java.security.KeyPair key) (.getPublic key)
+   (instance? java.security.PrivateKey key)
+    (throw (ex-info "Got a private key instead of public one."))
+   :else
+    (throw (ex-info (str "Do not know how to coerce to public key: "
+                         (class key))))))
+
+(defn serialize [^OutputStream out x]
+  (doto (ObjectOutputStream. out)
+    (.writeObject x)
+    (.flush))
+  nil)
