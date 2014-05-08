@@ -133,21 +133,17 @@ returns nil."
      :else (conj type-and-file (read-hash in)))))
 
 (defn read-tree
-  "Reads all the entries from a Git tree object, and returns a lazy sequence.
-The InputStream should not be used for anything else after passing it to this
-function."
-  [in]
-  (lazy-seq (let [entry (read-tree-entry in)]
-              (when entry
-                (cons entry (read-tree in))))))
-
-(defn read-tree*
   "Reads a tree object recursively and lazily from a Git repository. Returns a
-sequence of tree entries similar to those returned by read-tree. However, each
-(sub)tree entry (the entry itself being a sequence) has at least one extra item:
-the result of read-tree* for that subtree. The value is in a lazy-seq, so it
-will not be read from the repository until it is accessed."
-  ([git-dir tree-hash trans] (read-tree* "git" git-dir tree-hash trans))
+sequence of tree entries similar to those returned by read-tree-entry. However,
+if git-dir was passed to this function, each (sub)tree entry (the entry itself
+being a sequence) has at least one extra item: the result of read-tree for that
+subtree. The value is in a lazy-seq, so it will not be read from the repository
+until it is accessed.
+
+If in is passed, then in cannot be used to read anything else, but the caller is
+responsible for closing it."
+  ([in] (take-while some? (repeatedly #(read-tree-entry in))))
+  ([git-dir tree-hash trans] (read-tree "git" git-dir tree-hash trans))
   ([git git-dir tree-hash trans]
      (let [git-args (args git-dir ["cat-file" "tree" (str tree-hash)])
            [_ stdout :as cat-tree] (invoke-streams git git-args)]
@@ -157,7 +153,7 @@ will not be read from the repository until it is accessed."
           (concat info
                   (lazy-seq
                    (when (= type "40000")
-                     [(read-tree* git git-dir hash trans)]))))
+                     [(read-tree git git-dir hash trans)]))))
         (lazy-seq (swap! trans transact/close stdout)
                   (throw-if-error cat-tree)
                   nil)))))
@@ -174,7 +170,7 @@ will not be read from the repository until it is accessed."
 
 (defn write-tree
   "Writes a tree into a Git repository. The tree is a structure similar to that
-returned by read-tree*, but for each blob or tree that must be updated, the hash
+returned by read-tree, but for each blob or tree that must be updated, the hash
 has been replaced with nil. For each blob that must be updated, some value
 accepted as the third argument to write-blob should be after the nil value. For
 each tree that must be updated, the original tree structure (usually after the
@@ -362,4 +358,4 @@ lazy."
     (transact/transact
      (fn [trans]
        (clojure.pprint/pprint
-        (read-tree* "git" "/Users/matvore/hesokuri/.git" hash trans))))))
+        (read-tree "/Users/matvore/hesokuri/.git" hash trans))))))

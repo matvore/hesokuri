@@ -190,7 +190,7 @@
     (write-binary-hash hash baos)
     (ArrayBackedHash. (.toByteArray baos))))
 
-(deftest test-read-tree*
+(deftest test-read-tree
   (with-temp-repo [git-dir]
     (let [blob-1-hash (write-blob "git" git-dir "blob-1")
           blob-2-hash (write-blob "git" git-dir "blob-2")
@@ -216,7 +216,7 @@
                      ["40000" "subt" (binary-hash subt-hash)
                       [["100644" "subfoo" (binary-hash blob-1-hash)]
                        ["100644" "subbar" (binary-hash blob-2-hash)]]]]
-                    (read-tree* git-dir tree-hash trans))))))))))
+                    (read-tree git-dir tree-hash trans))))))))))
 
 (deftest test-write-tree-entry
   (are [expected-bytes entry]
@@ -241,10 +241,10 @@
          (is (= [["100644" "foo" hash-1]
                  ["40000" "bar" hash-2
                   [["100644" "file" hash-3]]]]
-                (read-tree* git-dir hash trans))))
+                (read-tree git-dir hash trans))))
        (let [hash (write-tree git-dir [])]
          (is (= "4b825dc642cb6eb9a060e54bf8d69288fbee4904" hash))
-         (is (= [] (read-tree* git-dir hash trans))))))))
+         (is (= [] (read-tree git-dir hash trans))))))))
 
 (def person "John Doe <jdoe@google.com> 1398561813 -0700")
 
