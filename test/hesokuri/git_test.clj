@@ -134,7 +134,7 @@
 
 (deftest test-write-blob-failure
   (try
-    (write-blob "git" (create-temp-dir) "asdf")
+    (write-blob "git" (create-temp-dir) "")
     (throw (ex-info "should have thrown" {}))
     (catch clojure.lang.ExceptionInfo e
       (is (not= -1 (.indexOf (.getMessage e) "hash-object -w --stdin")))
