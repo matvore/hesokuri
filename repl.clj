@@ -18,14 +18,32 @@
 ;;;; thoroughly unit tested.
 
 (require '[clojure.java.io :as cjio])
+(require '[clojure.pprint :as cppr])
 (require '[clojure.reflect :as cref])
 (require '[clojure.string :as cstr])
 (require '[clojure.tools.logging :as ctl])
+(require '[hesokuri.branch :as branch])
+(require '[hesokuri.config :as config])
+(require '[hesokuri.dynamic-config :as dynamic-config])
 (require '[hesokuri.git :as git])
+(require '[hesokuri.heartbeats :as heartbeats])
+(require '[hesokuri.heso :as heso])
 (require '[hesokuri.hesobase :as hesobase])
+(require '[hesokuri.main :as main])
+(require '[hesokuri.peer :as peer])
+(require '[hesokuri.peer-repo :as peer-repo])
+(require '[hesokuri.repo :as repo])
+(require '[hesokuri.see :as see])
+(require '[hesokuri.source :as source])
+(require '[hesokuri.source-def :as source-def])
 (require '[hesokuri.ssh :as ssh])
 (require '[hesokuri.transact :as transact])
+(require '[hesokuri.util :as util])
+(require '[hesokuri.validation :as validation])
+(require '[hesokuri.watcher :as watcher])
+(require '[hesokuri.web :as web])
 (require '[ring.util.io :as ruio])
+
 (import '[java.io ObjectOutputStream OutputStream])
 
 (use 'clojure.repl)
@@ -36,11 +54,11 @@
   (cond
    (instance? java.security.PublicKey key) key
    (instance? java.security.KeyPair key) (.getPublic key)
-   (instance? java.security.PrivateKey key)
-    (throw (ex-info "Got a private key instead of public one."))
    :else
-    (throw (ex-info (str "Do not know how to coerce to public key: "
-                         (class key))))))
+   (#(throw (ex-info % {:key key}))
+    (if (instance? java.security.PrivateKey key)
+      "Got a private key instead of public one."
+      (str "Do not know how to coerce class to public key: " (class key))))))
 
 (defn serialize [^OutputStream out x]
   (doto (ObjectOutputStream. out)
