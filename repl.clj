@@ -65,3 +65,16 @@
     (.writeObject x)
     (.flush))
   nil)
+
+(defn add-peer
+  "Adds a new peer to a configuration, and returns a new configuration that can
+be passed to hesokuri.git/write-tree.
+
+name: the name of the new peer
+key: the key of the new peer. Will be coerced to a public key with the
+    public-key function
+config-tree: the tree corresponding to the original configuration. Corresponds
+    to the the value returned by hesokuri.git/read-tree.
+"
+  [name key config-tree]
+  (git/add-blob ["peer" name "key"] #(serialize % (public-key key)) config-tree))
