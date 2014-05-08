@@ -96,15 +96,20 @@ read."
                       {:summary (second res-sum)})))))
 
 (defn write-blob
-  "Writes a blob to the given Git repository. in is passed as the first argument
-to clojure.java.io/copy to write the blob data, so it can be any type accepted
-by that function."
-  [git git-dir in]
+  "Writes a blob to the given Git repository. data represents the blob data. It
+can be one of the following, checked in this order:
+1. a function which, when called with an OutputStream, writes the blob data to
+   that stream. The function can close or flush the stream, but it need not.
+2. an argument that is passed as the first argument to clojure.java.io/copy to
+   write the blob data. 'data' can be any type accepted by that function."
+  [git git-dir data]
   (let [hash-blob-args (args git-dir ["hash-object" "-w" "--stdin"])
         [blob-in blob-out :as hash-blob]
         (invoke-streams git hash-blob-args)]
     (try
-      (clojure.java.io/copy in blob-in)
+      (if (fn? data)
+        (data blob-in)
+        (clojure.java.io/copy data blob-in))
       (.close blob-in)
       (first [(trim (slurp blob-out))
               (throw-if-error hash-blob)])
@@ -171,10 +176,10 @@ will not be read from the repository until it is accessed."
   "Writes a tree into a Git repository. The tree is a structure similar to that
 returned by read-tree*, but for each blob or tree that must be updated, the hash
 has been replaced with nil. For each blob that must be updated, some value
-accepted by clojure.java.io/copy should be after the nil value. For each tree
-that must be updated, the original tree structure (usually after the hash) has
-been replaced with a different one of the same format. This function returns the
-Hash of the tree that was written."
+accepted as the third argument to write-blob should be after the nil value. For
+each tree that must be updated, the original tree structure (usually after the
+hash) has been replaced with a different one of the same format. This function
+returns the Hash of the tree that was written."
   ([git-dir tree] (write-tree "git" git-dir tree))
   ([git git-dir tree]
      (let [cat-tree-args (args git-dir ["hash-object" "-w" "--stdin" "-t"

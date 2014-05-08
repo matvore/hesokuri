@@ -140,6 +140,13 @@
       (is (not= -1 (.indexOf (.getMessage e) "hash-object -w --stdin")))
       (is (not= -1 (.indexOf ((ex-data e) :err) "Not a git repository"))))))
 
+(deftest test-write-blob-data-is-fn
+  (with-temp-repo [git-dir]
+    (let [data-fn #(.write % (.getBytes "foo" "UTF-8"))
+          blob-hash (write-blob "git" git-dir data-fn)]
+      (is (= "19102815663d23f8b75a47e7a01965dcdc96468c" blob-hash))
+      (is (= "foo" (read-blob "git" git-dir blob-hash))))))
+
 (defn tree-entry-bytes [entry-type filename hash-cycle-bytes]
   (concat (.getBytes (str entry-type " " filename "\u0000") "UTF-8")
           (cycle-bytes hash-cycle-bytes 20)))
