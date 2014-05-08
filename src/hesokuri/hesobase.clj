@@ -55,7 +55,7 @@ to this base.
 
 In file called 'key'
 A Java-serialized instance of the RSA public key
-(result of (.getPublic (hesokuri.ssh/new-keypair)))
+(result of (.getPublic (hesokuri.ssh/new-key-pair)))
 
 Empty files named 'repo/{path}'
 The presence of the file indicates that the peer has a copy of the repo. This
