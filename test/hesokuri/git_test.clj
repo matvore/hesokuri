@@ -246,6 +246,52 @@
          (is (= "4b825dc642cb6eb9a060e54bf8d69288fbee4904" hash))
          (is (= [] (read-tree git-dir hash trans))))))))
 
+(deftest test-add-blob-blob-exists
+  (try
+    ;; Convert result to string to defeat laziness
+    (str (add-blob ["foo" "bar"] "asdf"
+                   [["40000" "foo" nil
+                     [["100644" "other-file" nil "asdf"]
+                      ["100644" "bar" nil "asdf"]]]]))
+    (throw (ex-info "Should have thrown." {}))
+    (catch ExceptionInfo e
+      (is (= (str "Cannot add blob or tree with name bar because a tree "
+                  "or blob with that name already exists.")
+             (.getMessage e)))
+      (is (= {:path ["bar"]
+              :blob-data "asdf"
+              :tree [["100644" "bar" nil "asdf"]]}
+             (ex-data e))))))
+
+(deftest test-add-blob-directory-exists-in-place-of-blob
+  (let [existing-tree ["40000" "bar" nil [["100644" "other-file" nil "asdf"]]]]
+    (try
+      ;; Convert result to string to defeat laziness
+      (str (add-blob ["foo" "bar"] "asdf"
+                     [["40000" "foo" nil
+                       [["100644" "other-file" nil "asdf"]
+                        existing-tree]]]))
+      (throw (ex-info "Should have thrown." {}))
+      (catch ExceptionInfo e
+        (is (= (str "Cannot add blob or tree with name bar because a tree "
+                    "or blob with that name already exists.")
+               (.getMessage e)))
+        (is (= {:path ["bar"]
+                :blob-data "asdf"
+                :tree [existing-tree]}
+               (ex-data e)))))))
+
+(deftest test-add-blob-no-tree
+  (is (= [["40000" "foo" nil [["100644" "bar" nil "new blob data"]]]]
+         (add-blob ["foo" "bar"] "new blob data"))))
+
+(deftest test-add-blob-into-existing-tree
+  (is (= [["40000" "foo" nil [["100644" "other-file" nil "existing blob"]
+                              ["100644" "bar" nil "new blob data"]]]]
+         (add-blob ["foo" "bar"] "new blob data"
+                   [["40000" "foo" nil
+                     [["100644" "other-file" nil "existing blob"]]]]))))
+
 (def person "John Doe <jdoe@google.com> 1398561813 -0700")
 
 (deftest test-read-commit

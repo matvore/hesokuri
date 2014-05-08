@@ -195,6 +195,47 @@ returns the Hash of the tree that was written."
          (finally (.close stdin)
                   (.close stdout))))))
 
+(defn add-blob
+  "Adds a blob to a tree. Automatically creates containing directories. Throws
+an ex-info if an entry at the given path already exists, or if a blob exists in
+place of a containing directory.
+path: the path, as a sequence of Strings, to the blob. The last String is the
+    actually name of the blob.
+blob-data: the blob-data, which is passed as the 'data' argument to write-blob
+tree: the tree to add the blob to. If omitted, effectively creates a new tree
+    with a single blob and as many levels of containing directories as needed to
+    realize the given path. This is a tree that should be returned from
+    read-tree."
+  ([path blob-data]
+     (let [pcount (count path)]
+       (if (zero? pcount)
+         blob-data
+         (lazy-seq
+          [[(if (= 1 pcount) "100644" "40000")
+            (first path)
+            nil
+            (add-blob (rest path) blob-data)]]))))
+  ([path blob-data tree]
+     (lazy-seq
+      (if (empty? tree)
+        (add-blob path blob-data)
+        (let [[[this-type this-name _ this-data]] tree]
+          (cond
+           (not= this-name (first path))
+            (cons (first tree) (add-blob path blob-data (rest tree)))
+           (or (= 1 (count path))
+               (not= this-type "40000"))
+            (throw (ex-info
+                    (str "Cannot add blob or tree with name " (first path)
+                         " because a tree or blob with that name already exists.")
+                    {:path path :blob-data blob-data :tree tree}))
+           :else
+            (cons ["40000"
+                   this-name
+                   nil
+                   (add-blob (rest path) blob-data this-data)]
+                  (rest tree))))))))
+
 (defn read-commit
   "Reads commit information lazily from an InputStream or by invoking git.
 Returns a lazyseq where each element is a sequence with at least two elements:
