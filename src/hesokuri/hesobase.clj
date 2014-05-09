@@ -49,10 +49,6 @@ In file called 'port'
 A plain-text integer indicating the port on which the peer listens for Hesokuri
 connections.
 
-In file called 'repo-root'
-The root path for all repositories, as a raw string. All repo paths are relative
-to this base.
-
 In file called 'key'
 A Java-serialized instance of the RSA public key
 (result of (.getPublic (hesokuri.ssh/new-key-pair)))
@@ -72,7 +68,8 @@ Empty files called 'live-edit/except/{branch-name}' (optional)
 List of branch names that are NOT considered live edit branches. Any branch not
 listed here IS a live edit branch.
 
-The live-edit/only and live-edit/except directories cannot both exist for a single repo.
+The live-edit/only and live-edit/except directories cannot both exist for a
+single repo.
 
 Empty files called 'unwanted/{branch-name}/{hash}' (optional)
 The presence of such a file tells Hesokuri to delete any branch where the {hash}
