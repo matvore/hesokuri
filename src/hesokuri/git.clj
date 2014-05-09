@@ -85,15 +85,20 @@ read."
     (new ArrayBackedHash result)))
 
 (defn read-blob
-  "Reads a blob as a String."
-  [git git-dir blob-hash]
-  (let [[{:keys [exit err out]} :as res-sum]
-        (invoke-with-summary
-         git (args git-dir ["cat-file" "blob" (str blob-hash)]))]
-    (if (and (zero? exit) (empty? err))
-      out
-      (throw (ex-info "git failed to read the blob."
-                      {:summary (second res-sum)})))))
+  "Reads a blob given its hash. stream-fn is called once with an InputStream
+that contains the data as a single argument. This function returns whatever
+stream-fn returns. If stream-fn is omitted, slurp is used (the blob is read into
+a String and returned.)"
+  ([git-dir blob-hash] (read-blob "git" git-dir blob-hash))
+  ([git git-dir blob-hash] (read-blob git git-dir blob-hash slurp))
+  ([git git-dir blob-hash stream-fn]
+     (let [[_ stdout :as cat-blob]
+           (invoke-streams
+            git (args git-dir ["cat-file" "blob" (str blob-hash)]))]
+       (first [(try
+                 (stream-fn stdout)
+                 (finally (.close stdout)))
+               (throw-if-error cat-blob)]))))
 
 (defn write-blob
   "Writes a blob to the given Git repository. data represents the blob data. It
@@ -102,19 +107,20 @@ can be one of the following, checked in this order:
    that stream. The function can close or flush the stream, but it need not.
 2. an argument that is passed as the first argument to clojure.java.io/copy to
    write the blob data. 'data' can be any type accepted by that function."
-  [git git-dir data]
-  (let [hash-blob-args (args git-dir ["hash-object" "-w" "--stdin"])
-        [blob-in blob-out :as hash-blob]
-        (invoke-streams git hash-blob-args)]
-    (try
-      (if (fn? data)
-        (data blob-in)
-        (clojure.java.io/copy data blob-in))
-      (.close blob-in)
-      (first [(trim (slurp blob-out))
-              (throw-if-error hash-blob)])
-      (finally (.close blob-in)
-               (.close blob-out)))))
+  ([git-dir data] (write-blob "git" git-dir data))
+  ([git git-dir data]
+     (let [hash-blob-args (args git-dir ["hash-object" "-w" "--stdin"])
+           [blob-in blob-out :as hash-blob]
+           (invoke-streams git hash-blob-args)]
+       (try
+         (try
+           (if (fn? data)
+             (data blob-in)
+             (clojure.java.io/copy data blob-in))
+           (finally (.close blob-in)))
+         (first [(trim (slurp blob-out))
+                 (throw-if-error hash-blob)])
+         (finally (.close blob-out))))))
 
 (defn read-tree-entry
   "Reads an entry from a Git tree object. Returns a sequence with at least three

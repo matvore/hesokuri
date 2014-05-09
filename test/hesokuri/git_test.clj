@@ -126,6 +126,12 @@
       (is (= {:exit 0 :err ""} @finish))
       (is (= "hello Git" (read-blob "git" git-dir hash))))))
 
+(deftest read-blob-custom-stream-fn
+  (with-temp-repo [git-dir]
+    (let [blob-hash (write-blob git-dir "A")
+          result (read-blob "git" git-dir blob-hash #(.read %))]
+      (is (= (int \A) result)))))
+
 (deftest test-write-blob-success
   (with-temp-repo [git-dir]
     (let [blob-hash (write-blob "git" git-dir "asdf")]
