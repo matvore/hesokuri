@@ -13,6 +13,7 @@
 ; limitations under the License.
 
 (ns hesokuri.util
+  (:import [java.io ByteArrayOutputStream OutputStream OutputStreamWriter])
   (:use clojure.tools.logging
         [clojure.string :only [trim]]))
 
@@ -120,7 +121,7 @@ conversion of baos to a string, and the terminator that was reached as an int
 (-1 for EOF).
 If term? is omitted, reads until EOF."
   ([in] (read-until in (constantly false)))
-  ([in term?] (read-until in term? (new java.io.ByteArrayOutputStream 128)))
+  ([in term?] (read-until in term? (ByteArrayOutputStream. 128)))
   ([in term? baos]
      (let [b (.read in)]
        (if (or (= b -1) (term? b))
@@ -129,9 +130,11 @@ If term? is omitted, reads until EOF."
              (recur in term? baos))))))
 
 (defn write-bytes
-  "Writes the UTF-8 bytes of a string to the given OutputStream."
-  [^java.io.OutputStream out s]
-  (doto (new java.io.OutputStreamWriter out "UTF-8")
-    (.write s 0 (count s))
-    (.flush))
+  "Writes the UTF-8 bytes of a string to the given OutputStream. s is coerced to
+a String with str if it is not a String already."
+  [^OutputStream out s]
+  (let [s (str s)]
+    (doto (OutputStreamWriter. out "UTF-8")
+      (.write s 0 (count s))
+      (.flush)))
   nil)

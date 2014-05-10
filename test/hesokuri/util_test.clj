@@ -47,7 +47,7 @@
 
 (deftest test-write-bytes
   (are [s by]
-    (= (seq (concat (.getBytes s "UTF-8") by))
+    (= (seq (concat (.getBytes (str s) "UTF-8") by))
        (let [baos (new java.io.ByteArrayOutputStream)]
          (write-bytes baos s)
          (.write baos (byte-array by))
@@ -55,4 +55,6 @@
     "abc" []
     "abc" [1 2 3]
     "" []
-    "" [4 5]))
+    "" [4 5]
+    1042 []
+    1042 [1 2 3]))
