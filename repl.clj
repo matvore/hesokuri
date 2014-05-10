@@ -17,6 +17,7 @@
 ;;;; probably move into the real app but is still experimental or is not
 ;;;; thoroughly unit tested.
 
+(require '[clojure.data.codec.base64 :as b64])
 (require '[clojure.java.io :as cjio])
 (require '[clojure.pprint :as cppr])
 (require '[clojure.reflect :as cref])

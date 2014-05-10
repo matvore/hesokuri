@@ -23,6 +23,7 @@
                  [lib-noir "0.7.0"]
                  [net.java.dev.jna/jna "3.2.3"]
                  [org.clojure/clojure "1.6.0"]
+                 [org.clojure/data.codec "0.1.0"]
                  [org.clojure/tools.logging "0.2.6"]
                  [ring/ring-core "1.2.0"]
                  [ring/ring-jetty-adapter "1.2.0"]
