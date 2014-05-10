@@ -305,6 +305,24 @@
               (add-blob ["a" "b"] "blob1")
               (add-blob ["a" "c"] "blob2")))))
 
+(deftest test-get-entry
+  (let [tree (->> []
+                  (add-blob ["topdir" "subdir" "blob1"] "blob1-data")
+                  (add-blob ["topdir" "subdir" "blob2"] "blob2-data")
+                  (add-blob ["topdir" "blob3"] "blob3-data")
+                  (add-blob ["topdir2" "blob4"] "blob4-data"))
+        subdir (-> tree (nth 0) (nth 3) (nth 0))]
+    (are [path result]
+      (= result (get-entry path tree))
+      [] [[] nil]
+      ["non-matching1" "non-matching2"] [["non-matching1" "non-matching2"] nil]
+      ["topdir"] [[] (first tree)]
+      ["topdir" "unmatching"] [["unmatching"] (first tree)]
+      ["topdir" "blob3" "unmatching"]
+       [["unmatching"] ["100644" "blob3" nil "blob3-data"]]
+      ["topdir" "subdir" "blobx"]
+       [["blobx"] subdir])))
+
 (def person "John Doe <jdoe@google.com> 1398561813 -0700")
 
 (deftest test-read-commit
