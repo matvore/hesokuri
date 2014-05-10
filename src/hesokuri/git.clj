@@ -15,7 +15,8 @@
 (ns hesokuri.git
   "Module that facilitates invoking git, and other Git utility code not specific
 to Hesokuri logic."
-  (:require clojure.java.io
+  (:import [java.io InputStream OutputStream])
+  (:require [clojure.java.io :as cjio]
             clojure.java.shell
             [hesokuri.transact :as transact])
   (:use [clojure.string :only [blank? join split trim]]
@@ -38,7 +39,7 @@ Returns nil for non hex characters and capitalized hex characters (A-F)."
      :else nil)))
 
 (defprotocol Hash
-  (write-binary-hash [this ^java.io.OutputStream out]
+  (write-binary-hash [this ^OutputStream out]
     "Writes the raw binary representation of this hash to the given
 OutputStream.")
   (full-hash? [this]
@@ -62,7 +63,7 @@ and formatted correctly."))
 
 (extend-type String
   Hash
-  (write-binary-hash [s ^java.io.OutputStream out]
+  (write-binary-hash [s ^OutputStream out]
     (doseq [[c1 c2] (partition 2 s)
             :let [c1v (hex-char-val c1)
                   c2v (hex-char-val c2)]]
@@ -116,7 +117,7 @@ can be one of the following, checked in this order:
          (try
            (if (fn? data)
              (data blob-in)
-             (clojure.java.io/copy data blob-in))
+             (cjio/copy data blob-in))
            (finally (.close blob-in)))
          (first [(trim (slurp blob-out))
                  (throw-if-error hash-blob)])
@@ -166,7 +167,7 @@ responsible for closing it."
 
 (defn write-tree-entry
   "Write a tree entry to an output stream."
-  [^java.io.OutputStream out [type name sha]]
+  [^OutputStream out [type name sha]]
   (doto out
     (write-bytes type)
     (.write (int \space))
@@ -298,7 +299,7 @@ process, and throws an ex-info if one is encountered."
                (lazy-seq (do (swap! trans transact/close stdout)
                              (throw-if-error cat-commit)
                              nil)))))
-  ([^java.io.InputStream in]
+  ([^InputStream in]
      (lazy-seq
       (let [nl (int \newline)
             sp (int \space)
@@ -324,7 +325,7 @@ process, and throws an ex-info if one is encountered."
   "Writes a single commit entry to the given OutputStream. A commit entry is a
 name and a value and corresponds to the names and values returned by
 read-commit."
-  [^java.io.OutputStream out [name value]]
+  [^OutputStream out [name value]]
   (do (if (= :msg name)
         (doto out
           (.write (int \newline))

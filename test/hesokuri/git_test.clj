@@ -20,6 +20,7 @@
         hesokuri.git
         hesokuri.testing.temp)
   (:import [clojure.lang ExceptionInfo]
+           [java.io ByteArrayOutputStream]
            [hesokuri.git ArrayBackedHash]))
 
 (def pretend-hash "aaaaaaaaaabbbbbbbbbbccccccccccffffffffff")
@@ -73,7 +74,7 @@
     [0x88 0x77 0x88 0x77] [0x88 0x77 0x88 0x77 0x66] false))
 
 (defn byte-stream [bytes]
-  (new java.io.ByteArrayInputStream (byte-array bytes)))
+  (cjio/input-stream (byte-array bytes)))
 
 (deftest test-read-hash
   (are [source-cycle source-count]
@@ -102,7 +103,7 @@
     (are [length]
       (let [expected (map unchecked-byte (take (quot length 2) parsed-bytes))
             hash-str (apply str (take length chars))
-            baos (new java.io.ByteArrayOutputStream)
+            baos (ByteArrayOutputStream.)
             actual (do (write-binary-hash hash-str baos)
                        (into [] (.toByteArray baos)))]
         (= expected actual))
@@ -196,7 +197,7 @@
       (+ 20 (count entry-1-bytes)))))
 
 (defn binary-hash [hash]
-  (let [baos (java.io.ByteArrayOutputStream.)]
+  (let [baos (ByteArrayOutputStream.)]
     (write-binary-hash hash baos)
     (ArrayBackedHash. (.toByteArray baos))))
 
@@ -230,7 +231,7 @@
 
 (deftest test-write-tree-entry
   (are [expected-bytes entry]
-       (let [baos (new java.io.ByteArrayOutputStream)]
+       (let [baos (ByteArrayOutputStream.)]
          (write-tree-entry baos entry)
          (is (= expected-bytes (into [] (.toByteArray baos)))))
        entry-1-bytes ["1" "file1" (cycle-bytes-hash [0x01 0x10])]
@@ -376,7 +377,7 @@
              (is (not= -1 (.indexOf (.getMessage e) err-substr))))))))))
 
 (defn commit-entry-string [e]
-  (let [baos (new java.io.ByteArrayOutputStream)]
+  (let [baos (ByteArrayOutputStream.)]
     (write-commit-entry baos e)
     (new String (.toByteArray baos) "UTF-8")))
 
