@@ -18,7 +18,8 @@ public/private key pairs only. All keys use RSA algorithm."
   (:import [java.io PipedInputStream PipedOutputStream]))
 
 (defn new-key-pair []
-  (.genKeyPair (java.security.KeyPairGenerator/getInstance "rsa")))
+  (.genKeyPair (doto (java.security.KeyPairGenerator/getInstance "rsa")
+                 (.initialize 2048))))
 
 (defn rsa-key-pair-provider [key-pair]
   (let [type-map {"ssh-rsa" key-pair}]
