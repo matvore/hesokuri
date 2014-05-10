@@ -45,14 +45,26 @@
 (require '[hesokuri.web :as web])
 (require '[ring.util.io :as ruio])
 
-(import '[java.io ObjectOutputStream OutputStream])
+(import '[java.io ByteArrayOutputStream ObjectOutputStream OutputStream])
+(import '[java.security KeyFactory])
+(import '[java.security.spec X509EncodedKeySpec])
 
 (use 'clojure.repl)
 
 (defn public-key
-  "Coerces the given key to a java.security.PublicKey."
+  "Coerces the given key value to a java.security.PublicKey. If the key value is
+a string, it is assumed to be a base64 X509-encoded, RSA public key. If the key
+value is a java.security.KeyPair instance, the .getPublic method is used to get
+the public key of the pair."
   [key]
   (cond
+   (string? key) (let [b64-encoded-bytes-stream
+                        (ruio/piped-input-stream #(cjio/copy key %))
+                       baos (ByteArrayOutputStream.)]
+                   (b64/decoding-transfer b64-encoded-bytes-stream baos)
+                   (.generatePublic
+                    (KeyFactory/getInstance "RSA")
+                    (X509EncodedKeySpec. (.toByteArray baos))))
    (instance? java.security.PublicKey key) key
    (instance? java.security.KeyPair key) (.getPublic key)
    :else
@@ -60,6 +72,18 @@
     (if (instance? java.security.PrivateKey key)
       "Got a private key instead of public one."
       (str "Do not know how to coerce class to public key: " (class key))))))
+
+(defn public-key-str
+  "Converts a key to a public key, then the public key to a base64 String in the
+default encoding."
+  [key]
+  (if (string? key)
+    key
+    (let [key (public-key key)
+          raw-key-bytes (cjio/input-stream (.getEncoded key))
+          b64-encoded-bytes-stream
+           (ruio/piped-input-stream #(b64/encoding-transfer raw-key-bytes %))]
+      (slurp b64-encoded-bytes-stream))))
 
 (defn serialize [^OutputStream out x]
   (doto (ObjectOutputStream. out)
