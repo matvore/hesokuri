@@ -70,5 +70,5 @@ config-tree: the tree corresponding to the original configuration. Corresponds
 "
   [name key port config-tree]
   (->> config-tree
-       (git/add-blob ["peer" name "key"] #(serialize % (public-key key)))
+       (git/add-blob ["peer" name "key"] #(serialize % (ssh/public-key key)))
        (git/add-blob ["peer" name "port"] (str port))))
