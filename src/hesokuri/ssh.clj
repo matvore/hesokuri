@@ -15,7 +15,12 @@
 (ns hesokuri.ssh
   "Module for transferring data over SSH. Authentication is done with
 public/private key pairs only. All keys use RSA algorithm."
-  (:import [java.io PipedInputStream PipedOutputStream]))
+  (:import [java.io ByteArrayOutputStream PipedInputStream PipedOutputStream]
+           [java.security KeyFactory KeyPair PrivateKey PublicKey]
+           [java.security.spec X509EncodedKeySpec])
+  (:require [clojure.data.codec.base64 :as b64]
+            [clojure.java.io :as cjio]
+            [ring.util.io :as ruio]))
 
 (defn new-key-pair []
   (.genKeyPair (doto (java.security.KeyPairGenerator/getInstance "rsa")
@@ -31,6 +36,40 @@ public/private key pairs only. All keys use RSA algorithm."
   [(.getInvertedIn channel)
    (.getInvertedOut channel)
    (.getInvertedErr channel)])
+
+(defn public-key
+  "Coerces the given key value to a java.security.PublicKey. If the key value is
+a string, it is assumed to be a base64 X509-encoded, RSA public key. If the key
+value is a java.security.KeyPair instance, the .getPublic method is used to get
+the public key of the pair."
+  [key]
+  (cond
+   (string? key) (let [b64-encoded-bytes-stream
+                        (ruio/piped-input-stream #(cjio/copy key %))
+                       baos (ByteArrayOutputStream.)]
+                   (b64/decoding-transfer b64-encoded-bytes-stream baos)
+                   (.generatePublic
+                    (KeyFactory/getInstance "RSA")
+                    (X509EncodedKeySpec. (.toByteArray baos))))
+   (instance? PublicKey key) key
+   (instance? KeyPair key) (.getPublic key)
+   :else
+    (#(throw (ex-info % {:key key}))
+     (if (instance? PrivateKey key)
+       "Got a private key instead of public one."
+       (str "Do not know how to coerce class to public key: " (class key))))))
+
+(defn public-key-str
+  "Converts a key to a public key, then the public key to a base64 String in the
+default encoding."
+  [key]
+  (if (string? key)
+    key
+    (let [key (public-key key)
+          raw-key-bytes (cjio/input-stream (.getEncoded key))
+          b64-encoded-bytes-stream
+           (ruio/piped-input-stream #(b64/encoding-transfer raw-key-bytes %))]
+      (slurp b64-encoded-bytes-stream))))
 
 (defn connect-to
   "Tries to connect to a peer with SSH authentication. This machine acts as the
