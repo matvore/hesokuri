@@ -18,7 +18,7 @@ to Hesokuri logic."
   (:require clojure.java.io
             clojure.java.shell
             [hesokuri.transact :as transact])
-  (:use [clojure.string :only [join split trim]]
+  (:use [clojure.string :only [blank? join split trim]]
         clojure.tools.logging
         hesokuri.util))
 
@@ -335,6 +335,33 @@ read-commit."
           (write-bytes (str value))
           (.write (int \newline))))
       nil))
+
+(defn author
+  "Generates an author or committer string for use in a commit. unix-timestamp
+is the number of seconds since the epoch. If unix-timestamp is omitted, uses the
+current system time."
+  ([] (author (quot (System/currentTimeMillis) 1000)))
+  ([unix-timestamp]
+     (str "Google Hesokuri <hesokuri@localhost> " unix-timestamp " +0000")))
+
+(defn commit
+  "Creates commit data. The returned value is a sequence such that each element
+can be written with write-commit-entry."
+  ([tree parents commit-msg]
+     (commit tree parents commit-msg (author)))
+  ([tree parents commit-msg author]
+     (commit tree parents commit-msg author author))
+  ([tree parents commit-msg author committer]
+     (let [commit-msg (-> commit-msg
+                          str
+                          (#(if (.endsWith % "\n") % (str % "\n")))
+                          (#(if (blank? %) "Automated commit\n" %)))]
+       (lazy-cat
+        [["tree" (str tree)]]
+        (map #(list "parent" (str %)) parents)
+        [["author" (str author)]
+         ["committer" (str committer)]
+         [:msg commit-msg]]))))
 
 (defn invoke-result?
   "Returns true iff x is a valid result of a call to invoke. Note that this has

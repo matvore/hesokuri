@@ -23,6 +23,8 @@
            [hesokuri.git ArrayBackedHash]))
 
 (def pretend-hash "aaaaaaaaaabbbbbbbbbbccccccccccffffffffff")
+(def pretend-hash-2 "aaaaaaaaaabbbbbbbbbbccccccccccdddddddddd")
+(def pretend-hash-3 "aaaaaaaaaa8888888888ccccccccccdddddddddd")
 
 (defn cycle-bytes [b count] (byte-array (take count (cycle b))))
 (defn cycle-bytes-hash [b] (new ArrayBackedHash (cycle-bytes b 20)))
@@ -44,7 +46,9 @@
        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" false
        "                                        " false
        "1234123412341234123412341234123412341234" true
-       pretend-hash true))
+       pretend-hash true
+       pretend-hash-2 true
+       pretend-hash-3 true))
 
 (deftest test-ArrayBackedHash-toString
   (is (= "a00000000000000000000000000000000000000b"
@@ -384,6 +388,33 @@
            (commit-entry-string ["parent" hash-1])))
     (is (= (str "author " person "\n")
            (commit-entry-string ["author" person])))))
+
+(deftest test-author
+  (let [first-time (quot (System/currentTimeMillis) 1000)
+        [_ timestamp]
+         (re-matches #"^Google Hesokuri <hesokuri@localhost> ([0-9]+) \+0000$"
+                     (author))
+        last-time (quot (System/currentTimeMillis) 1000)]
+    (is (<= first-time (Long/parseLong timestamp) last-time))))
+
+(deftest test-commit-fixes-message
+  (let [a (author 1000)
+        c (author 1001)]
+    (are [in-msg out-msg]
+      (=
+       [["tree" pretend-hash]
+        ["parent" pretend-hash-2]
+        ["parent" pretend-hash-3]
+        ["author" a]
+        ["committer" c]
+        [:msg out-msg]]
+       (commit pretend-hash [pretend-hash-2 pretend-hash-3] in-msg a c))
+      "a" "a\n"
+      " b" " b\n"
+      "c\nd" "c\nd\n"
+      "e\n\nf\n" "e\n\nf\n"
+      nil "Automated commit\n"
+      " \n " "Automated commit\n")))
 
 (deftest test-invoke-result-false
   (are [x] (not (invoke-result? x))
