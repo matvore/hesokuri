@@ -417,6 +417,40 @@
       nil "Automated commit\n"
       " \n " "Automated commit\n")))
 
+(deftest test-write-commit
+  (with-temp-repo [git-dir]
+    (let [commit-1 [["tree" nil [["100644" "some-file" nil "contents\n"]]]
+                    ["author" (author 1000)]
+                    ["committer" (author 1000)]
+                    [:msg "commit msg\n"]]
+          tree-hash-1 "a3d0b72057c8dc7f1d1c5e453ae354812b2c8465"
+          hash-1 (write-commit git-dir commit-1)]
+      (is (= "807edf48041693d978ca374fe34ea761dd68df2e" hash-1))
+      (transact/transact
+       #(is (= [["100644" "some-file"
+                 (binary-hash "12f00e90b6ef79117ce6e650416b8cf517099b78")]]
+               (read-tree git-dir tree-hash-1 %))))
+      (let [hash-2a (write-commit
+                     git-dir
+                     [["tree" nil [["100644" "some-file" nil "new contents\n"]]]
+                      ["parent" hash-1]
+                      ["author" (author 1001)]
+                      ["committer" (author 1001)]
+                      [:msg "commit msg 2\n"]])
+            hash-2b (write-commit
+                     git-dir
+                     [["tree" nil [["100644" "some-file" nil "new contents\n"]]]
+                      ["parent" nil commit-1]
+                      ["author" (author 1001)]
+                      ["committer" (author 1001)]
+                      [:msg "commit msg 2\n"]])]
+        (is (= "34891e130dfaf78bccad115aa9cfe18f773f4337" hash-2a hash-2b)))
+      (let [hash-3 (write-commit git-dir [["tree" tree-hash-1]
+                                          ["author" (author 1002)]
+                                          ["committer" (author 1002)]
+                                          [:msg "commit msg 3\n"]])]
+        (is (= "887282b23f1ba38df4d7a256eb4e865e5a37df5e" hash-3))))))
+
 (deftest test-invoke-result-false
   (are [x] (not (invoke-result? x))
        ""

@@ -289,7 +289,10 @@ When invoked with an InputStream, this function only reads from the InputStream
 and returns an equivalent lazy-seq. When invoked with a git-dir and commit-hash,
 associates the read with a transaction so the stream will be closed
 automatically when the transaction is over, and checks for errors in the git
-process, and throws an ex-info if one is encountered."
+process, and throws an ex-info if one is encountered.
+
+TODO: make this lazily recursive: the tree and parent objects should appear
+after the hash in the entry."
   ([git-dir commit-hash trans] (read-commit "git" git-dir commit-hash trans))
   ([git git-dir commit-hash trans]
      (let [cat-commit-args (args git-dir ["cat-file" "commit" commit-hash])
@@ -363,6 +366,28 @@ can be written with write-commit-entry."
         [["author" (str author)]
          ["committer" (str committer)]
          [:msg commit-msg]]))))
+
+(defn write-commit
+  "Writes a commit to the given repository, possibly writing the parent and tree
+fields if their hashes are nil and the corresponding data follows the nil hash."
+  ([git-dir commit] (write-commit "git" git-dir commit))
+  ([git git-dir commit]
+     (let [hash-args (args git-dir ["hash-object" "-w" "--stdin" "-t" "commit"])
+           [stdin stdout :as hash-commit] (invoke-streams git hash-args)]
+       (first [(try
+                 (doseq [[name value data :as entry] commit]
+                   (write-commit-entry
+                    stdin
+                    [name
+                     (cond
+                      (some? value) value
+                      (= name "parent") (write-commit git git-dir data)
+                      (= name "tree") (write-tree git git-dir data))]))
+                 (.close stdin)
+                 (trim (slurp stdout))
+                 (finally (.close stdin)
+                          (.close stdout)))
+               (throw-if-error hash-commit)]))))
 
 (defn invoke-result?
   "Returns true iff x is a valid result of a call to invoke. Note that this has
