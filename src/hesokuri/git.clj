@@ -378,12 +378,12 @@ can be written with write-commit-entry."
 (defn write-commit
   "Writes a commit to the given repository, possibly writing the parent and tree
 fields if their hashes are nil and the corresponding data follows the nil hash."
-  ([git-dir commit] (write-commit "git" git-dir commit))
-  ([git git-dir commit]
+  ([git-dir com] (write-commit "git" git-dir com))
+  ([git git-dir com]
      (let [hash-args (args git-dir ["hash-object" "-w" "--stdin" "-t" "commit"])
            [stdin stdout :as hash-commit] (invoke-streams git hash-args)]
        (first [(try
-                 (doseq [[name value data :as entry] commit]
+                 (doseq [[name value data :as entry] com]
                    (write-commit-entry
                     stdin
                     [name
