@@ -533,7 +533,16 @@
                   err "exit: 128\n")
              summary)))))
 
-(deftest test-if-error
+(deftest test-error?
+  (are [invoke-res is-err]
+    (= is-err (error? invoke-res))
+
+    {:exit 0 :err ""} false
+    {:exit 1 :err ""} true
+    {:exit 0 :err "a"} true
+    {:exit 2 :err "b"} true))
+
+(deftest test-if-error-for-invoke-streams-result
   (let [invoke-res (fn [exit err]
                      [nil nil (future {:exit exit :err err}) "summary"])]
     (is (= "summary+extra"
@@ -542,7 +551,18 @@
     (is (= 42 (if-error (invoke-res 13 "") (constantly 42))))
     (is (nil? (if-error (invoke-res 0 "")
                         (fn [_] (throw (IllegalStateException.
-                                        "Should not get here."))))))))
+                                        "Should not get here."))))))
+    (is (nil? (throw-if-error (invoke-res 0 ""))))
+    (is (thrown? ExceptionInfo (throw-if-error (invoke-res 128 ""))))))
+
+(deftest test-if-error-for-invoke-with-summary-result
+  (let [invoke-res (fn [exit err]
+                     [{:exit exit :err err :out "stdout"} "summary"])]
+    (is (= "summary+extra"
+           (if-error (invoke-res 13 "stderr") #(str % "+extra"))))
+    (is (= nil (if-error (invoke-res 0 "") (constantly 42))))
+    (is (nil? (throw-if-error (invoke-res 0 ""))))
+    (is (thrown? ExceptionInfo (throw-if-error (invoke-res 128 ""))))))
 
 (deftest test-summary
   (let [err "[stderr contents]"

@@ -454,23 +454,35 @@ invoke return value. The summary part of the returned sequence is lazy."
                     (format "execute: %s %s\nstderr:\n%sexit: %d\n"
                             git (join " " args) err exit))])))))
 
+(defn error?
+  "Determines if the given invoke result indicates an error. The result can be
+the result of invoke or the realized future returned by invoke-with-streams. A
+subprocess is considered to terminate in error if stderr is non-empty or the
+exit code is non-zero."
+  [{:keys [err exit]}]
+  (or (not= exit 0) (not (empty? err))))
+
 (defn if-error
-  "Calls a function if the result of invoke-streams indicates an error. A
-non-empty stderr or a non-zero exit code indicate error. The function (f) is
-called with a single argument: a human-readable summary of the invoke-streams
-result. If f is called, if-error returns whatever f returns. If f is not called,
-if-error returns nil."
-  [[_ _ finish :as invoke-streams-res] f]
-  (let [{:keys [err exit]} @finish]
-    (when (or (not= 0 exit) (not (empty? err)))
-      (f (nth invoke-streams-res 3)))))
+  "Calls a function if the result of invoke-streams or invoke-with-summary
+indicates an error. A non-empty stderr or a non-zero exit code indicate error.
+The function (f) is called with a single argument: a human-readable summary of
+the invoke-streams result. If f is called, if-error returns whatever f returns.
+If f is not called, if-error returns nil."
+  [res f]
+  (if (invoke-result? (nth res 0))
+    (when (error? (nth res 0))
+      (f (nth res 1)))
+    (when (error? @(nth res 2))
+      (f (nth res 3)))))
 
 (defn throw-if-error
   "Similar to if-error, but rather than executing an arbitrary function on
 error, throws an ex-info whose message is the summary and the info map contains
 the exit code and stderr output entries from the invoke-streams promise map."
-  [[_ _ finish :as invoke-streams-res]]
-  (if-error invoke-streams-res #(throw (ex-info % @finish))))
+  [res]
+  (if-error res #(throw (ex-info % (if (invoke-result? (nth res 0))
+                                     (nth res 0)
+                                     @(nth res 2))))))
 
 (defn summary
   "Returns a user-readable summary of the result of 'invoke' as a string."
