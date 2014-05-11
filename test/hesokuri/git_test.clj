@@ -417,18 +417,19 @@
       nil "Automated commit\n"
       " \n " "Automated commit\n")))
 
-(deftest test-write-commit
+(deftest test-write-and-read-commit-recursion
   (with-temp-repo [git-dir]
     (let [commit-1 [["tree" nil [["100644" "some-file" nil "contents\n"]]]
                     ["author" (author 1000)]
                     ["committer" (author 1000)]
                     [:msg "commit msg\n"]]
+          blob-hash "12f00e90b6ef79117ce6e650416b8cf517099b78"
           tree-hash-1 "a3d0b72057c8dc7f1d1c5e453ae354812b2c8465"
-          hash-1 (write-commit git-dir commit-1)]
+          hash-1 (write-commit git-dir commit-1)
+          hash-2 "34891e130dfaf78bccad115aa9cfe18f773f4337"]
       (is (= "807edf48041693d978ca374fe34ea761dd68df2e" hash-1))
       (transact/transact
-       #(is (= [["100644" "some-file"
-                 (binary-hash "12f00e90b6ef79117ce6e650416b8cf517099b78")]]
+       #(is (= [["100644" "some-file" (binary-hash blob-hash)]]
                (read-tree git-dir tree-hash-1 %))))
       (let [hash-2a (write-commit
                      git-dir
@@ -444,12 +445,26 @@
                       ["author" (author 1001)]
                       ["committer" (author 1001)]
                       [:msg "commit msg 2\n"]])]
-        (is (= "34891e130dfaf78bccad115aa9cfe18f773f4337" hash-2a hash-2b)))
+        (is (= hash-2 hash-2a hash-2b)))
       (let [hash-3 (write-commit git-dir [["tree" tree-hash-1]
                                           ["author" (author 1002)]
                                           ["committer" (author 1002)]
                                           [:msg "commit msg 3\n"]])]
-        (is (= "887282b23f1ba38df4d7a256eb4e865e5a37df5e" hash-3))))))
+        (is (= "887282b23f1ba38df4d7a256eb4e865e5a37df5e" hash-3)))
+      (transact/transact
+       #(is (= [["tree" "6a3a88444b0f4519764853af5c548bec66e28639"
+                 [["100644" "some-file"
+                   (binary-hash "014fd71bde5393ad8b79305d1af6ec907557f828")]]]
+                ["parent" hash-1
+                 [["tree" tree-hash-1
+                   [["100644" "some-file" (binary-hash blob-hash)]]]
+                  ["author" (author 1000)]
+                  ["committer" (author 1000)]
+                  [:msg "commit msg\n"]]]
+                ["author" (author 1001)]
+                ["committer" (author 1001)]
+                [:msg "commit msg 2\n"]]
+               (read-commit git-dir hash-2 %)))))))
 
 (deftest test-invoke-result-false
   (are [x] (not (invoke-result? x))

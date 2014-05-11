@@ -288,17 +288,25 @@ KEY           VALUE
 When invoked with an InputStream, this function only reads from the InputStream
 and returns an equivalent lazy-seq. When invoked with a git-dir and commit-hash,
 associates the read with a transaction so the stream will be closed
-automatically when the transaction is over, and checks for errors in the git
-process, and throws an ex-info if one is encountered.
+automatically when the transaction is over, checks for errors in the git process
+and throws an ex-info if one is encountered, and performs a lazily recursive
+read.
 
-TODO: make this lazily recursive: the tree and parent objects should appear
-after the hash in the entry."
+When the read is lazily recursive, the tree and parent entries have a third
+element in the sequence which is the result of read-tree or read-commit for the
+hash. These sequence elements are lazily evaluated, so read-tree and read-commit
+will not get called if the elements are never evaluated."
   ([git-dir commit-hash trans] (read-commit "git" git-dir commit-hash trans))
   ([git git-dir commit-hash trans]
      (let [cat-commit-args (args git-dir ["cat-file" "commit" commit-hash])
            [_ stdout :as cat-commit] (invoke-streams git cat-commit-args)]
        (swap! trans transact/open stdout)
-       (concat (read-commit stdout)
+       (concat (for [[name value] (read-commit stdout)]
+                 (lazy-cat
+                  [name value]
+                  (cond
+                   (= name "tree") [(read-tree git git-dir value trans)]
+                   (= name "parent") [(read-commit git git-dir value trans)])))
                (lazy-seq (do (swap! trans transact/close stdout)
                              (throw-if-error cat-commit)
                              nil)))))
