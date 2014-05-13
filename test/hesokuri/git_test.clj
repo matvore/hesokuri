@@ -466,6 +466,46 @@
                 [:msg "commit msg 2\n"]]
                (read-commit git-dir hash-2 %)))))))
 
+(deftest test-change
+  (with-temp-repo [git-dir]
+    (let [first-com-hash
+           (write-commit git-dir [["tree" nil
+                                   [["100644" "first_file" nil "foo"]]]
+                                  ["author" (author 1)]
+                                  ["committer" (author 1)]])
+          set-branch-args (args git-dir ["update-ref"
+                                         "refs/heads/master"
+                                         first-com-hash])
+          second-com-tail [["author" (author 2)]
+                           ["committer" (author 2)]
+                           [:msg "hesokuri.git/test-change\n"]]
+          second-com-hash "8d410286cba8ae75c9c7225264132b28b5a7b7f2"]
+      (is (= "7e980a15b3aac54a97aecd59b28d6cd7cffd368d" first-com-hash))
+      (throw-if-error (invoke-with-summary "git" set-branch-args))
+      (is (= second-com-hash
+             (change git-dir "refs/heads/master"
+                     #(->> %
+                           (add-blob ["dir" "new-file-1"] "file contents\n")
+                           (add-blob ["dir" "new-file-2"] (byte-array [1 2 3])))
+                     second-com-tail)))
+      (transact/transact
+       (fn [trans]
+         (is (= (concat [["tree" "e91010a6f3c954b766d83296a382ceeac6fe556a"]
+                         ["parent" first-com-hash]]
+                        second-com-tail)
+                (map #(take 2 %)
+                     (read-commit git-dir second-com-hash trans)))))))))
+
+(deftest test-change-throws-for-non-existent-ref
+  (with-temp-repo [git-dir]
+    (try
+      (change git-dir "refs/heads/foo" identity [["author" (author)]
+                                                 ["committer" (author)]
+                                                 [:msg "msg!\n"]])
+      (throw (ex-info "Should have thrown."))
+      (catch ExceptionInfo e
+        (is (not= -1 (.indexOf (.getMessage e) "rev-parse refs/heads/foo")))))))
+
 (deftest test-invoke-result-false
   (are [x] (not (invoke-result? x))
        ""

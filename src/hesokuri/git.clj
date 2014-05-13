@@ -24,7 +24,9 @@ to Hesokuri logic."
         hesokuri.util))
 
 (declare args
+         error?
          throw-if-error
+         invoke
          invoke-streams
          invoke-with-summary)
 
@@ -396,6 +398,45 @@ fields if their hashes are nil and the corresponding data follows the nil hash."
                  (finally (.close stdin)
                           (.close stdout)))
                (throw-if-error hash-commit)]))))
+
+(defn change
+  "Changes a ref by transforming the tree of its commit with a function, making
+a new commit with the transformed tree, and updating the ref with the new
+commit. Automatically retries if the ref is updated by a separate process.
+
+ref - the ref to change, for instance 'refs/heads/master'
+tree-fn - a function that takes a single value, the function returned by
+    read-tree, and returns a new tree that can be passed to write-tree. This
+    should not have side-effects, since it may be called multiple times with
+    different values
+commit-tail - the commit data to use in the new commit, minus the parent and
+    tree fields
+
+Returns the hash corresponding to the new commit."
+  ([git-dir ref tree-fn commit-tail]
+     (change "git" git-dir ref tree-fn commit-tail))
+  ([git git-dir ref tree-fn commit-tail]
+     (let [[{:keys [out]} :as get-orig-ref-hash]
+            (invoke-with-summary git (args git-dir ["rev-parse" ref]))
+           orig-ref-hash (trim out)]
+       (throw-if-error get-orig-ref-hash)
+       (let [new-commit-hash
+              (transact/transact
+               (fn [trans]
+                 (let [orig-commit (read-commit git git-dir orig-ref-hash trans)
+                       orig-tree (-> #(= "tree" (first %))
+                                     (filter orig-commit)
+                                     first
+                                     (nth 2))
+                       new-commit (concat [["tree" nil (tree-fn orig-tree)]
+                                           ["parent" orig-ref-hash]]
+                                          commit-tail)]
+                   (write-commit git git-dir new-commit))))
+             update-ref-args
+              (args git-dir ["update-ref" ref new-commit-hash orig-ref-hash])]
+         (if (error? (invoke git update-ref-args))
+           (recur git git-dir ref tree-fn commit-tail)
+           new-commit-hash)))))
 
 (defn invoke-result?
   "Returns true iff x is a valid result of a call to invoke. Note that this has
