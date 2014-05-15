@@ -245,6 +245,30 @@ tree: the tree to add the blob to. If omitted, effectively creates a new tree
                    (add-blob (rest path) blob-data this-data)]
                   (rest tree))))))))
 
+(defn remove-entry
+  "Removes an entry (blob or tree) from a tree. Throws an ex-info if an entry at
+the given path does not exist.
+path: the path, as a sequence of Strings, to the entry to remove. The last
+    String is the actual entry that will be removed.
+tree: the tree to remove the entry from. This is a tree that shold be returned
+    from read-tree."
+  ([path tree]
+     (lazy-seq
+      (cond
+       (empty? path) []
+       (empty? tree) (throw (ex-info
+                             (str "Cannot remove an entry at path " path
+                                  " because it does not exist.")
+                             {:path path}))
+       :else
+        (let [[[this-type this-name _ this-data]] tree]
+          (if (not= this-name (first path))
+            (cons (first tree) (remove-entry path (rest tree)))
+            (let [removed (remove-entry (rest path) this-data)]
+              (if (empty? removed)
+                (rest tree)
+                (cons [this-type this-name nil removed] (rest tree))))))))))
+
 (defn get-entry
   "Finds an entry in a tree returned by read-tree.
 path: sequence of strings representing the path to the entry to find
