@@ -47,6 +47,8 @@ flag (to pass to git when operating on the repo) to the git-dir-flag symbol."
            ~dir (create-temp-dir)
            ;; _ (.makeDirectory)
            ~git-dir-flag (str "--git-dir=" (file ~dir (if bare# "" ".git")))]
-       (git/throw-if-error
-        (git/invoke-with-summary "git" [~git-dir-flag "init"]))
+       (doseq [args# [[~git-dir-flag "init"]
+                      [~git-dir-flag "config" "user.name" "Hesokuri Tester"]
+                      [~git-dir-flag "config" "user.email" "test@hesokuri"]]]
+         (git/throw-if-error (git/invoke-with-summary "git" args#)))
        ~@body)))
