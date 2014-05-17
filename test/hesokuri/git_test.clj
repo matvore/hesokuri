@@ -372,7 +372,7 @@
          (is (= 1 (count @trans)))
          (try
            (doseq [e c] nil)
-           (throw (ex-info "should have thrown"))
+           (throw (ex-info "should have thrown" {}))
            (catch ExceptionInfo e
              (is (not= -1 (.indexOf (.getMessage e) err-substr))))))))))
 
@@ -502,7 +502,7 @@
       (change git-dir "refs/heads/foo" identity [["author" (author)]
                                                  ["committer" (author)]
                                                  [:msg "msg!\n"]])
-      (throw (ex-info "Should have thrown."))
+      (throw (ex-info "Should have thrown." {}))
       (catch ExceptionInfo e
         (is (not= -1 (.indexOf (.getMessage e) "rev-parse refs/heads/foo")))))))
 
