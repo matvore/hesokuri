@@ -46,10 +46,7 @@ flag (to pass to git when operating on the repo) to the git-dir-flag symbol."
     `(let [bare# (not ~non-bare)
            ~dir (create-temp-dir)
            ;; _ (.makeDirectory)
-           ~git-dir-flag (str "--git-dir=" (file ~dir (if bare# "" ".git")))
-           init-result# (git/invoke "git" [~git-dir-flag "init"])]
-       (is (git/invoke-result? init-result#))
-       (is (not= -1 (.indexOf (:out init-result#) (str ~dir))))
-       (is (= (:exit init-result#) 0))
-       (is (= (:err init-result#) ""))
+           ~git-dir-flag (str "--git-dir=" (file ~dir (if bare# "" ".git")))]
+       (git/throw-if-error
+        (git/invoke-with-summary "git" [~git-dir-flag "init"]))
        ~@body)))
