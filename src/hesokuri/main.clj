@@ -22,15 +22,22 @@
             [hesokuri.web :as web])
   (:gen-class))
 
-(def web-port
-  "The port to serve the heso web UI."
+(def diag-ui-port
+  "The port on which to serve the diagnostics web UI, which is implemented in
+the hesokuri.web namespace."
   (Integer. (or (getenv "HESOPORT") "8080")))
 
 (def home
   "The user's home directory. This is used as a default for some settings."
   (cjio/file (System/getProperty "user.home")))
 
-(def config-file
+(def heso-cfg-file
+  "The configuration file for storing the Hesokuri configuration, which includes
+things like the address of each peer machine, the paths of each source on each
+machine, which branches are live-edit, and which branches or unwanted.
+
+TODO(matvore): Consider removing support for this file once the hesobase is
+functional."
   (cjio/file (or (getenv "HESOCFG")
                  (cjio/file home ".hesocfg"))))
 
@@ -39,7 +46,7 @@
   (cjio/file (or (getenv "HESOROOT") home)
              ".hesobase.git"))
 
-(def default-proto-port
+(def default-prot-port
   "The default protocol port. This number is pronounced 'hesoku,' because 8
 sounds like 'hay,' 50 looks like 'so', and 9 in Japanese is 'ku.'"
   8509)
@@ -61,7 +68,7 @@ Experimental features
 lein run init MACHINE-NAME [PORT]
   MACHINE-NAME is the name (and address) of this machine on the Hesokuri
   network. PORT is the local port to use for communicating with other machines
-  on the network, or " default-proto-port " if omitted.
+  on the network, or " default-prot-port " if omitted.
 "))
 
 (defn exit
@@ -79,26 +86,25 @@ lein run init MACHINE-NAME [PORT]
   (cond
    (empty? args)
     (let [heso-agent (agent (heso/with-config []))
-
           dynamic-config-agent
-          (->> (cb [heso-agent] [config]
-                   (send heso-agent heso/update-config config))
-               (dynamic-config/of config-file)
-               agent)]
+           (->> (cb [heso-agent] [config]
+                    (send heso-agent heso/update-config config))
+                (dynamic-config/of heso-cfg-file)
+                agent)]
       (send dynamic-config-agent dynamic-config/start)
       (alter-var-root #'hesokuri.web/*web-heso* (constantly heso-agent))
       (run-jetty (-> web/heso-web-routes
                      wrap-params)
-                 {:port web-port :join? false}))
+                 {:port diag-ui-port :join? false}))
    (= "init" (first args))
-    (let [[_ machine-name proto-port & extra-args] args
-          proto-port (if proto-port
-                       (try (Integer. proto-port)
-                            (catch NumberFormatException _
-                              (exit
-                               (format "Invalid port number: '%s'\n" proto-port)
-                               *err* 1)))
-                       default-proto-port)]
+    (let [[_ machine-name prot-port & extra-args] args
+          prot-port (if prot-port
+                      (try (Integer. prot-port)
+                           (catch NumberFormatException _
+                             (exit
+                              (format "Invalid port number: '%s'\n" prot-port)
+                              *err* 1)))
+                      default-prot-port)]
       (when (or (seq extra-args)
                 (not machine-name))
         (exit usage *err* 1))
