@@ -13,6 +13,8 @@
 ; limitations under the License.
 
 (ns hesokuri.util-test
+  (:import [java.io ByteArrayInputStream ByteArrayOutputStream
+            ObjectInputStream])
   (:use clojure.test
         hesokuri.util
         hesokuri.testing.mock))
@@ -31,8 +33,7 @@
 (deftest test-read-until
   (let [space? #{(int \space)}]
     (are [src term? exp-str exp-term stream-rest]
-        (let [src-stream (new java.io.ByteArrayInputStream
-                              (.getBytes src "UTF-8"))
+        (let [src-stream (ByteArrayInputStream. (.getBytes src "UTF-8"))
               [actual-str actual-term] (read-until src-stream term?)]
           (and (= exp-str actual-str)
                (integer? actual-term)
@@ -48,7 +49,7 @@
 (deftest test-write-bytes
   (are [s by]
     (= (seq (concat (.getBytes (str s) "UTF-8") by))
-       (let [baos (new java.io.ByteArrayOutputStream)]
+       (let [baos (ByteArrayOutputStream.)]
          (write-bytes baos s)
          (.write baos (byte-array by))
          (seq (.toByteArray baos))))
@@ -58,3 +59,16 @@
     "" [4 5]
     1042 []
     1042 [1 2 3]))
+
+(deftest test-serialize
+  (are [obj]
+    (= obj (-> (ByteArrayOutputStream.)
+               (#(do (serialize % obj)
+                     %))
+               .toByteArray
+               ByteArrayInputStream.
+               ObjectInputStream.
+               .readObject))
+    42
+    "a string"
+    [10 12 14]))

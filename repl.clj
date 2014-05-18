@@ -51,12 +51,6 @@
 
 (use 'clojure.repl)
 
-(defn serialize [^OutputStream out x]
-  (doto (ObjectOutputStream. out)
-    (.writeObject x)
-    (.flush))
-  nil)
-
 (defn add-peer
   "Adds a new peer to a configuration, and returns a new configuration that can
 be passed to hesokuri.git/write-tree.
