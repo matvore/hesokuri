@@ -17,7 +17,8 @@
            [java.security PublicKey])
   (:use clojure.test
         clojure.tools.logging
-        hesokuri.ssh))
+        hesokuri.ssh
+        hesokuri.testing.data))
 
 (defn free-port []
   (let [socket (new java.net.ServerSocket 0)
@@ -42,17 +43,9 @@ the trailing newline."
     (is (= "RSA" (.getAlgorithm (.getPublic pair))))
     (is (= "RSA" (.getAlgorithm (.getPrivate pair))))))
 
-(def key-str (str "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtkP4D+a8xsr6W"
-                  "Shm86vD0msWxKIwgBXwKSHwkiuzVEUPeND9iNXdfTIeDt1tw/IDfFuCq5"
-                  "ZbSDIl5X5stx3r26ls8s/bFzG7cqJ1W523QmeH+QZWbjcRqdByw48e6Df"
-                  "mcE2UcWoB/O3TgHqIhfUeRvyfeZ3+hgeJumwsmjKqcCE5sTMPum9OfpKQ"
-                  "U2KzjdXb/njO10v9g2CzByJd2V9rEp7amTBsexIe2gZ7Oui8or3Op9yls"
-                  "Gokf8YD5l2NOvlDT2DonSmxWTqcRlTfN44ywXrNfHkzX3qnj9XstbyIf7"
-                  "F8Ejl9Jhyrpp+ygRuJxg9k2tF7hRiP4ToGtPR340nUNQIDAQAB"))
-
 (deftest test-public-key-coersion-string-round-trip
-  (is (instance? PublicKey (public-key key-str)))
-  (is (= key-str (public-key-str (public-key key-str)))))
+  (is (instance? PublicKey (public-key *key-str*)))
+  (is (= *key-str* (public-key-str (public-key *key-str*)))))
 
 (deftest test-public-key-coersion-from-key-pair
   (is (instance? PublicKey (public-key (new-key-pair)))))

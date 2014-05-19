@@ -438,6 +438,17 @@ Returns the hash corresponding to the new commit."
            (recur git git-dir ref tree-fn commit-tail)
            new-commit-hash)))))
 
+(defn branch-and-hash-list
+  "Returns a sequence of pairs. Each pair is a sequence containing two strings:
+a branch name and its hash. output is the output of the command
+'git branch -v --no-abbrev' as a string."
+  [output]
+  (for [line (-> output trim (split #"\n+"))
+        :let [unmarked (if (.startsWith line "*") (.substring line 1) line)
+              [name hash] (-> unmarked trim (split #" +" 3))]
+        :when (and hash (full-hash? hash) (not= name ""))]
+    [name hash]))
+
 (defn invoke-result?
   "Returns true iff x is a valid result of a call to invoke. Note that this has
 nothing to do with whether the result indicates a successful invocation."

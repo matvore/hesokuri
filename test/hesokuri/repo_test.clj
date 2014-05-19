@@ -220,36 +220,6 @@
        {:out "refs/heads/bar\n" :err "" :exit 0} "bar"
        {:out "refs/heads/master\n" :err "" :exit 128} nil))
 
-(deftest test-branch-and-hash-list
-  (are [branch-output expected]
-       (is (= expected (#'hesokuri.repo/branch-and-hash-list
-                        (apply str branch-output))))
-       [""] []
-       ["\n"] []
-       ["\n\n"] []
-
-       ["* a abcabcababcabcababcabcababcabcababcabcab\n"
-        "  b abcabcababcabcababcabcababcabcababcabcad"]
-       [["a" "abcabcababcabcababcabcababcabcababcabcab"]
-        ["b" "abcabcababcabcababcabcababcabcababcabcad"]]
-
-       ["  maint-v1.1.x                     "
-        "fd9d7ad30c8bff048c630e14851e751527c774f4 Correct docstrings\n"
-        "  master                           "
-        "62bf79ca2ca18159f26a84a5fc307a3416592ded Make start more testable\n"
-        "* use-git-command-to-enum-branches "
-        "62bf79ca2ca18159f26a84a5fc307a3416592ded Make start more testable\n"]
-       [["maint-v1.1.x"
-         "fd9d7ad30c8bff048c630e14851e751527c774f4"]
-        ["master"
-         "62bf79ca2ca18159f26a84a5fc307a3416592ded"]
-        ["use-git-command-to-enum-branches"
-         "62bf79ca2ca18159f26a84a5fc307a3416592ded"]]
-
-       ["invalid-branch invalidhash desc\n"
-        "valid-branch dddddddddddddddddddddddddddddddddddddddd"]
-       [["valid-branch" "dddddddddddddddddddddddddddddddddddddddd"]]))
-
 (deftest test-push-to-branch
   (let [repo {:dir (file "/srcdir") :init true}
         test-peer "test-peer-repo"

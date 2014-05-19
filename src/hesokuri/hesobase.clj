@@ -90,5 +90,36 @@ changed to a directory or a non-empty file to hold more information.
 ***
 Merge conflicts that cannot be resolved automatically should be summarized in
 some kind of log in the repo, so in the off-chance it happens, the user can
-recover.
-")
+recover."
+  (:require [clojure.java.io :as cjio]
+            [hesokuri.git :as git]
+            [hesokuri.ssh :as ssh]))
+
+(defn init
+  "Initializes the hesobase repository with the information of a single peer.
+Returns the hash of the first commit.
+
+git-dir - .git directory for the new repository.
+machine-name - the name of the first peer.
+port - the port on which the first peer listens for Hesokuri connections.
+key - the key of the first peer. Before storing, this will be coerced with
+    ssh/public-key-str.
+author - the author string of the first commit in the hesobase repo. See
+    hesokuri.git/author."
+  [git-dir machine-name port key author]
+  (->> (git/args git-dir ["init" "--bare"])
+       (git/invoke-with-summary "git")
+       git/throw-if-error)
+  (let [tree (->> (git/add-blob ["peer" machine-name "port"] (str port))
+                  (git/add-blob ["peer" machine-name "key"]
+                                (ssh/public-key-str key)))
+        commit-hash
+         (git/write-commit git-dir [["tree" nil tree]
+                                    ["author" author]
+                                    ["committer" author]
+                                    [:msg "executing hesobase/init\n"]])]
+    (->> ["update-ref" "refs/heads/master" (str commit-hash) ""]
+         (git/args git-dir)
+         (git/invoke-with-summary "git")
+         git/throw-if-error)
+    commit-hash))

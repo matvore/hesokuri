@@ -83,17 +83,6 @@
         (and (= 0 (:exit status))
              (= "" (:out status))))))
 
-(defn- branch-and-hash-list
-  "Returns a sequence of pairs. Each pair is a sequence containing two strings:
-  a branch name and its hash. output is the output of the command
-  'git branch -v --no-abbrev' as a string."
-  [output]
-  (for [line (-> output trim (split #"\n+"))
-        :let [unmarked (if (.startsWith line "*") (.substring line 1) line)
-              [name hash] (-> unmarked trim (split #" +" 3))]
-        :when (and hash (git/full-hash? hash) (not= name ""))]
-    [name hash]))
-
 (defn branches
   "Returns a map of refs/heads branches to their hashes."
   [{:keys [dir init] :as repo}]
@@ -104,7 +93,7 @@
     ;; correctly, so if there was an error just log a warning and try to parse
     ;; the output anyway.
     (when (not= 0 exit) (clojure.tools.logging/warn (second res-sum)))
-    (into {} (branch-and-hash-list out))))
+    (into {} (git/branch-and-hash-list out))))
 
 (defn checked-out-branch
   "Returns the name of the currently checked-out branch, or nil if no local
