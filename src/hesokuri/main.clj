@@ -13,12 +13,16 @@
 ; limitations under the License.
 
 (ns hesokuri.main
+  (:import [java.io FileOutputStream])
   (:use hesokuri.util
         [ring.adapter.jetty :only [run-jetty]]
         [ring.middleware.params :only [wrap-params]])
   (:require [clojure.java.io :as cjio]
             [hesokuri.dynamic-config :as dynamic-config]
+            [hesokuri.git :as git]
             [hesokuri.heso :as heso]
+            [hesokuri.hesobase :as hesobase]
+            [hesokuri.ssh :as ssh]
             [hesokuri.web :as web])
   (:gen-class))
 
@@ -41,10 +45,15 @@ functional."
   (cjio/file (or (getenv "HESOCFG")
                  (cjio/file home ".hesocfg"))))
 
+(def hesoroot
+  (cjio/file (or (getenv "HESOROOT") home)))
+
 (def hesobase-git-dir
   "Location of the hesobase .git directory."
-  (cjio/file (or (getenv "HESOROOT") home)
-             ".hesobase.git"))
+  (cjio/file hesoroot ".hesobase.git"))
+
+(def ssh-key-file
+  (cjio/file hesoroot ".hesoid"))
 
 (def default-prot-port
   "The default protocol port. This number is pronounced 'hesoku,' because 8
@@ -66,6 +75,14 @@ lein run help
 Experimental features
 ---------------------
 lein run init MACHINE-NAME [PORT]
+  Prepares this machine to be a Hesokuri peer. This includes creating a hesobase
+  to store configuration information, and a key pair for the identity of the
+  peer.
+
+  The key pair and hesobase will be stored in the hesoroot directory. By
+  default, hesoroot is the current user's home directory, but this can be
+  overridden by setting the HESOROOT environment variable.
+
   MACHINE-NAME is the name (and address) of this machine on the Hesokuri
   network. PORT is the local port to use for communicating with other machines
   on the network, or " default-prot-port " if omitted.
@@ -78,6 +95,49 @@ lein run init MACHINE-NAME [PORT]
   (.flush out)
   (System/exit code))
 
+(defn cmd-init
+  "Implementation of the 'init' command. Returns a vector representing the
+arguments to pass to exit.
+
+machine-name, prot-port-str - correspond to the command-line arguments.
+    prot-port-str is a String but can be nil if the argument was omitted on the
+    command line.
+hesobase-git-dir - .git directory of the hesobase configuration repo to create.
+    After this function returns, it will be a bare git repository with a single
+    commit on the 'master' branch.
+ssh-key-file - path to store the key pair
+key-pair - the key pair representing this machine. See
+    hesokuri.ssh/new-key-pair.
+author - the author string for the first commit's author and committer line. See
+    hesokuri.git/author."
+  [machine-name prot-port-str hesobase-git-dir ssh-key-file key-pair author]
+  (let [prot-port (if prot-port-str
+                    (try (Integer. prot-port-str)
+                         (catch NumberFormatException _ nil))
+                    default-prot-port)
+        already-exists (->> [hesobase-git-dir ssh-key-file]
+                            (filter #(.exists (cjio/file %)))
+                            first)]
+    (cond
+     (nil? prot-port) [(str "Invalid port number: '" prot-port-str "'\n")
+                       *err* 1]
+     already-exists [(str "File already exists at " already-exists "\n"
+                          "Delete it or set HESOROOT to a new location.\n")
+                     *err* 1]
+     :else
+     ,(do (with-open [key-stream (FileOutputStream. ssh-key-file)]
+            (serialize key-stream key-pair))
+          ;; Only let the owner read the key file
+          (doto (cjio/file ssh-key-file)
+            (.setReadOnly)
+            (.setReadable false false)
+            (.setReadable true true))
+          (hesobase/init hesobase-git-dir machine-name prot-port key-pair
+                         author)
+          [(str "Initialized hesobase in: " hesobase-git-dir "\n"
+                "Wrote this machine's key to: " ssh-key-file "\n")
+           *out* 0]))))
+
 (defn -main
   "Starts up Hesokuri or performs some administration task."
   [& args]
@@ -85,7 +145,7 @@ lein run init MACHINE-NAME [PORT]
   (alter-var-root #'*read-eval* (constantly false))
   (cond
    (empty? args)
-    (let [heso-agent (agent (heso/with-config []))
+   ,(let [heso-agent (agent (heso/with-config []))
           dynamic-config-agent
            (->> (cb [heso-agent] [config]
                     (send heso-agent heso/update-config config))
@@ -97,20 +157,13 @@ lein run init MACHINE-NAME [PORT]
                      wrap-params)
                  {:port diag-ui-port :join? false}))
    (= "init" (first args))
-    (let [[_ machine-name prot-port & extra-args] args
-          prot-port (if prot-port
-                      (try (Integer. prot-port)
-                           (catch NumberFormatException _
-                             (exit
-                              (format "Invalid port number: '%s'\n" prot-port)
-                              *err* 1)))
-                      default-prot-port)]
-      (when (or (seq extra-args)
-                (not machine-name))
-        (exit usage *err* 1))
-      ;; TODO: actually do initialization logic here. We should create a new
-      ;; repository for the hesobase and a key pair for this machine's
-      ;; identity.
-      )
+   ,(let [[machine-name prot-port :as cmd-args] (rest args)]
+      (apply exit
+             (if-not (<= 1 (count cmd-args) 2)
+               [usage *err* 1]
+               (do
+                 (.mkdirs (cjio/file hesoroot))
+                 (cmd-init machine-name prot-port hesobase-git-dir ssh-key-file
+                           (ssh/new-key-pair) (git/author))))))
    (= ["help"] args) (exit usage *out* 0)
    :else (exit usage *err* 1)))
