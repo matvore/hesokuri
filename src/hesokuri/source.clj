@@ -89,7 +89,7 @@
   (for [[branch hash] branches
           :let [local-branch (dissoc branch :peer)
                 local-hash (branches local-branch)]
-          :when (or (source-def/unwanted-branch? source-def (:name branch))
+          :when (or (source-def/unwanted-branch? source-def (:name branch) hash)
                     (and (not= branch local-branch)
                          local-hash
                          (ff? hash local-hash)))]

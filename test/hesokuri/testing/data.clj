@@ -48,3 +48,13 @@
 (def ^:dynamic *commit-tail* [["author" (git/author 2)]
                               ["committer" (git/author 2)]
                               [:msg "hesokuri.git/test-change\n"]])
+
+(def ^:dynamic *key-str*
+  (str "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtkP4D+a8xsr6W"
+       "Shm86vD0msWxKIwgBXwKSHwkiuzVEUPeND9iNXdfTIeDt1tw/IDfFuCq5"
+       "ZbSDIl5X5stx3r26ls8s/bFzG7cqJ1W523QmeH+QZWbjcRqdByw48e6Df"
+       "mcE2UcWoB/O3TgHqIhfUeRvyfeZ3+hgeJumwsmjKqcCE5sTMPum9OfpKQ"
+       "U2KzjdXb/njO10v9g2CzByJd2V9rEp7amTBsexIe2gZ7Oui8or3Op9yls"
+       "Gokf8YD5l2NOvlDT2DonSmxWTqcRlTfN44ywXrNfHkzX3qnj9XstbyIf7"
+       "F8Ejl9Jhyrpp+ygRuJxg9k2tF7hRiP4ToGtPR340nUNQIDAQAB"))
+
