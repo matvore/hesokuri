@@ -18,14 +18,12 @@
   (:use [clojure.string :only [trim]]
         clojure.test
         hesokuri.git
+        hesokuri.testing.data
+        hesokuri.testing.mock
         hesokuri.testing.temp)
   (:import [clojure.lang ExceptionInfo]
            [java.io ByteArrayOutputStream]
            [hesokuri.git ArrayBackedHash]))
-
-(def pretend-hash "aaaaaaaaaabbbbbbbbbbccccccccccffffffffff")
-(def pretend-hash-2 "aaaaaaaaaabbbbbbbbbbccccccccccdddddddddd")
-(def pretend-hash-3 "aaaaaaaaaa8888888888ccccccccccdddddddddd")
 
 (defn cycle-bytes [b count] (byte-array (take count (cycle b))))
 (defn cycle-bytes-hash [b] (new ArrayBackedHash (cycle-bytes b 20)))
@@ -47,9 +45,9 @@
        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" false
        "                                        " false
        "1234123412341234123412341234123412341234" true
-       pretend-hash true
-       pretend-hash-2 true
-       pretend-hash-3 true))
+       *hash-a* true
+       *hash-b* true
+       *hash-c* true))
 
 (deftest test-ArrayBackedHash-toString
   (is (= "a00000000000000000000000000000000000000b"
@@ -118,8 +116,8 @@
 
 (deftest read-blob-error
   (with-temp-repo [git-dir]
-    (is (full-hash? pretend-hash))
-    (is (thrown? ExceptionInfo (read-blob "git" git-dir pretend-hash)))))
+    (is (full-hash? *hash-a*))
+    (is (thrown? ExceptionInfo (read-blob "git" git-dir *hash-a*)))))
 
 (deftest read-blob-success
   (with-temp-repo [git-dir]
@@ -367,8 +365,8 @@
     (transact/transact
      (fn [trans]
        (is (= 0 (count @trans)))
-       (let [c (read-commit git-dir pretend-hash trans)
-             err-substr (str "cat-file commit " pretend-hash)]
+       (let [c (read-commit git-dir *hash-a* trans)
+             err-substr (str "cat-file commit " *hash-a*)]
          (is (= 1 (count @trans)))
          (try
            (doseq [e c] nil)
@@ -403,13 +401,13 @@
         c (author 1001)]
     (are [in-msg out-msg]
       (=
-       [["tree" pretend-hash]
-        ["parent" pretend-hash-2]
-        ["parent" pretend-hash-3]
+       [["tree" *hash-a*]
+        ["parent" *hash-b*]
+        ["parent" *hash-c*]
         ["author" a]
         ["committer" c]
         [:msg out-msg]]
-       (commit pretend-hash [pretend-hash-2 pretend-hash-3] in-msg a c))
+       (commit *hash-a* [*hash-b* *hash-c*] in-msg a c))
       "a" "a\n"
       " b" " b\n"
       "c\nd" "c\nd\n"
@@ -419,15 +417,11 @@
 
 (deftest test-write-and-read-commit-recursion
   (with-temp-repo [git-dir]
-    (let [commit-1 [["tree" nil [["100644" "some-file" nil "contents\n"]]]
-                    ["author" (author 1000)]
-                    ["committer" (author 1000)]
-                    [:msg "commit msg\n"]]
-          blob-hash "12f00e90b6ef79117ce6e650416b8cf517099b78"
+    (let [blob-hash "12f00e90b6ef79117ce6e650416b8cf517099b78"
           tree-hash-1 "a3d0b72057c8dc7f1d1c5e453ae354812b2c8465"
-          hash-1 (write-commit git-dir commit-1)
+          hash-1 (write-commit git-dir *first-commit*)
           hash-2 "34891e130dfaf78bccad115aa9cfe18f773f4337"]
-      (is (= "807edf48041693d978ca374fe34ea761dd68df2e" hash-1))
+      (is (= *first-commit-hash* hash-1))
       (transact/transact
        #(is (= [["100644" "some-file" (binary-hash blob-hash)]]
                (read-tree git-dir tree-hash-1 %))))
@@ -441,7 +435,7 @@
             hash-2b (write-commit
                      git-dir
                      [["tree" nil [["100644" "some-file" nil "new contents\n"]]]
-                      ["parent" nil commit-1]
+                      ["parent" nil *first-commit*]
                       ["author" (author 1001)]
                       ["committer" (author 1001)]
                       [:msg "commit msg 2\n"]])]
@@ -476,9 +470,6 @@
           set-branch-args (args git-dir ["update-ref"
                                          "refs/heads/master"
                                          first-com-hash])
-          second-com-tail [["author" (author 2)]
-                           ["committer" (author 2)]
-                           [:msg "hesokuri.git/test-change\n"]]
           second-com-hash "8d410286cba8ae75c9c7225264132b28b5a7b7f2"]
       (is (= "7e980a15b3aac54a97aecd59b28d6cd7cffd368d" first-com-hash))
       (throw-if-error (invoke-with-summary "git" set-branch-args))
@@ -487,24 +478,64 @@
                      #(->> %
                            (add-blob ["dir" "new-file-1"] "file contents\n")
                            (add-blob ["dir" "new-file-2"] (byte-array [1 2 3])))
-                     second-com-tail)))
+                     *commit-tail*)))
       (transact/transact
        (fn [trans]
          (is (= (concat [["tree" "e91010a6f3c954b766d83296a382ceeac6fe556a"]
                          ["parent" first-com-hash]]
-                        second-com-tail)
+                        *commit-tail*)
                 (map #(take 2 %)
                      (read-commit git-dir second-com-hash trans)))))))))
 
 (deftest test-change-throws-for-non-existent-ref
   (with-temp-repo [git-dir]
     (try
-      (change git-dir "refs/heads/foo" identity [["author" (author)]
-                                                 ["committer" (author)]
-                                                 [:msg "msg!\n"]])
+      (change git-dir "refs/heads/foo" identity *commit-tail*)
       (throw (ex-info "Should have thrown."))
       (catch ExceptionInfo e
         (is (not= -1 (.indexOf (.getMessage e) "rev-parse refs/heads/foo")))))))
+
+(deftest test-git-hash
+  (with-temp-repo [git-dir]
+    (make-first-commit git-dir)
+    (is (= *first-commit-hash* (git-hash "git" git-dir "refs/heads/master")))
+    (is (thrown? ExceptionInfo (git-hash "git" git-dir "refs/heads/oops")))))
+
+(deftest test-fast-forward
+  (let [dir "/srcdir"
+        dir-flag "--git-dir=/srcdir"
+        git-cmd "foogit"
+        git-result (fn [output] (repeat 10 {:err "" :out output :exit 0}))
+        invoke-mock (mock {[git-cmd [dir-flag "merge-base" *hash-a* *hash-b*]]
+                           (git-result *hash-c*)
+                           [git-cmd [dir-flag "merge-base" *hash-b* *hash-a*]]
+                           (git-result *hash-c*)
+                           [git-cmd [dir-flag "merge-base" *hash-d* *hash-e*]]
+                           (git-result *hash-e*)
+                           [git-cmd [dir-flag "merge-base" *hash-e* *hash-d*]]
+                           (git-result *hash-e*)
+                           [git-cmd [dir-flag "merge-base" *hash-f* *hash-g*]]
+                           (git-result *hash-f*)})]
+    (with-redefs [invoke invoke-mock]
+      (are [from-hash to-hash when-equal res]
+           (= (boolean res)
+              (boolean
+               (fast-forward? git-cmd dir from-hash to-hash when-equal)))
+           *hash-a* *hash-b* nil false
+           *hash-b* *hash-a* nil false
+           *hash-d* *hash-d* true true
+           *hash-d* *hash-e* nil false
+           *hash-e* *hash-d* nil true))))
+
+(deftest test-fast-forward-coerces-ref-to-hash
+  (with-temp-repo [git-dir]
+    (make-first-commit git-dir)
+    (change git-dir "refs/heads/master" #(add-blob ["foo"] "foo-text\n" %)
+            *commit-tail*)
+    (is (= ::equal
+           (fast-forward? "git" git-dir *first-commit-hash* "HEAD~1" ::equal)))
+    (is (true?
+         (fast-forward? "git" git-dir "HEAD~1" "refs/heads/master" ::equal)))))
 
 (deftest test-invoke-result-false
   (are [x] (not (invoke-result? x))
@@ -592,7 +623,8 @@
     (is (nil? (if-error (invoke-res 0 "")
                         (fn [_] (throw (IllegalStateException.
                                         "Should not get here."))))))
-    (is (nil? (throw-if-error (invoke-res 0 ""))))
+    (let [res (invoke-res 0 "")]
+      (is (= res (throw-if-error res))))
     (is (thrown? ExceptionInfo (throw-if-error (invoke-res 128 ""))))))
 
 (deftest test-if-error-for-invoke-with-summary-result
@@ -601,7 +633,8 @@
     (is (= "summary+extra"
            (if-error (invoke-res 13 "stderr") #(str % "+extra"))))
     (is (= nil (if-error (invoke-res 0 "") (constantly 42))))
-    (is (nil? (throw-if-error (invoke-res 0 ""))))
+    (let [res (invoke-res 0 "")]
+      (is (= res (throw-if-error res))))
     (is (thrown? ExceptionInfo (throw-if-error (invoke-res 128 ""))))))
 
 (deftest test-summary

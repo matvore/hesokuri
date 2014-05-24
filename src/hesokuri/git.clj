@@ -438,6 +438,31 @@ Returns the hash corresponding to the new commit."
            (recur git git-dir ref tree-fn commit-tail)
            new-commit-hash)))))
 
+(defn git-hash
+  "Coerces to a hash. To coerce to a hash string, call str on the result."
+  [git git-dir ref]
+  (if (full-hash? ref)
+    ref
+    (let [res-sum (throw-if-error
+                   (invoke-with-summary
+                    git (args git-dir ["rev-parse" (str ref)])))]
+      (trim (:out (first res-sum))))))
+
+(defn fast-forward?
+  "Returns true if the second hash is a fast-forward of the first hash. When
+the hashes are the same, returns when-equal. Returns false if the second hash
+is not a fast-forward of the first hash. Throws an ex-info if there was an error
+invoking git."
+  [git git-dir from-hash to-hash when-equal]
+  (let [from-hash (str (git-hash git git-dir from-hash))
+        to-hash (str (git-hash git git-dir to-hash))]
+    (if (= from-hash to-hash)
+      when-equal
+      (let [res-sum (throw-if-error
+                     (invoke-with-summary
+                      git (args git-dir ["merge-base" from-hash to-hash])))]
+        (= from-hash (trim (:out (first res-sum))))))))
+
 (defn invoke-result?
   "Returns true iff x is a valid result of a call to invoke. Note that this has
 nothing to do with whether the result indicates a successful invocation."
@@ -519,11 +544,13 @@ If f is not called, if-error returns nil."
 (defn throw-if-error
   "Similar to if-error, but rather than executing an arbitrary function on
 error, throws an ex-info whose message is the summary and the info map contains
-the exit code and stderr output entries from the invoke-streams promise map."
+the exit code and stderr output entries from the invoke-streams promise map.
+Returns the res argument if there was no error."
   [res]
   (if-error res #(throw (ex-info % (if (invoke-result? (nth res 0))
                                      (nth res 0)
-                                     @(nth res 2))))))
+                                     @(nth res 2)))))
+  res)
 
 (defn summary
   "Returns a user-readable summary of the result of 'invoke' as a string."
