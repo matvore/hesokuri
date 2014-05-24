@@ -148,7 +148,7 @@
   "Equivalent to hesokuri.git/fast-forward? but for repo objects."
   [repo & args]
   {:pre [(:init repo)]}
-  (apply git/fast-forward? "git" (git-dir repo) args))
+  (apply git/fast-forward? (git-dir repo) args))
 
 (defn push-to-branch
   "Performs a push. Returns 0 for success, non-zero for failure."

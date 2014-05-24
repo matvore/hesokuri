@@ -117,33 +117,32 @@
 (deftest read-blob-error
   (with-temp-repo [git-dir]
     (is (full-hash? *hash-a*))
-    (is (thrown? ExceptionInfo (read-blob "git" git-dir *hash-a*)))))
+    (is (thrown? ExceptionInfo (read-blob git-dir *hash-a*)))))
 
 (deftest read-blob-success
   (with-temp-repo [git-dir]
     (let [[stdin stdout finish]
-          (invoke-streams "git"
-                          (args git-dir ["hash-object" "-w" "--stdin"]))
+          ,(invoke-streams git-dir "hash-object" ["-w" "--stdin"])
           hash (do (spit stdin "hello Git")
                    (clojure.string/trim (slurp stdout)))]
       (is (= {:exit 0 :err ""} @finish))
-      (is (= "hello Git" (read-blob "git" git-dir hash))))))
+      (is (= "hello Git" (read-blob git-dir hash))))))
 
 (deftest read-blob-custom-stream-fn
   (with-temp-repo [git-dir]
     (let [blob-hash (write-blob git-dir "A")
-          result (read-blob "git" git-dir blob-hash #(.read %))]
+          result (read-blob git-dir blob-hash #(.read %))]
       (is (= (int \A) result)))))
 
 (deftest test-write-blob-success
   (with-temp-repo [git-dir]
-    (let [blob-hash (write-blob "git" git-dir "asdf")]
+    (let [blob-hash (write-blob git-dir "asdf")]
       (is (= "5e40c0877058c504203932e5136051cf3cd3519b" blob-hash))
-      (is (= "asdf" (read-blob "git" git-dir blob-hash))))))
+      (is (= "asdf" (read-blob git-dir blob-hash))))))
 
 (deftest test-write-blob-failure
   (try
-    (write-blob "git" (create-temp-dir) "")
+    (write-blob (create-temp-dir) "")
     (throw (ex-info "should have thrown" {}))
     (catch clojure.lang.ExceptionInfo e
       (is (not= -1 (.indexOf (.getMessage e) "hash-object -w --stdin")))
@@ -152,9 +151,9 @@
 (deftest test-write-blob-data-is-fn
   (with-temp-repo [git-dir]
     (let [data-fn #(.write % (.getBytes "foo" "UTF-8"))
-          blob-hash (write-blob "git" git-dir data-fn)]
+          blob-hash (write-blob git-dir data-fn)]
       (is (= "19102815663d23f8b75a47e7a01965dcdc96468c" blob-hash))
-      (is (= "foo" (read-blob "git" git-dir blob-hash))))))
+      (is (= "foo" (read-blob git-dir blob-hash))))))
 
 (defn tree-entry-bytes [entry-type filename hash-cycle-bytes]
   (concat (.getBytes (str entry-type " " filename "\u0000") "UTF-8")
@@ -201,8 +200,8 @@
 
 (deftest test-read-tree
   (with-temp-repo [git-dir]
-    (let [blob-1-hash (write-blob "git" git-dir "blob-1")
-          blob-2-hash (write-blob "git" git-dir "blob-2")
+    (let [blob-1-hash (write-blob git-dir "blob-1")
+          blob-2-hash (write-blob git-dir "blob-2")
           hash-args (args git-dir ["hash-object" "-w" "--stdin" "-t" "tree"])
           [subt-in subt-out :as hash-subt] (invoke-streams "git" hash-args)
           [tree-in tree-out :as hash-tree] (invoke-streams "git" hash-args)]
@@ -498,29 +497,27 @@
 (deftest test-git-hash
   (with-temp-repo [git-dir]
     (make-first-commit git-dir)
-    (is (= *first-commit-hash* (git-hash "git" git-dir "refs/heads/master")))
-    (is (thrown? ExceptionInfo (git-hash "git" git-dir "refs/heads/oops")))))
+    (is (= *first-commit-hash* (git-hash git-dir "refs/heads/master")))
+    (is (thrown? ExceptionInfo (git-hash git-dir "refs/heads/oops")))))
 
 (deftest test-fast-forward
   (let [dir "/srcdir"
         dir-flag "--git-dir=/srcdir"
-        git-cmd "foogit"
         git-result (fn [output] (repeat 10 {:err "" :out output :exit 0}))
-        invoke-mock (mock {[git-cmd [dir-flag "merge-base" *hash-a* *hash-b*]]
+        invoke-mock (mock {["git" [dir-flag "merge-base" *hash-a* *hash-b*]]
                            (git-result *hash-c*)
-                           [git-cmd [dir-flag "merge-base" *hash-b* *hash-a*]]
+                           ["git" [dir-flag "merge-base" *hash-b* *hash-a*]]
                            (git-result *hash-c*)
-                           [git-cmd [dir-flag "merge-base" *hash-d* *hash-e*]]
+                           ["git" [dir-flag "merge-base" *hash-d* *hash-e*]]
                            (git-result *hash-e*)
-                           [git-cmd [dir-flag "merge-base" *hash-e* *hash-d*]]
+                           ["git" [dir-flag "merge-base" *hash-e* *hash-d*]]
                            (git-result *hash-e*)
-                           [git-cmd [dir-flag "merge-base" *hash-f* *hash-g*]]
+                           ["git" [dir-flag "merge-base" *hash-f* *hash-g*]]
                            (git-result *hash-f*)})]
     (with-redefs [invoke invoke-mock]
       (are [from-hash to-hash when-equal res]
            (= (boolean res)
-              (boolean
-               (fast-forward? git-cmd dir from-hash to-hash when-equal)))
+              (boolean (fast-forward? dir from-hash to-hash when-equal)))
            *hash-a* *hash-b* nil false
            *hash-b* *hash-a* nil false
            *hash-d* *hash-d* true true
@@ -533,9 +530,9 @@
     (change git-dir "refs/heads/master" #(add-blob ["foo"] "foo-text\n" %)
             *commit-tail*)
     (is (= ::equal
-           (fast-forward? "git" git-dir *first-commit-hash* "HEAD~1" ::equal)))
+           (fast-forward? git-dir *first-commit-hash* "HEAD~1" ::equal)))
     (is (true?
-         (fast-forward? "git" git-dir "HEAD~1" "refs/heads/master" ::equal)))))
+         (fast-forward? git-dir "HEAD~1" "refs/heads/master" ::equal)))))
 
 (deftest test-invoke-result-false
   (are [x] (not (invoke-result? x))
@@ -584,7 +581,7 @@
 (deftest test-invoke-streams-empty-err
   (with-temp-repo [repo-dir git-dir-flag]
     (let [[in out finish :as result]
-          (invoke-streams "git" [git-dir-flag "hash-object" "-w" "--stdin"])]
+          ,(invoke-streams repo-dir "hash-object" ["-w" "--stdin"])]
       (cjio/copy "hello\n" in)
       (is (not (realized? finish)))
       (.close in)
@@ -597,7 +594,7 @@
 (deftest test-invoke-streams-err
   (with-temp-repo [repo-dir git-dir-flag]
     (let [[_ _ result summary]
-          (invoke-streams "git" [git-dir-flag "cat-file" "-t" "1234567"])
+          ,(invoke-streams repo-dir "cat-file" ["-t" "1234567"])
           err "fatal: Not a valid object name 1234567\n"]
       (is (= {:err err :exit 128} @result))
       (is (= (str "execute: git " git-dir-flag " cat-file -t 1234567\nstderr:\n"
