@@ -13,6 +13,7 @@
 ; limitations under the License.
 
 (ns hesokuri.config-test
+  (:require [hesokuri.ssh :as ssh])
   (:use clojure.test
         hesokuri.config
         hesokuri.testing.data
@@ -44,7 +45,8 @@
        ["(bad-value 1)" "(bad-value 2)"]
 
        {'(bad-key 1) :a '(bad-key 2) :b} false ["(bad-key 1)" "(bad-key 2)"]
-       {'(1) '(2) '(3) '(4)} false ["(1)" "(2)" "(3)" "(4)"]))
+       {'(1) '(2) '(3) '(4)} false ["(1)" "(2)" "(3)" "(4)"]
+       [(ssh/public-key *key-str*)] true []))
 
 (deftest test-validation-error
   (are [config okay substrings]
@@ -57,4 +59,8 @@
        {:comment "sources is wrong type" :sources #{}} false []
        {:comment ["not round-trippable" 'foo] :sources []} false ["foo"]
        {:comment ["no sources is okay"] :sources []} true []
-       #{"must be a map or vector"} false ["PersistentHashSet"]))
+       #{"must be a map or vector"} false ["PersistentHashSet"]
+       {:host-to-key [] :sources []} false [":host-to-key must be a map"]
+       {:host-to-key {"a" "b"} :sources []} false
+       ,["must be a java.security.PublicKey"]
+       {:host-to-key {"a" (ssh/public-key *key-str*)} :sources []} true []))

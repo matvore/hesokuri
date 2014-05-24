@@ -13,6 +13,7 @@
 ; limitations under the License.
 
 (ns hesokuri.config
+  (:import [java.security PublicKey])
   (:require [hesokuri.source-def :as source-def]
             [hesokuri.util :as util]
             [hesokuri.validation :as validation]))
@@ -30,6 +31,7 @@
    (true? data) nil
    (false? data) nil
    (nil? data) nil
+   (instance? PublicKey data) nil
 
    (map? data)
    (validation/combine (map round-trip-validation-error (apply concat data)))
@@ -40,6 +42,16 @@
    true
    (str "Data of type " (class data) " is not allowed in config files: " data)))
 
+(defn host-to-key-validation
+  [host-to-key]
+  (cond
+   (nil? host-to-key) nil
+   (not (map? host-to-key)) ":host-to-key must be a map"
+   (not (every? string? (keys host-to-key)))
+   ,"every host in :host-to-key must be a string"
+   (not (every? #(instance? PublicKey %) (vals host-to-key)))
+   ,"every key in :host-to-key must be a java.security.PublicKey"))
+
 (defn validation
   "Performs validation on the given config."
   [config]
@@ -49,4 +61,5 @@
      [(validation/for-vector "source def"
                              source-def/validation
                              (source-defs config))
-      (round-trip-validation-error config)])))
+      (round-trip-validation-error config)
+      (host-to-key-validation (:host-to-key config))])))
