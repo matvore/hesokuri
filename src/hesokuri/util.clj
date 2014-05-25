@@ -14,7 +14,8 @@
 
 (ns hesokuri.util
   (:import [java.io ByteArrayOutputStream ObjectInputStream ObjectOutputStream
-            OutputStream OutputStreamWriter])
+            OutputStream OutputStreamWriter]
+           [java.net URLDecoder URLEncoder])
   (:use clojure.tools.logging
         [clojure.string :only [trim]]))
 
@@ -148,3 +149,5 @@ a String with str if it is not a String already."
     .flush)
   nil)
 
+(defn %-decode [s] (URLDecoder/decode (str s) "UTF-8"))
+(defn %-encode [s] (URLEncoder/encode (str s) "UTF-8"))
