@@ -178,7 +178,7 @@
 (def entry-1-bytes (tree-entry-bytes "1" "file1" [0x01 0x10]))
 (def entry-2-bytes (tree-entry-bytes "2" "file2" [0x02 0x20]))
 
-(deftest test-read-tree
+(deftest test-read-tree-from-stream
   (let [bytes (concat entry-1-bytes entry-2-bytes)
         entries [(read-tree-entry (byte-stream entry-1-bytes))
                  (read-tree-entry (byte-stream entry-2-bytes))]
@@ -225,6 +225,32 @@
                       [["100644" "subfoo" (binary-hash blob-1-hash)]
                        ["100644" "subbar" (binary-hash blob-2-hash)]]]]
                     (read-tree git-dir tree-hash trans))))))))))
+
+(deftest test-blobs
+  (are [tree result]
+    (= result (blobs tree))
+    []
+    []
+
+    [["100644" "blob-name" *hash-a* :extra]]
+    [[["blob-name"] *hash-a* :extra]]
+
+    [["40000" "tree-name" *hash-a* [["100644" "blob-1" *hash-b* :extra]
+                                    ["100644" "blob-2" *hash-c* false]]]
+     ["100644" "blob-3" *hash-d* nil]]
+    [[["tree-name" "blob-1"] *hash-b* :extra]
+     [["tree-name" "blob-2"] *hash-c* false]
+     [["blob-3"] *hash-d* nil]]
+
+    [["40000" "empty-tree" *hash-a* []]
+     ["100644" "no-extra" *hash-b*]]
+    [[["no-extra"] *hash-b*]]
+
+    [["40000" "top" *hash-a*
+      [["40000" "middle" *hash-b*
+        [["40000" "bottom" *hash-c*
+          [["100644" "blob" *hash-d*]]]]]]]]
+    [[["top" "middle" "bottom" "blob"] *hash-d*]]))
 
 (deftest test-write-tree-entry
   (are [expected-bytes entry]

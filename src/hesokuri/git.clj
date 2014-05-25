@@ -181,6 +181,28 @@ responsible for closing it."
                   (throw-if-error cat-tree)
                   nil)))))
 
+(defn blobs
+  "Returns a flat, blob-centric view of a tree. This function returns a lazy
+  sequence in which every element represents a blob. Each blob is represented by
+  a sequence:
+    [PATH & DETAIL]
+  PATH is a vector containing the path to the blob. If the blob is named a/b/c,
+  then PATH is [\"a\" \"b\" \"c\"].
+  DETAIL is whatever appears after the blob name in the original tree entry, and
+  begins with the blob's hash.
+
+  tree - The tree as returned by read-tree.
+  path-prefix - A sequence (usually vector) representing the path up to the
+      entry.
+  entry - A single tree entry, such as [\"100644\" \"blob\" ...]."
+  ([tree] (mapcat blobs (repeat []) tree))
+  ([path-prefix entry]
+     (let [[type name & [_ subtree :as detail]] entry
+           path (conj path-prefix name)]
+       (case type
+         "100644" [(cons path detail)]
+         "40000" (mapcat blobs (repeat path) subtree)))))
+
 (defn write-tree-entry
   "Write a tree entry to an output stream."
   [^OutputStream out [type name sha]]
