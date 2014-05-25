@@ -473,8 +473,8 @@ Returns the hash corresponding to the new commit."
 
 (defn branch-and-hash-list
   "Returns a sequence of pairs. Each pair is a sequence containing two strings:
-a branch name and its hash. output is the output of the command
-'git branch -v --no-abbrev' as a string."
+  a branch name and its hash. output is the output of the command
+  'git branch -v --no-abbrev' as a string."
   [output]
   (for [line (-> output trim (split #"\n+"))
         :let [unmarked (if (.startsWith line "*") (.substring line 1) line)

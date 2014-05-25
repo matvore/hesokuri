@@ -97,19 +97,19 @@ lein run init MACHINE-NAME [PORT]
 
 (defn cmd-init
   "Implementation of the 'init' command. Returns a vector representing the
-arguments to pass to exit.
+  arguments to pass to exit.
 
-machine-name, prot-port-str - correspond to the command-line arguments.
-    prot-port-str is a String but can be nil if the argument was omitted on the
-    command line.
-hesobase-git-dir - .git directory of the hesobase configuration repo to create.
-    After this function returns, it will be a bare git repository with a single
-    commit on the 'master' branch.
-ssh-key-file - path to store the key pair
-key-pair - the key pair representing this machine. See
-    hesokuri.ssh/new-key-pair.
-author - the author string for the first commit's author and committer line. See
-    hesokuri.git/author."
+  machine-name, prot-port-str - correspond to the command-line arguments.
+      prot-port-str is a String but can be nil if the argument was omitted on
+      the command line.
+  hesobase-git-dir - .git directory of the hesobase configuration repo to
+      create. After this function returns, it will be a bare git repository with
+       a single commit on the 'master' branch.
+  ssh-key-file - path to store the key pair
+  key-pair - the key pair representing this machine. See
+      hesokuri.ssh/new-key-pair.
+  author - the author string for the first commit's author and committer line.
+      See hesokuri.git/author."
   [machine-name prot-port-str hesobase-git-dir ssh-key-file key-pair author]
   (let [prot-port (if prot-port-str
                     (try (Integer. prot-port-str)
