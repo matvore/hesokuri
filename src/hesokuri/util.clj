@@ -13,7 +13,8 @@
 ; limitations under the License.
 
 (ns hesokuri.util
-  (:import [java.io ByteArrayOutputStream OutputStream OutputStreamWriter])
+  (:import [java.io ByteArrayOutputStream ObjectInputStream ObjectOutputStream
+            OutputStream OutputStreamWriter])
   (:use clojure.tools.logging
         [clojure.string :only [trim]]))
 
@@ -138,3 +139,12 @@ a String with str if it is not a String already."
       (.write s 0 (count s))
       (.flush)))
   nil)
+
+(defn serialize
+  "Uses Java serialization to serialize x to the OutputStream specified by out."
+  [^OutputStream out x]
+  (doto (ObjectOutputStream. out)
+    (.writeObject x)
+    .flush)
+  nil)
+

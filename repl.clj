@@ -39,7 +39,7 @@
 (require '[hesokuri.source-def :as source-def])
 (require '[hesokuri.ssh :as ssh])
 (require '[hesokuri.transact :as transact])
-(require '[hesokuri.util :as util])
+(require '[hesokuri.util :refer :all])
 (require '[hesokuri.validation :as validation])
 (require '[hesokuri.watcher :as watcher])
 (require '[hesokuri.web :as web])
@@ -50,12 +50,6 @@
 (import '[java.security.spec X509EncodedKeySpec])
 
 (use 'clojure.repl)
-
-(defn serialize [^OutputStream out x]
-  (doto (ObjectOutputStream. out)
-    (.writeObject x)
-    (.flush))
-  nil)
 
 (defn add-peer
   "Adds a new peer to a configuration, and returns a new configuration that can

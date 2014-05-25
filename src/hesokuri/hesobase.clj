@@ -89,8 +89,36 @@ changed to a directory or a non-empty file to hold more information.
 ***
 Merge conflicts that cannot be resolved automatically should be summarized in
 some kind of log in the repo, so in the off-chance it happens, the user can
-recover.
-")
+recover."
+  (:require [clojure.java.io :as cjio]
+            [hesokuri.git :as git]
+            [hesokuri.ssh :as ssh]))
+
+(defn init
+  "Initializes the hesobase repository with the information of a single peer.
+  Returns the hash of the first commit.
+
+  git-ctx - instance of hesokuri.git/Context
+  machine-name - the name of the first peer.
+  port - the port on which the first peer listens for Hesokuri connections.
+  key - the key of the first peer. Before storing, this will be coerced with
+      ssh/public-key-str.
+  author - the author string of the first commit in the hesobase repo. See
+      hesokuri.git/author."
+  [git-ctx machine-name port key author]
+  (git/throw-if-error (git/invoke-with-summary git-ctx "init" ["--bare"]))
+  (let [tree (->> (git/add-blob ["peer" machine-name "port"] (str port))
+                  (git/add-blob ["peer" machine-name "key"]
+                                (ssh/public-key-str key)))
+        commit-hash
+        ,(git/write-commit git-ctx [["tree" nil tree]
+                                    ["author" author]
+                                    ["committer" author]
+                                    [:msg "executing hesobase/init\n"]])]
+    (git/throw-if-error
+     (git/invoke-with-summary
+      git-ctx "update-ref" ["refs/heads/master" (str commit-hash) ""]))
+    commit-hash))
 
 (defn to-config
   "Converts a Git tree (see hesokuri.git/read-tree) to the config format, which
