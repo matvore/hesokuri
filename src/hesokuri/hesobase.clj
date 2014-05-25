@@ -72,11 +72,10 @@ The live-edit/only and live-edit/except directories cannot both exist for a
 single repo.
 
 Empty files called 'unwanted/{branch-name}/{hash}' (optional)
-The presence of such a file tells Hesokuri to delete any branch where the {hash}
-listed is a fast-forward or the same as the {branch-name}'s SHA. It will
-probably be very common for each branch-name to only have a single SHA listed,
-but by allowing multiple SHAs, you can later re-use the same branch name for
-newer work.
+The presence of such a file tells Hesokuri to delete any branch with the given
+name and SHA-1 hash. It will probably be very common for each branch-name to
+only have a single SHA listed, but by allowing multiple SHAs, you can later
+re-use the same branch name for newer work.
 
 FUTURE IMPROVEMENTS
 -------------------
@@ -92,3 +91,9 @@ Merge conflicts that cannot be resolved automatically should be summarized in
 some kind of log in the repo, so in the off-chance it happens, the user can
 recover.
 ")
+
+(defn to-config
+  "Converts a Git tree (see hesokuri.git/read-tree) to the config format, which
+is defined by hesokuri.config/validation."
+  [tree]
+  (throw (ex-info "TODO: implement" {})))

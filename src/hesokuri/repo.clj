@@ -145,17 +145,10 @@
   (log (invoke-git repo ["branch" (if allow-overwrite "-M" "-m") from to])))
 
 (defn fast-forward?
-  "Returns true iff the second hash is a fast-forward of the first hash. When
-  the hashes are the same, returns when-equal."
-  [{:keys [dir init] :as repo} from-hash to-hash when-equal]
-  {:pre [(git/full-hash? from-hash) (git/full-hash? to-hash) init]}
-  (if (= from-hash to-hash)
-    when-equal
-    (-> (invoke-git repo ["merge-base" from-hash to-hash])
-        first
-        :out
-        trim
-        (= from-hash))))
+  "Equivalent to hesokuri.git/fast-forward? but for repo objects."
+  [repo & args]
+  {:pre [(:init repo)]}
+  (apply git/fast-forward? (git-dir repo) args))
 
 (defn push-to-branch
   "Performs a push. Returns 0 for success, non-zero for failure."

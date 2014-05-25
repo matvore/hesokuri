@@ -16,7 +16,8 @@
   (:import [java.io File FileWriter])
   (:require [hesokuri.git :as git])
   (:use clojure.test
-        [clojure.java.io :only [file]]))
+        [clojure.java.io :only [file]]
+        hesokuri.testing.data))
 
 (defn create-temp-dir
   "Creates a temporary directory and returns a File pointing to its path."
@@ -53,3 +54,13 @@ flag (to pass to git when operating on the repo) to the git-dir-flag symbol."
        (is (= (:exit init-result#) 0))
        (is (= (:err init-result#) ""))
        ~@body)))
+
+(defn make-first-commit
+  "Writes *first-commit* to the given repository and creates a 'master' branch
+that points to it."
+  [git-dir]
+  (is (= *first-commit-hash* (git/write-commit git-dir *first-commit*)))
+  (->> ["update-ref" "refs/heads/master" *first-commit-hash*]
+       (git/args git-dir)
+       (git/invoke-with-summary "git")
+       git/throw-if-error))

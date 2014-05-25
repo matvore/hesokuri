@@ -15,7 +15,7 @@
 (ns hesokuri.git
   "Module that facilitates invoking git, and other Git utility code not specific
 to Hesokuri logic."
-  (:import [java.io InputStream OutputStream])
+  (:import [java.io File InputStream OutputStream])
   (:require [clojure.java.io :as cjio]
             clojure.java.shell
             [hesokuri.transact :as transact])
@@ -29,6 +29,25 @@ to Hesokuri logic."
          invoke
          invoke-streams
          invoke-with-summary)
+
+(defprotocol Context
+  "Represents a Git repository and a path to a Git command. When a String or
+java.io.File is used as a Context, the Git command is simply 'git' and the
+repository is the repository whose .git directory is the file specified by this
+value."
+  (cmd [this]
+    "Returns the path to the git executable. This could just be 'git'.")
+  (git-dir [this] "Returns the path to the .git directory."))
+
+(extend-type String
+  Context
+  (cmd [_] "git")
+  (git-dir [this] (cjio/file this)))
+
+(extend-type File
+  Context
+  (cmd [_] "git")
+  (git-dir [this] this))
 
 (defn hex-char-val
   "Returns the integral value of a hex digit for c in the range of 0-9 or a-f.
@@ -92,12 +111,10 @@ read."
 that contains the data as a single argument. This function returns whatever
 stream-fn returns. If stream-fn is omitted, slurp is used (the blob is read into
 a String and returned.)"
-  ([git-dir blob-hash] (read-blob "git" git-dir blob-hash))
-  ([git git-dir blob-hash] (read-blob git git-dir blob-hash slurp))
-  ([git git-dir blob-hash stream-fn]
+  ([ctx blob-hash] (read-blob ctx blob-hash slurp))
+  ([ctx blob-hash stream-fn]
      (let [[_ stdout :as cat-blob]
-           (invoke-streams
-            git (args git-dir ["cat-file" "blob" (str blob-hash)]))]
+           ,(invoke-streams ctx "cat-file" ["blob" (str blob-hash)])]
        (first [(try
                  (stream-fn stdout)
                  (finally (.close stdout)))
@@ -110,11 +127,9 @@ can be one of the following, checked in this order:
    that stream. The function can close or flush the stream, but it need not.
 2. an argument that is passed as the first argument to clojure.java.io/copy to
    write the blob data. 'data' can be any type accepted by that function."
-  ([git-dir data] (write-blob "git" git-dir data))
-  ([git git-dir data]
-     (let [hash-blob-args (args git-dir ["hash-object" "-w" "--stdin"])
-           [blob-in blob-out :as hash-blob]
-           (invoke-streams git hash-blob-args)]
+  ([ctx data]
+     (let [[blob-in blob-out :as hash-blob]
+           ,(invoke-streams ctx "hash-object" ["-w" "--stdin"])]
        (try
          (try
            (if (fn? data)
@@ -152,17 +167,16 @@ until it is accessed.
 If in is passed, then in cannot be used to read anything else, but the caller is
 responsible for closing it."
   ([in] (take-while some? (repeatedly #(read-tree-entry in))))
-  ([git-dir tree-hash trans] (read-tree "git" git-dir tree-hash trans))
-  ([git git-dir tree-hash trans]
-     (let [git-args (args git-dir ["cat-file" "tree" (str tree-hash)])
-           [_ stdout :as cat-tree] (invoke-streams git git-args)]
+  ([ctx tree-hash trans]
+     (let [[_ stdout :as cat-tree]
+           ,(invoke-streams ctx "cat-file" ["tree" (str tree-hash)])]
        (swap! trans transact/open stdout)
        (concat
         (for [[type _ hash :as info] (read-tree stdout)]
           (concat info
                   (lazy-seq
                    (when (= type "40000")
-                     [(read-tree git git-dir hash trans)]))))
+                     [(read-tree ctx hash trans)]))))
         (lazy-seq (swap! trans transact/close stdout)
                   (throw-if-error cat-tree)
                   nil)))))
@@ -185,18 +199,16 @@ accepted as the third argument to write-blob should be after the nil value. For
 each tree that must be updated, the original tree structure (usually after the
 hash) has been replaced with a different one of the same format. This function
 returns the Hash of the tree that was written."
-  ([git-dir tree] (write-tree "git" git-dir tree))
-  ([git git-dir tree]
-     (let [cat-tree-args (args git-dir ["hash-object" "-w" "--stdin" "-t"
-                                        "tree"])
-           [stdin stdout :as cat-tree] (invoke-streams git cat-tree-args)]
+  ([ctx tree]
+     (let [[stdin stdout :as cat-tree]
+           ,(invoke-streams ctx "hash-object" ["-w" "--stdin" "-t" "tree"])]
        (try
          (doseq [[type name hash replace] tree]
            (let [new-hash
                  (cond
                   hash hash
-                  (= type "40000") (write-tree git git-dir replace)
-                  :else (write-blob git git-dir replace))]
+                  (= type "40000") (write-tree ctx replace)
+                  :else (write-blob ctx replace))]
              (write-tree-entry stdin [type name new-hash])))
          (.close stdin)
          (first [(trim (slurp stdout))
@@ -298,17 +310,16 @@ When the read is lazily recursive, the tree and parent entries have a third
 element in the sequence which is the result of read-tree or read-commit for the
 hash. These sequence elements are lazily evaluated, so read-tree and read-commit
 will not get called if the elements are never evaluated."
-  ([git-dir commit-hash trans] (read-commit "git" git-dir commit-hash trans))
-  ([git git-dir commit-hash trans]
-     (let [cat-commit-args (args git-dir ["cat-file" "commit" commit-hash])
-           [_ stdout :as cat-commit] (invoke-streams git cat-commit-args)]
+  ([ctx commit-hash trans]
+     (let [[_ stdout :as cat-commit]
+           ,(invoke-streams ctx "cat-file" ["commit" commit-hash])]
        (swap! trans transact/open stdout)
        (concat (for [[name value] (read-commit stdout)]
                  (lazy-cat
                   [name value]
                   (cond
-                   (= name "tree") [(read-tree git git-dir value trans)]
-                   (= name "parent") [(read-commit git git-dir value trans)])))
+                   (= name "tree") [(read-tree ctx value trans)]
+                   (= name "parent") [(read-commit ctx value trans)])))
                (lazy-seq (do (swap! trans transact/close stdout)
                              (throw-if-error cat-commit)
                              nil)))))
@@ -380,10 +391,9 @@ can be written with write-commit-entry."
 (defn write-commit
   "Writes a commit to the given repository, possibly writing the parent and tree
 fields if their hashes are nil and the corresponding data follows the nil hash."
-  ([git-dir com] (write-commit "git" git-dir com))
-  ([git git-dir com]
-     (let [hash-args (args git-dir ["hash-object" "-w" "--stdin" "-t" "commit"])
-           [stdin stdout :as hash-commit] (invoke-streams git hash-args)]
+  ([ctx com]
+     (let [[stdin stdout :as hash-commit]
+           ,(invoke-streams ctx "hash-object" ["-w" "--stdin" "-t" "commit"])]
        (first [(try
                  (doseq [[name value data :as entry] com]
                    (write-commit-entry
@@ -391,8 +401,8 @@ fields if their hashes are nil and the corresponding data follows the nil hash."
                     [name
                      (cond
                       (some? value) value
-                      (= name "parent") (write-commit git git-dir data)
-                      (= name "tree") (write-tree git git-dir data))]))
+                      (= name "parent") (write-commit ctx data)
+                      (= name "tree") (write-tree ctx data))]))
                  (.close stdin)
                  (trim (slurp stdout))
                  (finally (.close stdin)
@@ -413,17 +423,15 @@ commit-tail - the commit data to use in the new commit, minus the parent and
     tree fields
 
 Returns the hash corresponding to the new commit."
-  ([git-dir ref tree-fn commit-tail]
-     (change "git" git-dir ref tree-fn commit-tail))
-  ([git git-dir ref tree-fn commit-tail]
+  ([ctx ref tree-fn commit-tail]
      (let [[{:keys [out]} :as get-orig-ref-hash]
-            (invoke-with-summary git (args git-dir ["rev-parse" ref]))
+           ,(invoke-with-summary ctx "rev-parse" [ref])
            orig-ref-hash (trim out)]
        (throw-if-error get-orig-ref-hash)
        (let [new-commit-hash
-              (transact/transact
+             ,(transact/transact
                (fn [trans]
-                 (let [orig-commit (read-commit git git-dir orig-ref-hash trans)
+                 (let [orig-commit (read-commit ctx orig-ref-hash trans)
                        orig-tree (-> #(= "tree" (first %))
                                      (filter orig-commit)
                                      first
@@ -431,12 +439,37 @@ Returns the hash corresponding to the new commit."
                        new-commit (concat [["tree" nil (tree-fn orig-tree)]
                                            ["parent" orig-ref-hash]]
                                           commit-tail)]
-                   (write-commit git git-dir new-commit))))
+                   (write-commit ctx new-commit))))
              update-ref-args
-              (args git-dir ["update-ref" ref new-commit-hash orig-ref-hash])]
-         (if (error? (invoke git update-ref-args))
-           (recur git git-dir ref tree-fn commit-tail)
+             ,(args (git-dir ctx)
+                    ["update-ref" ref new-commit-hash orig-ref-hash])]
+         (if (error? (invoke (cmd ctx) update-ref-args))
+           (recur ctx ref tree-fn commit-tail)
            new-commit-hash)))))
+
+(defn git-hash
+  "Coerces to a hash. To coerce to a hash string, call str on the result."
+  [ctx ref]
+  (if (full-hash? ref)
+    ref
+    (let [res-sum
+          ,(throw-if-error (invoke-with-summary ctx "rev-parse" [(str ref)]))]
+      (trim (:out (first res-sum))))))
+
+(defn fast-forward?
+  "Returns true if the second hash is a fast-forward of the first hash. When
+the hashes are the same, returns when-equal. Returns false if the second hash
+is not a fast-forward of the first hash. Throws an ex-info if there was an error
+invoking git."
+  [ctx from-hash to-hash when-equal]
+  (let [from-hash (str (git-hash ctx from-hash))
+        to-hash (str (git-hash ctx to-hash))]
+    (if (= from-hash to-hash)
+      when-equal
+      (let [res-sum (throw-if-error
+                     (invoke-with-summary
+                      ctx "merge-base" [from-hash to-hash]))]
+        (= from-hash (trim (:out (first res-sum))))))))
 
 (defn invoke-result?
   "Returns true iff x is a valid result of a call to invoke. Note that this has
@@ -474,26 +507,34 @@ four elements: an OutputStream corresponding to stdin, an InputStream
 corresponding to stdout, a future that will realize when the process
 terminates, and the summary as a string. The future is a map with two keys:
 :exit and :err, whose values correspond to the values of the same keys in the
-invoke return value. The summary part of the returned sequence is lazy."
-  [git args]
-  {:pre [(args? args)]}
-  (let [process (new ProcessBuilder (into [git] args))]
-    (doto process
-      (.redirectInput java.lang.ProcessBuilder$Redirect/PIPE)
-      (.redirectOutput java.lang.ProcessBuilder$Redirect/PIPE)
-      (.redirectError java.lang.ProcessBuilder$Redirect/PIPE))
-    (let [process (.start process)
-          finish (future
-                   (let [stderr (slurp (.getErrorStream process))]
-                     {:exit (.waitFor process)
-                      :err stderr}))]
-      (concat
-       [(.getOutputStream process)
-        (.getInputStream process)
-        finish]
-       (lazy-seq [(let [{:keys [err exit]} @finish]
-                    (format "execute: %s %s\nstderr:\n%sexit: %d\n"
-                            git (join " " args) err exit))])))))
+invoke return value. The summary part of the returned sequence is lazy.
+
+The two-argument overload simply takes the path to git and the args to pass to
+it. The three-argument overload composes the non-sub-command arguments to git
+itself based on which sub-command is being used. For instance, for the cat-file
+sub-command, only --git-dir needs to be passed besides the arguments specific to
+cat-file."
+  ([git args]
+     {:pre [(args? args)]}
+     (let [process (new ProcessBuilder (into [git] args))]
+       (doto process
+         (.redirectInput java.lang.ProcessBuilder$Redirect/PIPE)
+         (.redirectOutput java.lang.ProcessBuilder$Redirect/PIPE)
+         (.redirectError java.lang.ProcessBuilder$Redirect/PIPE))
+       (let [process (.start process)
+             finish (future
+                      (let [stderr (slurp (.getErrorStream process))]
+                        {:exit (.waitFor process)
+                         :err stderr}))]
+         (concat
+          [(.getOutputStream process)
+           (.getInputStream process)
+           finish]
+          (lazy-seq [(let [{:keys [err exit]} @finish]
+                       (format "execute: %s %s\nstderr:\n%sexit: %d\n"
+                               git (join " " args) err exit))])))))
+  ([ctx sub-cmd cmd-args]
+     (invoke-streams (cmd ctx) (args (git-dir ctx) (cons sub-cmd cmd-args)))))
 
 (defn error?
   "Determines if the given invoke result indicates an error. The result can be
@@ -519,11 +560,13 @@ If f is not called, if-error returns nil."
 (defn throw-if-error
   "Similar to if-error, but rather than executing an arbitrary function on
 error, throws an ex-info whose message is the summary and the info map contains
-the exit code and stderr output entries from the invoke-streams promise map."
+the exit code and stderr output entries from the invoke-streams promise map.
+Returns the res argument if there was no error."
   [res]
   (if-error res #(throw (ex-info % (if (invoke-result? (nth res 0))
                                      (nth res 0)
-                                     @(nth res 2))))))
+                                     @(nth res 2)))))
+  res)
 
 (defn summary
   "Returns a user-readable summary of the result of 'invoke' as a string."
@@ -536,11 +579,17 @@ the exit code and stderr output entries from the invoke-streams promise map."
 (defn invoke-with-summary
   "Calls invoke and returns two items in a sequence: the result of invoke
 followed by a string which is the summary. The summary part of the sequence is
-lazy."
-  [git args]
-  {:pre [(args? args)]}
-  (let [result (invoke git args)]
-    (cons result (lazy-seq [(summary args result)]))))
+lazy.
+
+See the documentation for invoke-streams for information on using the overload
+that takes a context."
+  ([git args]
+     {:pre [(args? args)]}
+     (let [result (invoke git args)]
+       (cons result (lazy-seq [(summary args result)]))))
+  ([ctx sub-cmd cmd-args]
+     (invoke-with-summary
+      (cmd ctx) (args (git-dir ctx) (cons sub-cmd cmd-args)))))
 
 (comment
   ;; Recursively read a tree at the given hash
