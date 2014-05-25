@@ -13,6 +13,7 @@
 ; limitations under the License.
 
 (ns hesokuri.hesobase-test
+  (:import [clojure.lang ExceptionInfo])
   (:require [clojure.java.io :as cjio]
             [hesokuri.git :as git]
             [hesokuri.transact :as transact])
@@ -38,3 +39,13 @@
       (is (= [["master" commit-hash]]
              (git/branch-and-hash-list
               (:out (git/invoke "git" branch-args))))))))
+
+(deftest test-init-master-branch-already-exists
+  (with-temp-repo [git-dir]
+    (make-first-commit git-dir)
+    (try
+      (init git-dir "machine-name" 1011 *key-str* (git/author 42))
+      (throw (ex-info "Should have thrown." {}))
+      (catch ExceptionInfo e
+        (is (not= (.indexOf (:err (ex-data e)) *first-commit-hash*) -1)
+            e)))))
