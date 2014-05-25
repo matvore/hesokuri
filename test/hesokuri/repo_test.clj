@@ -22,14 +22,6 @@
         hesokuri.testing.temp
         hesokuri.util))
 
-(def hash-a "a00000000000000000000000000000000000000a")
-(def hash-b "b00000000000000000000000000000000000000b")
-(def hash-c "c00000000000000000000000000000000000000c")
-(def hash-d "d00000000000000000000000000000000000000d")
-(def hash-e "e00000000000000000000000000000000000000e")
-(def hash-f "f00000000000000000000000000000000000000f")
-(def hash-g "0100000000000000000000000000000000000010")
-
 (deftest test-init-existing-bare-repo
   (with-temp-repo [repo-dir git-dir-flag false]
     (let [repo (init {:dir repo-dir})]
@@ -83,29 +75,6 @@
           (is (true? (fast-forward? repo commit-1-hash commit-2-hash :equal)))
           (is (not
                (fast-forward? repo commit-2-hash commit-1-hash :equal))))))))
-
-(deftest test-fast-forward
-  (let [repo {:dir "/srcdir" :bare false :init true}
-        git-result (fn [output] (repeat 10 {:err "" :out output :exit 0}))
-        invoke-git (mock {[repo ["merge-base" hash-a hash-b]]
-                          [(git-result hash-c)]
-                          [repo ["merge-base" hash-b hash-a]]
-                          [(git-result hash-c)]
-                          [repo ["merge-base" hash-d hash-e]]
-                          [(git-result hash-e)]
-                          [repo ["merge-base" hash-e hash-d]]
-                          [(git-result hash-e)]
-                          [repo ["merge-base" hash-f hash-g]]
-                          [(git-result hash-f)]})]
-    (with-redefs [hesokuri.repo/invoke-git invoke-git]
-      (are [from-hash to-hash when-equal res]
-           (= (boolean res)
-              (boolean (fast-forward? repo from-hash to-hash when-equal)))
-           hash-a hash-b nil false
-           hash-b hash-a nil false
-           hash-d hash-d true true
-           hash-d hash-e nil false
-           hash-e hash-d nil true))))
 
 (deftest test-working-area-clean-bare
   (is (working-area-clean {:dir (file "/ignored") :bare true :init true})))

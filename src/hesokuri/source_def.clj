@@ -36,14 +36,25 @@
             indicates that any branch, except one called private, should be
             considered live-edit.
       :unwanted-branches (optional)
+          This can be either a set or a map.
+
+          [If it is a set]
           A set of strings which indicate unwanted branch names. For any string
           in this set FOO, branches named FOO or FOO_hesokr_* will be
           automatically deleted when they are created. This prevents other peers
           from polluting your local set of branches. Obviously, care must be
           taken when putting strings here.
+
+          [If it is a map]
+          A map of branch names to vector of Git hashes (see hesokuri.git/Hash).
+          The branch is branch is deleted if some branch
+          exists with the given name and points to one of those hashes.
+
   More entries will be added in the future to allow advanced customization of
   behavior."
-  (:require [hesokuri.validation :as validation]))
+  (:import [java.util Set])
+  (:require [hesokuri.git :as git]
+            [hesokuri.validation :as validation]))
 
 (defn- kind
   "Returns the kind of the given def, and also performs a sanity check on it
@@ -63,7 +74,8 @@
 (defn- extensible-validation
   [def]
   (let [live-edit-branches-value
-        (delay (second (first (:live-edit-branches def))))]
+        ,(delay (second (first (:live-edit-branches def))))
+        unwanted (delay (:unwanted-branches def))]
     (validation/conditions
      (= (kind def) :extensible)
      "expected :extensible, but got :simple"
@@ -81,10 +93,17 @@
      ["Value in live-edit-branches map must be set of non-empty strings: "
       @live-edit-branches-value]
 
-     (or (not (:unwanted-branches def))
-         (set-of-non-empty-strings? (:unwanted-branches def)))
-     [":unwanted-branches value must be set of non-empty strings: "
-      (:unwanted-branches def)]
+     (or (nil? @unwanted)
+         (set-of-non-empty-strings? @unwanted)
+         (and (map? @unwanted)
+              (all-non-empty-strings? (keys @unwanted))
+              (every? (fn [v]
+                        (and (vector? v)
+                             (every? #(and (string? %) (git/full-hash? %)) v)))
+                      (vals @unwanted))))
+     [":unwanted-branches value must be set of non-empty strings, or a map of "
+      "branch names to vectors of full Git hash strings: "
+      @unwanted]
 
      :passes
      (validation (:host-to-path def)))))
@@ -150,8 +169,15 @@
         (only branch-name)))))
 
 (defn unwanted-branch?
-  "Truthy if the branch name given should be deleted if every found. This
-  includes versions of the branch that originate on another peer."
-  [def branch-name]
-  {:pre [(string? branch-name)]}
-  ((or (:unwanted-branches def) #{}) branch-name))
+  "Truthy if the branch name given should be deleted. This includes versions of
+the branch that originate on another peer. If the branch-hash is not given, and
+the unwanted-branches map specifies unwanted hashes, then this function will
+return falsey."
+  [{:keys [unwanted-branches] :as self} branch-name branch-hash]
+  (let [branch-name (str branch-name)
+        branch-hash (str branch-hash)]
+    (cond
+     (map? unwanted-branches)
+     ,(some #(= branch-hash (str %)) (unwanted-branches branch-name))
+     (set? unwanted-branches)
+     ,(unwanted-branches branch-name))))
