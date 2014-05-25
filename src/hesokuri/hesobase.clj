@@ -96,4 +96,4 @@ recover.
   "Converts a Git tree (see hesokuri.git/read-tree) to the config format, which
 is defined by hesokuri.config/validation."
   [tree]
-  (throw (ex-info "TODO: implement")))
+  (throw (ex-info "TODO: implement" {})))
