@@ -307,6 +307,50 @@
               (add-blob ["a" "b"] "blob1")
               (add-blob ["a" "c"] "blob2")))))
 
+(deftest test-remove-entry
+  (let [foo-tree ["40000" "foo" *hash-d*
+                  [["100644" "bar" *hash-e* "blob content"]]]]
+    (is (thrown? ExceptionInfo (into [] (remove-entry ["fake"] [foo-tree]))))
+    (are [in-tree path out-tree]
+      (= out-tree (remove-entry path in-tree))
+
+      [["40000" "foo" nil
+        [["100644" "bar" nil "blob content"]]]]
+      ["foo"]
+      []
+
+      [foo-tree]
+      ["foo" "bar"]
+      []
+
+      [["100644" "README.md" nil "docs"]
+       foo-tree]
+      ["foo" "bar"]
+      [["100644" "README.md" nil "docs"]]
+
+      [["100644" "README.md" nil "docs"]
+       foo-tree]
+      ["foo"]
+      [["100644" "README.md" nil "docs"]]
+
+      [["100644" "README.md" nil "docs"]
+       foo-tree]
+      ["README.md"]
+      [foo-tree]
+
+      [foo-tree]
+      []
+      []
+
+      [["100644" "LICENSE" *hash-a*]
+       ["40000" "should_lose_hash" *hash-b*
+        [foo-tree
+         ["100644" "README.md" *hash-c*]]]]
+      ["should_lose_hash" "README.md"]
+      [["100644" "LICENSE" *hash-a*]
+       ["40000" "should_lose_hash" nil
+        [foo-tree]]])))
+
 (deftest test-get-entry
   (let [tree (->> []
                   (add-blob ["topdir" "subdir" "blob1"] "blob1-data")
