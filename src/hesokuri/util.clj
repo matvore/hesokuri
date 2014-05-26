@@ -151,3 +151,15 @@ a String with str if it is not a String already."
 
 (defn %-decode [s] (URLDecoder/decode (str s) "UTF-8"))
 (defn %-encode [s] (URLEncoder/encode (str s) "UTF-8"))
+
+(defn conj-in
+  "Similar to assoc-in, but the deepest substructure is a collection that
+  supports conj rather than a map.
+  m - Nested associative structure to alter.
+  ks - Sequences of keys representing path to the collection to conj to.
+  v - The new value to conj into the collection.
+  default-coll - What to conj into if the collection is not present. Typically
+      this is [], #{}, or ()."
+  [m ks v default-coll]
+  (let [orig-coll (get-in m ks default-coll)]
+    (assoc-in m ks (conj orig-coll v))))

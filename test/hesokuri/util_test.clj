@@ -72,3 +72,10 @@
     42
     "a string"
     [10 12 14]))
+
+(deftest test-conj-in
+  (are [m ks v default-coll result]
+    (= result (conj-in m ks v default-coll))
+    {} [:a] 4 #{1 2 3} {:a #{1 2 3 4}}
+    {:a {}} [:a :b] 4 [3 2 1 0] {:a {:b [3 2 1 0 4]}}
+    [] [0 :a] 42 '(7 6) [{:a '(42 7 6)}]))
