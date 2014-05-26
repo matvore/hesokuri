@@ -66,3 +66,15 @@ config-tree: the tree corresponding to the original configuration. Corresponds
   (->> config-tree
        (git/add-blob ["peer" name "key"] #(serialize % (ssh/public-key key)))
        (git/add-blob ["peer" name "port"] (str port))))
+
+(defn read-config
+  "Reads a hesobase repo and converts it to the config format, which is defined
+  by hesokuri.config/validation.
+
+  git-ctx - Instance of hesokuri.git/Context.
+  ref - The ref to read. Defaults to refs/heads/master. Can be a tree or a
+      commit."
+  ([git-ctx] (read-config git-ctx "refs/heads/master"))
+  ([git-ctx ref]
+     (transact/transact
+      #(hesobase/tree->config (git/read-tree git-ctx ref % git/read-blob)))))

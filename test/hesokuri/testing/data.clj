@@ -49,7 +49,10 @@
                               ["committer" (git/author 2)]
                               [:msg "hesokuri.git/test-change\n"]])
 
-(def ^:dynamic *key-str*
+;;; Keys take a non-trivial amount of time to generate. DO NOT generate them in
+;;; unit tests.
+
+(def ^:dynamic *key-str-a*
   (str "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtkP4D+a8xsr6W"
        "Shm86vD0msWxKIwgBXwKSHwkiuzVEUPeND9iNXdfTIeDt1tw/IDfFuCq5"
        "ZbSDIl5X5stx3r26ls8s/bFzG7cqJ1W523QmeH+QZWbjcRqdByw48e6Df"
@@ -57,3 +60,12 @@
        "U2KzjdXb/njO10v9g2CzByJd2V9rEp7amTBsexIe2gZ7Oui8or3Op9yls"
        "Gokf8YD5l2NOvlDT2DonSmxWTqcRlTfN44ywXrNfHkzX3qnj9XstbyIf7"
        "F8Ejl9Jhyrpp+ygRuJxg9k2tF7hRiP4ToGtPR340nUNQIDAQAB"))
+
+(def ^:dynamic *key-str-b*
+  (str "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkNHFHdrOIZawB"
+       "p5gidF8X3dkWu0kUkFfMhcLFzdS5FDKF5zdWgaAtwyn4UTXa7aB3f4zxl"
+       "V2SwEIl33nOcUIzRphER0Hl9bYkyrWrdWnP2Xc0CF3EqGXQGCF75+PJ7F"
+       "Lrf0CcNc6h/d3YFXoctJxlqEu43K5s0kZFWFsRrjNxgbZuqCsHvo4qqw7"
+       "2R3qLJ5GdRl2ZFXy3hQ+h72FXkyCbqqTT0Jzre7lo0mgWr3/EA2lGbuLf"
+       "Te3fM1L7J2tENOUTVZsEXrAtrBGa9BiLG4SPJkiJ6lLgE9S7fXF9M3Rkf"
+       "wO6OpXO4OS+DRRD+n+f4sR4RgWsMXuc7ksT50M6B+pVQIDAQAB"))
