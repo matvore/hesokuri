@@ -13,13 +13,13 @@
 ; limitations under the License.
 
 (ns hesokuri.peer-test
-  (:use [clojure.java.io :only [file]]
-        clojure.test
-        hesokuri.testing.mock
-        hesokuri.util)
-  (:require [hesokuri.git :as git]
+  (:require [clojure.java.io :refer [file]]
+            [clojure.test :refer :all]
+            [hesokuri.git :as git]
             [hesokuri.peer :as peer]
-            [hesokuri.peer-repo :as peer-repo]))
+            [hesokuri.peer-repo :as peer-repo]
+            [hesokuri.testing.mock :refer :all]
+            [hesokuri.util :refer :all]))
 
 (def ^:dynamic peer-repo {:host "repohost" :path "/repopath"})
 

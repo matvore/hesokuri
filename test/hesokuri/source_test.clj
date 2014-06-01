@@ -13,8 +13,8 @@
 ; limitations under the License.
 
 (ns hesokuri.source-test
-  (:use clojure.test
-        hesokuri.source))
+  (:require [clojure.test :refer :all]
+            [hesokuri.source :refer :all]))
 
 (deftest test-branches-to-delete
   (are [branches unwanted-branches ff-pairs expected-result]

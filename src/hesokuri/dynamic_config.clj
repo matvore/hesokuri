@@ -13,11 +13,11 @@
 ; limitations under the License.
 
 (ns hesokuri.dynamic-config
-  (:require [hesokuri.config :as config]
-            [hesokuri.watcher :as watcher])
-  (:use [clojure.java.io :only [file]]
-        clojure.tools.logging
-        hesokuri.util))
+  (:require [clojure.java.io :refer [file]]
+            [clojure.tools.logging :refer :all]
+            [hesokuri.config :as config]
+            [hesokuri.util :refer :all]
+            [hesokuri.watcher :as watcher]))
 
 (defn- handle-change
   "Reads the configuration from the given file and calls on-change-cb with it.

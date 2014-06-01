@@ -13,11 +13,11 @@
 ; limitations under the License.
 
 (ns hesokuri.watcher-test
-  (:use [clojure.java.io :only [file]]
-        clojure.test
-        hesokuri.testing.temp
-        hesokuri.util
-        hesokuri.watcher))
+  (:require [clojure.java.io :refer [file]]
+            [clojure.test :refer :all]
+            [hesokuri.testing.temp :refer :all]
+            [hesokuri.util :refer :all]
+            [hesokuri.watcher :refer :all]))
 
 (deftest test-for-dir
   (let [temp-dir (create-temp-dir)]

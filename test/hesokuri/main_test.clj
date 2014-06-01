@@ -15,11 +15,11 @@
 (ns hesokuri.main-test
   (:import [java.io FileInputStream ObjectInputStream])
   (:require [clojure.java.io :as cjio]
-            [hesokuri.git :as git])
-  (:use clojure.test
-        hesokuri.main
-        hesokuri.testing.data
-        hesokuri.testing.temp))
+            [clojure.test :refer :all]
+            [hesokuri.git :as git]
+            [hesokuri.main :refer :all]
+            [hesokuri.testing.data :refer :all]
+            [hesokuri.testing.temp :refer :all]))
 
 (defn do-cmd-init [prot-port-str hesoroot]
   (cmd-init "machine-name"

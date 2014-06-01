@@ -13,11 +13,11 @@
 ; limitations under the License.
 
 (ns hesokuri.source-def-test
-  (:require [hesokuri.git :as git])
-  (:use clojure.test
-        hesokuri.source-def
-        hesokuri.testing.data
-        hesokuri.testing.temp))
+  (:require [clojure.test :refer :all]
+            [hesokuri.git :as git]
+            [hesokuri.source-def :refer :all]
+            [hesokuri.testing.data :refer :all]
+            [hesokuri.testing.temp :refer :all]))
 
 (def ^:dynamic *host-to-path* {"host" "/path"})
 

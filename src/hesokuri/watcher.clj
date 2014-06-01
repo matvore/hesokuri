@@ -30,8 +30,8 @@
             Path
             Paths
             StandardWatchEventKinds])
-  (:use [clojure.java.io :only [file]]
-        hesokuri.util))
+  (:require [clojure.java.io :refer [file]]
+            [hesokuri.util :refer :all]))
 
 (defmulti ^:private register (fn [service _ _] (class service)))
 

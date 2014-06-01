@@ -18,10 +18,10 @@ to Hesokuri logic."
   (:import [java.io File InputStream OutputStream])
   (:require [clojure.java.io :as cjio]
             clojure.java.shell
-            [hesokuri.transact :as transact])
-  (:use [clojure.string :only [blank? join split trim]]
-        clojure.tools.logging
-        hesokuri.util))
+            [clojure.string :refer [blank? join split trim]]
+            [clojure.tools.logging :refer :all]
+            [hesokuri.transact :as transact]
+            [hesokuri.util :refer :all]))
 
 (declare args
          error?

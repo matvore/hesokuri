@@ -14,16 +14,16 @@
 
 (ns hesokuri.main
   (:import [java.io FileOutputStream])
-  (:use hesokuri.util
-        [ring.adapter.jetty :only [run-jetty]]
-        [ring.middleware.params :only [wrap-params]])
   (:require [clojure.java.io :as cjio]
             [hesokuri.dynamic-config :as dynamic-config]
             [hesokuri.git :as git]
             [hesokuri.heso :as heso]
             [hesokuri.hesobase :as hesobase]
             [hesokuri.ssh :as ssh]
-            [hesokuri.web :as web])
+            [hesokuri.util :refer :all]
+            [hesokuri.web :as web]
+            [ring.adapter.jetty :refer [run-jetty]]
+            [ring.middleware.params :refer [wrap-params]])
   (:gen-class))
 
 (def diag-ui-port

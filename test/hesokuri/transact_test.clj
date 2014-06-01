@@ -13,8 +13,8 @@
 ; limitations under the License.
 
 (ns hesokuri.transact-test
-  (:use clojure.test
-        hesokuri.transact))
+  (:require [clojure.test :refer :all]
+            [hesokuri.transact :refer :all]))
 
 (deftest test-noop-transaction
   (is (= 42 (transact (fn [_] 42)))))

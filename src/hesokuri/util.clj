@@ -16,8 +16,8 @@
   (:import [java.io ByteArrayOutputStream ObjectInputStream ObjectOutputStream
             OutputStream OutputStreamWriter]
            [java.net URLDecoder URLEncoder])
-  (:use clojure.tools.logging
-        [clojure.string :only [trim]]))
+  (:require [clojure.string :refer [trim]]
+            [clojure.tools.logging :refer :all]))
 
 (defmacro letmap
   "A macro that behaves like let, creating temporary bindings for variables, and

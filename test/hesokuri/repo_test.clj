@@ -13,14 +13,14 @@
 ; limitations under the License.
 
 (ns hesokuri.repo-test
-  (:require [hesokuri.git :as git])
-  (:use [clojure.java.io :only [file]]
-        [clojure.string :only [trim]]
-        clojure.test
-        hesokuri.repo
-        hesokuri.testing.mock
-        hesokuri.testing.temp
-        hesokuri.util))
+  (:require [clojure.java.io :refer [file]]
+            [clojure.string :refer [trim]]
+            [clojure.test :refer :all]
+            [hesokuri.git :as git]
+            [hesokuri.repo :refer :all]
+            [hesokuri.testing.mock :refer :all]
+            [hesokuri.testing.temp :refer :all]
+            [hesokuri.util :refer :all]))
 
 (deftest test-init-existing-bare-repo
   (with-temp-repo [repo-dir git-dir-flag false]

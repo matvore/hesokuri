@@ -13,16 +13,16 @@
 ; limitations under the License.
 
 (ns hesokuri.heso
-  (:use [clojure.java.shell :only [sh]]
-        [clojure.string :only [split trim]]
-        clojure.tools.logging
-        hesokuri.util)
-  (:require [hesokuri.config :as config]
+  (:require [clojure.java.shell :refer [sh]]
+            [clojure.string :refer [split trim]]
+            [clojure.tools.logging :refer :all]
+            [hesokuri.config :as config]
             [hesokuri.heartbeats :as heartbeats]
             [hesokuri.peer :as peer]
             [hesokuri.repo :as repo]
             [hesokuri.source :as source]
-            [hesokuri.source-def :as source-def]))
+            [hesokuri.source-def :as source-def]
+            [hesokuri.util :refer :all]))
 
 (defn- ips
   "Returns the IP addresses of all network interfaces as a vector of strings."

@@ -15,10 +15,10 @@
 (ns hesokuri.ssh-test
   (:import [clojure.lang ExceptionInfo]
            [java.security PublicKey])
-  (:use clojure.test
-        clojure.tools.logging
-        hesokuri.ssh
-        hesokuri.testing.data))
+  (:require [clojure.test :refer :all]
+            [clojure.tools.logging :refer :all]
+            [hesokuri.ssh :refer :all]
+            [hesokuri.testing.data :refer :all]))
 
 (defn free-port []
   (let [socket (new java.net.ServerSocket 0)

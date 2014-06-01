@@ -13,11 +13,11 @@
 ; limitations under the License.
 
 (ns hesokuri.config-test
-  (:require [hesokuri.ssh :as ssh])
-  (:use clojure.test
-        hesokuri.config
-        hesokuri.testing.data
-        hesokuri.testing.validation))
+  (:require [clojure.test :refer :all]
+            [hesokuri.config :refer :all]
+            [hesokuri.ssh :as ssh]
+            [hesokuri.testing.data :refer :all]
+            [hesokuri.testing.validation :refer :all]))
 
 (deftest test-source-defs
   (are [config sources]

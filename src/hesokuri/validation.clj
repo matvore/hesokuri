@@ -20,7 +20,7 @@
   Functions that check for validation will return either a string, indicating
   the error, or nil - indicating validity. Such a value is called the validation
   result."
-  (:use [clojure.string :only [join]]))
+  (:require [clojure.string :refer [join]]))
 
 (defn combine
   "Combines validation results. This takes a sequence of validation results and

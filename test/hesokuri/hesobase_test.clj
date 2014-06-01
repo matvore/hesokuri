@@ -15,14 +15,14 @@
 (ns hesokuri.hesobase-test
   (:import [clojure.lang ExceptionInfo])
   (:require [clojure.java.io :as cjio]
+            [clojure.test :refer :all]
             [hesokuri.git :as git]
+            [hesokuri.hesobase :refer :all]
             [hesokuri.ssh :as ssh]
+            [hesokuri.testing.data :refer :all]
+            [hesokuri.testing.temp :refer :all]
             [hesokuri.transact :as transact]
-            [hesokuri.util :refer :all])
-  (:use clojure.test
-        hesokuri.hesobase
-        hesokuri.testing.data
-        hesokuri.testing.temp))
+            [hesokuri.util :refer :all]))
 
 (deftest test-init
   (let [git-dir (cjio/file (create-temp-dir) "hesobase.git")

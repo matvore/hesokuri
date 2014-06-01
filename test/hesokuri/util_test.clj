@@ -15,9 +15,9 @@
 (ns hesokuri.util-test
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream
             ObjectInputStream])
-  (:use clojure.test
-        hesokuri.util
-        hesokuri.testing.mock))
+  (:require [clojure.test :refer :all]
+            [hesokuri.util :refer :all]
+            [hesokuri.testing.mock :refer :all]))
 
 (deftest test-cb
   (let [x 10

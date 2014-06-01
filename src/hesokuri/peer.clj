@@ -15,9 +15,9 @@
 (ns hesokuri.peer
   "Implementation of the peer object. It optimizes access to a peer by keeping
   track of what has been successfully pushed to it."
-  (:use hesokuri.util)
   (:require [hesokuri.peer-repo :as peer-repo]
-            [hesokuri.repo :as repo]))
+            [hesokuri.repo :as repo]
+            [hesokuri.util :refer :all]))
 
 (def default
   "A new peer with default values for each entry. A peer has the following keys:

@@ -13,17 +13,17 @@
 ; limitations under the License.
 
 (ns hesokuri.git-test
-  (:require [clojure.java.io :as cjio]
-            [hesokuri.transact :as transact])
-  (:use [clojure.string :only [trim]]
-        clojure.test
-        hesokuri.git
-        hesokuri.testing.data
-        hesokuri.testing.mock
-        hesokuri.testing.temp)
   (:import [clojure.lang ExceptionInfo]
            [java.io ByteArrayOutputStream]
-           [hesokuri.git ArrayBackedHash]))
+           [hesokuri.git ArrayBackedHash])
+  (:require [clojure.java.io :as cjio]
+            [clojure.string :refer [trim]]
+            [clojure.test :refer :all]
+            [hesokuri.git :refer :all]
+            [hesokuri.testing.data :refer :all]
+            [hesokuri.testing.mock :refer :all]
+            [hesokuri.testing.temp :refer :all]
+            [hesokuri.transact :as transact]))
 
 (defn cycle-bytes [b count] (byte-array (take count (cycle b))))
 (defn cycle-bytes-hash [b] (new ArrayBackedHash (cycle-bytes b 20)))
