@@ -23,21 +23,17 @@ Data is organized as a file system, rather than a single flat file. This makes
 the database more storage-efficient when updated frequently.
 
 The Hesobase has slightly different information from the original configuration
-file, but the same kind of objects (repo, peer) are present. Each object
+file, but the same kind of objects (source, peer) are present. Each object
 is represented by a directory:
 
-/            # repo root
-/peer/       # contains all peers
-/peer/{name} # contains information on peer named {name}
-/repo/       # contains all repos
-/repo/{path} # contains information on repo at path {path}
+/              # repo root
+/peer/         # contains all peers
+/peer/{name}   # contains information on peer named {name}
+/source/       # contains all sources (synced repos)
+/source/{name} # contains information on source named {name}
 
-{name} and {path} are percent-encoded. The {name} of a peer corresponds exactly
-with the address used to access the peer.
-
-When a repo {path} is referred to, this is the path using '/' as the path
-component separator, even if it is in the context of a peer that does not use
-that as a path component separator.
+{name} for source and peer is percent-encoded. The {name} of a peer corresponds
+exactly with the address used to access the peer.
 
 When {name}, {path}, or {branch-name} appear in a directory or file name, it is
 percent-encoded.
@@ -53,12 +49,14 @@ In file called 'key'
 A Java-serialized instance of the RSA public key
 (result of (.getPublic (hesokuri.ssh/new-key-pair)))
 
-Empty files named 'repo/{path}'
-The presence of the file indicates that the peer has a copy of the repo. This
-file allows the user to configure which repos appear on which peers.
+Files named 'source/{name}'
+The presence of the file indicates that the peer has a copy of the source named
+{name}. The contents of the file is a raw String indicating the path of the
+source on the peer. If the path is relative, it is relative to hesoroot on that
+peer.
 
-FOR EACH REPO
--------------
+FOR EACH SOURCE
+---------------
 
 Empty files called 'live-edit/only/{branch-name}' (optional)
 Indicates a branch is considered a live edit branch. Any branch not listed here
@@ -69,7 +67,7 @@ List of branch names that are NOT considered live edit branches. Any branch not
 listed here IS a live edit branch.
 
 The live-edit/only and live-edit/except directories cannot both exist for a
-single repo.
+single source.
 
 Empty files called 'unwanted/{branch-name}/{hash}' (optional)
 The presence of such a file tells Hesokuri to delete any branch with the given
@@ -88,11 +86,13 @@ There are some instances of 'empty files.' Each empty file may some day be
 changed to a directory or a non-empty file to hold more information.
 ***
 Merge conflicts that cannot be resolved automatically should be summarized in
-some kind of log in the repo, so in the off-chance it happens, the user can
+some kind of log in the source, so in the off-chance it happens, the user can
 recover."
   (:require [clojure.java.io :as cjio]
             [hesokuri.git :as git]
-            [hesokuri.ssh :as ssh]))
+            [hesokuri.ssh :as ssh]
+            [hesokuri.transact :as transact]
+            [hesokuri.util :refer :all]))
 
 (defn init
   "Initializes the hesobase repository with the information of a single peer.
@@ -120,8 +120,52 @@ recover."
       git-ctx "update-ref" ["refs/heads/master" (str commit-hash) ""]))
     commit-hash))
 
-(defn to-config
-  "Converts a Git tree (see hesokuri.git/read-tree) to the config format, which
-is defined by hesokuri.config/validation."
+(defn tree->config
+  "Converts a tree to the config format, which is defined by
+  hesokuri.config/validation. The tree is in the format returned by
+  hesokuri.git/read-tree with hesokuri.git/read-blob as the blob reader."
   [tree]
-  (throw (ex-info "TODO: implement" {})))
+  (letfn [(reducer [config [path & blob-detail]]
+            (case (path 0)
+              "peer"
+              ,(let [peer-name (%-decode (path 1))
+                     blob-str (nth blob-detail 1)]
+                 (case (path 2)
+                   "port"
+                   ,(assoc-in config
+                              [:host-to-port peer-name]
+                              (Integer/parseInt blob-str))
+                   "key"
+                   ,(assoc-in config
+                              [:host-to-key peer-name]
+                              (ssh/public-key blob-str))
+                   "source"
+                   ,(let [source-path (%-decode (path 3))]
+                      (assoc-in config
+                                [:source-name-map source-path :host-to-path
+                                 peer-name]
+                                blob-str))))
+              "source"
+              ,(let [source-name (%-decode (path 1))]
+                 (case (path 2)
+                   "live-edit"
+                   ,(let [kind (keyword (path 3))
+                          branch-name (%-decode (path 4))]
+                      (conj-in config
+                               [:source-name-map source-name :live-edit-branches
+                                kind]
+                               branch-name
+                               #{}))
+                   "unwanted"
+                   ,(let [branch-name (%-decode (path 3))
+                          branch-hash (path 4)]
+                      (conj-in config
+                               [:source-name-map source-name :unwanted-branches
+                                branch-name]
+                               branch-hash
+                               []))))))
+          (add-sources-vector [config]
+            (assoc config :sources (vec (vals (:source-name-map config)))))]
+    (->> (git/blobs tree)
+         (reduce reducer {:source-name-map (sorted-map)})
+         add-sources-vector)))

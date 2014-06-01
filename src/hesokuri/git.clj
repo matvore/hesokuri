@@ -158,28 +158,62 @@ returns nil."
 
 (defn read-tree
   "Reads a tree object recursively and lazily from a Git repository. Returns a
-sequence of tree entries similar to those returned by read-tree-entry. However,
-if git-dir was passed to this function, each (sub)tree entry (the entry itself
-being a sequence) has at least one extra item: the result of read-tree for that
-subtree. The value is in a lazy-seq, so it will not be read from the repository
-until it is accessed.
+  sequence of tree entries similar to those returned by read-tree-entry.
+  However, if ctx was passed to this function, each entry (the entry itself
+  being a sequence) has an additional item. For entries corresponding to
+  subtrees, that item is the result of read-tree for that subtree. For entries
+  corresponding to blobs, that item is the result of calling blob-reader for
+  that blob. The last item is in a lazy-seq, so it will not be read from the
+  repository until it is accessed.
 
-If in is passed, then in cannot be used to read anything else, but the caller is
-responsible for closing it."
+  in - An InputStream from which to read the tree. If in is passed, then it
+      cannot be used to read anything else, but the caller is responsible for
+      closing it.
+  ctx - the Context.
+  tree-ref - the ref to read the tree from. This can be a commit ref.
+  blob-reader - a function which takes a Context and a blob hash and returns
+      some value. This value is appended to the end of each blob entry sequence,
+      and this function is called lazily. read-blob is a good function to use
+      here, since it returns the blob contents as a String. If omitted, defaults
+      to (constantly nil)."
   ([in] (take-while some? (repeatedly #(read-tree-entry in))))
-  ([ctx tree-hash trans]
+  ([ctx tree-ref trans] (read-tree ctx tree-ref trans (constantly nil)))
+  ([ctx tree-ref trans blob-reader]
      (let [[_ stdout :as cat-tree]
-           ,(invoke-streams ctx "cat-file" ["tree" (str tree-hash)])]
+           ,(invoke-streams ctx "cat-file" ["tree" (str tree-ref)])]
        (swap! trans transact/open stdout)
        (concat
         (for [[type _ hash :as info] (read-tree stdout)]
           (concat info
                   (lazy-seq
-                   (when (= type "40000")
-                     [(read-tree ctx hash trans)]))))
+                   [(case type
+                      "40000" (read-tree ctx hash trans blob-reader)
+                      "100644" (blob-reader ctx hash))])))
         (lazy-seq (swap! trans transact/close stdout)
                   (throw-if-error cat-tree)
                   nil)))))
+
+(defn blobs
+  "Returns a flat, blob-centric view of a tree. This function returns a lazy
+  sequence in which every element represents a blob. Each blob is represented by
+  a sequence:
+    [PATH & DETAIL]
+  PATH is a vector containing the path to the blob. If the blob is named a/b/c,
+  then PATH is [\"a\" \"b\" \"c\"].
+  DETAIL is whatever appears after the blob name in the original tree entry, and
+  begins with the blob's hash.
+
+  tree - The tree as returned by read-tree.
+  path-prefix - A sequence (usually vector) representing the path up to the
+      entry.
+  entry - A single tree entry, such as [\"100644\" \"blob\" ...]."
+  ([tree] (mapcat blobs (repeat []) tree))
+  ([path-prefix entry]
+     (let [[type name & detail] entry
+           path (conj path-prefix name)]
+       (case type
+         "100644" [(cons path detail)]
+         "40000" (mapcat blobs (repeat path) (nth detail 1))))))
 
 (defn write-tree-entry
   "Write a tree entry to an output stream."

@@ -46,7 +46,7 @@
 
        {'(bad-key 1) :a '(bad-key 2) :b} false ["(bad-key 1)" "(bad-key 2)"]
        {'(1) '(2) '(3) '(4)} false ["(1)" "(2)" "(3)" "(4)"]
-       [(ssh/public-key *key-str*)] true []))
+       [(ssh/public-key *key-str-a*)] true []))
 
 (deftest test-validation-error
   (are [config okay substrings]
@@ -63,4 +63,4 @@
        {:host-to-key [] :sources []} false [":host-to-key must be a map"]
        {:host-to-key {"a" "b"} :sources []} false
        ,["must be a java.security.PublicKey"]
-       {:host-to-key {"a" (ssh/public-key *key-str*)} :sources []} true []))
+       {:host-to-key {"a" (ssh/public-key *key-str-a*)} :sources []} true []))

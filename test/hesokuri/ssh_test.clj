@@ -44,8 +44,8 @@ the trailing newline."
     (is (= "RSA" (.getAlgorithm (.getPrivate pair))))))
 
 (deftest test-public-key-coersion-string-round-trip
-  (is (instance? PublicKey (public-key *key-str*)))
-  (is (= *key-str* (public-key-str (public-key *key-str*)))))
+  (is (instance? PublicKey (public-key *key-str-a*)))
+  (is (= *key-str-a* (public-key-str (public-key *key-str-a*)))))
 
 (deftest test-public-key-coersion-from-key-pair
   (is (instance? PublicKey (public-key (new-key-pair)))))

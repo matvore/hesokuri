@@ -178,7 +178,7 @@
 (def entry-1-bytes (tree-entry-bytes "1" "file1" [0x01 0x10]))
 (def entry-2-bytes (tree-entry-bytes "2" "file2" [0x02 0x20]))
 
-(deftest test-read-tree
+(deftest test-read-tree-from-stream
   (let [bytes (concat entry-1-bytes entry-2-bytes)
         entries [(read-tree-entry (byte-stream entry-1-bytes))
                  (read-tree-entry (byte-stream entry-2-bytes))]
@@ -219,12 +219,57 @@
           (throw-if-error hash-tree)
           (transact/transact
            (fn [trans]
-             (is (= [["100644" "foo" (binary-hash blob-1-hash)]
-                     ["100644" "bar" (binary-hash blob-2-hash)]
+             (is (= [["100644" "foo" (binary-hash blob-1-hash) nil]
+                     ["100644" "bar" (binary-hash blob-2-hash) nil]
                      ["40000" "subt" (binary-hash subt-hash)
-                      [["100644" "subfoo" (binary-hash blob-1-hash)]
-                       ["100644" "subbar" (binary-hash blob-2-hash)]]]]
+                      [["100644" "subfoo" (binary-hash blob-1-hash) nil]
+                       ["100644" "subbar" (binary-hash blob-2-hash) nil]]]]
                     (read-tree git-dir tree-hash trans))))))))))
+
+(deftest test-read-tree-custom-blob-reader
+  (with-temp-repo [git-dir]
+    (make-first-commit git-dir)
+    (change git-dir "refs/heads/master" #(add-blob ["dir" "blob"] "foo\n" %)
+            *commit-tail*)
+    (let [some-file-hash
+          ,(binary-hash "12f00e90b6ef79117ce6e650416b8cf517099b78")
+          dir-hash
+          ,(binary-hash "99a6a65ad7fa98164b610e9e40e0fd98cb59b4c7")
+          dir-blob-hash
+          ,(binary-hash "257cc5642cb1a054f08cc83f2d943e56fd3ebe99")]
+      (transact/transact
+       #(is (= [["100644" "some-file" some-file-hash
+                 (vector git-dir some-file-hash)]
+                ["40000" "dir" dir-hash
+                 [["100644" "blob" dir-blob-hash
+                   (vector git-dir dir-blob-hash)]]]]
+               (read-tree git-dir "HEAD" % vector)))))))
+
+(deftest test-blobs
+  (are [tree result]
+    (= result (blobs tree))
+    []
+    []
+
+    [["100644" "blob-name" *hash-a* :extra]]
+    [[["blob-name"] *hash-a* :extra]]
+
+    [["40000" "tree-name" *hash-a* [["100644" "blob-1" *hash-b* :extra]
+                                    ["100644" "blob-2" *hash-c* false]]]
+     ["100644" "blob-3" *hash-d* nil]]
+    [[["tree-name" "blob-1"] *hash-b* :extra]
+     [["tree-name" "blob-2"] *hash-c* false]
+     [["blob-3"] *hash-d* nil]]
+
+    [["40000" "empty-tree" *hash-a* []]
+     ["100644" "no-extra" *hash-b*]]
+    [[["no-extra"] *hash-b*]]
+
+    [["40000" "top" *hash-a*
+      [["40000" "middle" *hash-b*
+        [["40000" "bottom" *hash-c*
+          [["100644" "blob" *hash-d*]]]]]]]]
+    [[["top" "middle" "bottom" "blob"] *hash-d*]]))
 
 (deftest test-write-tree-entry
   (are [expected-bytes entry]
@@ -244,11 +289,11 @@
              hash (write-tree git-dir
                               [["100644" "foo" nil "at top dir\n"]
                                ["40000" "bar" nil [["100644" "file" nil
-                                                     "in dir\n"]]]])]
+                                                    "in dir\n"]]]])]
          (is (= "1fd6436bd031da537877d1531ac474a939e907fb" hash))
-         (is (= [["100644" "foo" hash-1]
+         (is (= [["100644" "foo" hash-1 nil]
                  ["40000" "bar" hash-2
-                  [["100644" "file" hash-3]]]]
+                  [["100644" "file" hash-3 nil]]]]
                 (read-tree git-dir hash trans))))
        (let [hash (write-tree git-dir [])]
          (is (= "4b825dc642cb6eb9a060e54bf8d69288fbee4904" hash))
@@ -466,7 +511,7 @@
           hash-2 "34891e130dfaf78bccad115aa9cfe18f773f4337"]
       (is (= *first-commit-hash* hash-1))
       (transact/transact
-       #(is (= [["100644" "some-file" (binary-hash blob-hash)]]
+       #(is (= [["100644" "some-file" (binary-hash blob-hash) nil]]
                (read-tree git-dir tree-hash-1 %))))
       (let [hash-2a (write-commit
                      git-dir
@@ -491,10 +536,11 @@
       (transact/transact
        #(is (= [["tree" "6a3a88444b0f4519764853af5c548bec66e28639"
                  [["100644" "some-file"
-                   (binary-hash "014fd71bde5393ad8b79305d1af6ec907557f828")]]]
+                   (binary-hash "014fd71bde5393ad8b79305d1af6ec907557f828")
+                   nil]]]
                 ["parent" hash-1
                  [["tree" tree-hash-1
-                   [["100644" "some-file" (binary-hash blob-hash)]]]
+                   [["100644" "some-file" (binary-hash blob-hash) nil]]]
                   ["author" (author 1000)]
                   ["committer" (author 1000)]
                   [:msg "commit msg\n"]]]
