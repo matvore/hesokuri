@@ -419,6 +419,26 @@
       ["topdir" "subdir" "blobx"]
        [["blobx"] subdir])))
 
+(deftest test-can-add-blob?-yes
+  (are [path tree]
+    (can-add-blob? (get-entry path tree))
+    ["a" "b"] []
+    ["a" "b"] [["100644" "b"]]
+    ["a" "b"] [["40000" "a" nil []]]
+    ["a" "b"] [["40000" "a" nil [["100644" "c" nil "asdf"]]]]))
+
+(deftest test-can-add-blob?-no
+  (are [path tree]
+    (not (can-add-blob? (get-entry path tree)))
+    [] []
+    [] [["100644" "a" nil "asdf"]]
+    ["a"] [["100644" "a" nil "asdf"]]
+    ["a" "b"] [["100644" "a" nil "asdf"]]
+    ["a" "b"] [["40000" "a" nil [["100644" "b" nil "asdf"]]]]
+    ["a" "b"] [["40000" "a" nil
+                [["40000" "b" nil
+                  [["100644" "c" nil "asdf"]]]]]]))
+
 (def person "John Doe <jdoe@google.com> 1398561813 -0700")
 
 (deftest test-read-commit

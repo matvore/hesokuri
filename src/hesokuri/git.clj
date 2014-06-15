@@ -324,20 +324,20 @@ tree: the tree to add the blob to. If omitted, effectively creates a new tree
 
 (defn get-entry
   "Finds an entry in a tree returned by read-tree.
-path: sequence of strings representing the path to the entry to find
-tree: a tree as returned by read-tree
+  path: sequence of strings representing the path to the entry to find
+  tree: a tree as returned by read-tree
 
-The return value is a sequence with at least two elements: the remaining,
-unmatched path; and the tree entry data corresponding to the final entry found.
-The second value will be nil if no items in 'path' could be matched.
+  The return value is a sequence with at least two elements: the remaining,
+  unmatched path; and the tree entry data corresponding to the final entry
+  found. The second value will be nil if no items in 'path' could be matched.
 
-The first value is the unmatched part of the path. If this is empty, the entry
-can considered to be successfully found.
+  The first value is the unmatched part of the path. If this is empty, the entry
+  can considered to be successfully found.
 
-The second value corresponds to a value returned by read-tree-entry, plus the
-additional data returned by read-tree appended to the end, if available. This
-second value can be used to make sure the type of the entry is expected (i.e. a
-blob or tree) by checking the first element in the sequence."
+  The second value corresponds to a value returned by read-tree-entry, plus the
+  additional data returned by read-tree appended to the end, if available. This
+  second value can be used to make sure the type of the entry is expected (i.e.
+  a blob or tree) by checking the first element in the sequence."
   ([path tree] (get-entry path tree nil))
   ([path tree last-matching]
      (if (or (empty? path) (empty? tree))
@@ -345,11 +345,22 @@ blob or tree) by checking the first element in the sequence."
        (let [[type name _ data :as entry] (first tree)]
          (cond
           (not= (first path) name)
-           (recur path (rest tree) last-matching)
-          (not= "40000" type)
-           [(rest path) entry]
+          ,(recur path (rest tree) last-matching)
+          (= "40000" type)
+          ,(recur (rest path) data entry)
           :else
-           (recur (rest path) data entry))))))
+          ,[(rest path) entry])))))
+
+(defn can-add-blob?
+  "Detects whether a blob can be safely added at some path, given the return
+  value of the 'get-entry' function."
+  [get-entry-result]
+  (let [[unmatch-path entry] get-entry-result]
+    (cond
+     (empty? unmatch-path) false
+     (nil? entry) true
+     (= "40000" (first entry)) true
+     :else false)))
 
 (defn read-commit
   "Reads commit information lazily from an InputStream or by invoking git.
