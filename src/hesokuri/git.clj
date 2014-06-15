@@ -206,8 +206,15 @@ returns nil."
   tree - The tree as returned by read-tree.
   path-prefix - A sequence (usually vector) representing the path up to the
       entry.
-  entry - A single tree entry, such as [\"100644\" \"blob\" ...]."
-  ([tree] (mapcat blobs (repeat []) tree))
+  entry - A single tree entry, such as [\"100644\" \"blob\" ...].
+
+  If tree is already a sequence of blobs, this function just returns that
+  sequence."
+  ([tree]
+     (cond
+      (empty? tree) []
+      (string? (first (first tree))) (mapcat blobs (repeat []) tree)
+      :else tree))
   ([path-prefix entry]
      (let [[type name & detail] entry
            path (conj path-prefix name)]

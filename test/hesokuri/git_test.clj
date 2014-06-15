@@ -269,7 +269,12 @@
       [["40000" "middle" *hash-b*
         [["40000" "bottom" *hash-c*
           [["100644" "blob" *hash-d*]]]]]]]]
-    [[["top" "middle" "bottom" "blob"] *hash-d*]]))
+    [[["top" "middle" "bottom" "blob"] *hash-d*]]
+
+    [[["a" "b" "c"] *hash-a*]
+     [["a" "b" "d"] *hash-b*]]
+    [[["a" "b" "c"] *hash-a*]
+     [["a" "b" "d"] *hash-b*]]))
 
 (deftest test-write-tree-entry
   (are [expected-bytes entry]
