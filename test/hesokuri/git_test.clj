@@ -428,16 +428,25 @@
     ["a" "b"] [["40000" "a" nil [["100644" "c" nil "asdf"]]]]))
 
 (deftest test-can-add-blob?-no
-  (are [path tree]
-    (not (can-add-blob? (get-entry path tree)))
-    [] []
-    [] [["100644" "a" nil "asdf"]]
-    ["a"] [["100644" "a" nil "asdf"]]
-    ["a" "b"] [["100644" "a" nil "asdf"]]
-    ["a" "b"] [["40000" "a" nil [["100644" "b" nil "asdf"]]]]
-    ["a" "b"] [["40000" "a" nil
-                [["40000" "b" nil
-                  [["100644" "c" nil "asdf"]]]]]]))
+  (let [tree-with-sources [["40000" "peer" nil
+                            [["40000" "a" nil
+                              [["40000" "source" nil
+                                [["100644" "sn" nil "sn"]]]]]
+                             ["40000" "b" nil
+                              [["40000" "source" nil
+                                [["100644" "sn" nil "sn"]]]]]]]]]
+    (are [path tree]
+      (not (can-add-blob? (get-entry path tree)))
+      [] []
+      [] [["100644" "a" nil "asdf"]]
+      ["a"] [["100644" "a" nil "asdf"]]
+      ["a" "b"] [["100644" "a" nil "asdf"]]
+      ["a" "b"] [["40000" "a" nil [["100644" "b" nil "asdf"]]]]
+      ["a" "b"] [["40000" "a" nil
+                  [["40000" "b" nil
+                    [["100644" "c" nil "asdf"]]]]]]
+      ["peer" "a" "source" "sn"] tree-with-sources
+      ["peer" "b" "source" "sn"] tree-with-sources)))
 
 (def person "John Doe <jdoe@google.com> 1398561813 -0700")
 

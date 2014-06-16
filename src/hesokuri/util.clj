@@ -163,3 +163,10 @@ a String with str if it is not a String already."
   [m ks v default-coll]
   (let [orig-coll (get-in m ks default-coll)]
     (assoc-in m ks (conj orig-coll v))))
+
+(defn like
+  "Converts all args using convert, then calls f with them. For
+  instance:
+  (like int + \\a 1) => (+ (int \\a) (int 1)) => 98"
+  [convert f & args]
+  (apply f (map convert args)))

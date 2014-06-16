@@ -119,6 +119,32 @@ changed to a directory or a non-empty file to hold more information."
           (map str (seq (format "%016x" timestamp)))
           [(%-encode (pr-str args))]))
 
+(defn source-name?
+  "Detects whether the given value can be used as a source name. See
+  source-name-spec for values that this function will return true for."
+  [name]
+  (and (string? name)
+       (not-empty name)
+       (every? #(or (like int <= \a % \z)
+                    (like int <= \A % \Z)
+                    (like int <= \0 % \9)
+                    (= \- %)
+                    (= \_ %))
+               name)))
+
+(def source-name-spec
+  "Human-readable string describing what is allowed in a source name."
+  (str "A source name is a non-empty string containing alpha-numeric "
+       "characters, hyphens (-), and/or underscores (_)."))
+
+(defn peer-names
+  "Returns the names of every peer in the hesobase given by 'tree'."
+  [tree]
+  (let [[unmatched [_ _ _ peer-tree]] (git/get-entry ["peer"] tree)]
+    (if (not-empty unmatched)
+      []
+      (map #(nth % 1) peer-tree))))
+
 (def cmd-map
   "Maps each command name to a function that implements it. A command is an
   atomic hesobase operation that may fail and is comprehensible to a human.
@@ -132,12 +158,36 @@ changed to a directory or a non-empty file to hold more information."
   Each function returns either the new tree of the hesobase repo, or an error
   message as a String. The function does NOT add a log entry."
   {"add-peer"
-   ,(fn [tree machine-name port key]
-      (if (git/can-add-blob? (git/get-entry ["peer" machine-name] tree))
-        (->> tree
-             (git/add-blob ["peer" machine-name "port"] port)
-             (git/add-blob ["peer" machine-name "key"] key))
-        (str "There is already a machine named: " machine-name)))})
+   (fn [tree machine-name port key]
+     (if (git/can-add-blob? (git/get-entry ["peer" machine-name] tree))
+       (->> tree
+            (git/add-blob ["peer" machine-name "port"] port)
+            (git/add-blob ["peer" machine-name "key"] key))
+       (str "There is already a machine named: " machine-name)))
+
+   "new-source"
+   ;;; Adds a source to every peer. The path of the source is equal to the name
+   ;;; of the source. Error if no peers exist, or all peers already have the
+   ;;; given source.
+   (fn [tree source-name]
+     (if-not (source-name? source-name)
+       (format "Not a valid source name. %s (%s)" source-name-spec source-name)
+       (loop [tree tree
+              to-add (peer-names tree)
+              added 0]
+         (if (empty? to-add)
+           (if (zero? added)
+             (str "No peers to add source to: " source-name)
+             tree)
+           (let [source-blob-path
+                 ["peer" (first to-add) "source" source-name]]
+             (if (git/can-add-blob? (git/get-entry source-blob-path tree))
+               (recur (git/add-blob source-blob-path source-name tree)
+                      (rest to-add)
+                      (inc added))
+               (recur tree
+                      (rest to-add)
+                      added)))))))})
 
 (defn cmd
   "Executes a command, usually one in the cmd-map, altering the given tree (if

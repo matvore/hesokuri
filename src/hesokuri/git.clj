@@ -53,11 +53,10 @@ value."
   "Returns the integral value of a hex digit for c in the range of 0-9 or a-f.
 Returns nil for non hex characters and capitalized hex characters (A-F)."
   [c]
-  (let [c (int c)]
-    (cond
-     (<= (int \0) c (int \9)) (- c (int \0))
-     (<= (int \a) c (int \f)) (-> c (- (int \a)) (+ 10))
-     :else nil)))
+  (cond
+   (like int <= \0 c \9) (like int - c \0)
+   (like int <= \a c \f) (+ 10 (like int - c \a))
+   :else nil))
 
 (defprotocol Hash
   (write-binary-hash [this ^OutputStream out]

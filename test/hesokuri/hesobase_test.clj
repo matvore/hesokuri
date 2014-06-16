@@ -32,6 +32,52 @@
     0x12345 "other-stuff" 456
     ,(concat (repeat 11 "0") (map str (seq "12345")) ["456"])))
 
+(deftest test-source-name?-yes
+  (are [n]
+    (source-name? n)
+    "a"
+    "Aa"
+    "aA"
+    "zZ"
+    "-a-"
+    "-aa-"
+    "-_"
+    "-_-"))
+
+(deftest test-source-name?-no
+  (are [n]
+    (not (source-name? n))
+    ""
+    1
+    {}
+    []
+    (seq "a")
+    "a "
+    " "
+    "/"
+    "\\"
+    "____ _____"))
+
+(deftest test-peer-names
+  (are [tree result]
+    (= result (peer-names tree))
+
+    [["40000" "peer" nil []]]
+    []
+
+    [["40000" "some-other-dir" nil []]
+     ["100644" "some-other-file" nil "blob"]]
+    []
+
+    [["40000" "peer" nil [["40000" "asdf" nil []]]]]
+    ["asdf"]
+
+    [["40000" "peer" nil [["40000" "asdf" nil []] ["40000" "ffff" nil []]]]]
+    ["asdf" "ffff"]
+
+    [["40000" "peer" nil [["40000" "a" nil []] ["40000" "b" nil []]]]]
+    ["a" "b"]))
+
 (deftest test-cmd-map--add-peer
   (are [tree machine-name port key result]
     (= result ((cmd-map "add-peer") tree machine-name port key))
@@ -44,6 +90,33 @@
                            ["40000" "new-peer" nil
                             [["100644" "port" nil "1042"]
                              ["100644" "key" nil *key-str-a*]]]]]]))
+
+(deftest test-cmd-map--new-source
+  (let [not-yet-added-tree [["40000" "peer" nil [["40000" "a" nil []]
+                                                 ["40000" "b" nil []]]]]
+        already-added-tree [["40000" "peer" nil
+                             [["40000" "a" nil
+                               [["40000" "source" nil
+                                 [["100644" "sn" nil "sn"]]]]]
+                              ["40000" "b" nil
+                               [["40000" "source" nil
+                                 [["100644" "sn" nil "sn"]]]]]]]]]
+    (are [tree source-name result]
+      (= result ((cmd-map "new-source") tree source-name))
+
+      [] "a" "No peers to add source to: a"
+      [["40000" "peer" nil []]] "a" "No peers to add source to: a"
+      already-added-tree "sn" "No peers to add source to: sn"
+      not-yet-added-tree "sn" already-added-tree
+
+      [["40000" "other-dir" nil
+        [["100644" "other-file" nil "blob"]]]]
+      "a"
+      "No peers to add source to: a"
+
+      [["40000" "peer" nil [["40000" "a" nil []]]]]
+      "**"
+      (str "Not a valid source name. " source-name-spec " (**)"))))
 
 (deftest test-cmd
   (let [timestamp-ms 4221955
