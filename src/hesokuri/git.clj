@@ -258,44 +258,51 @@ returns the Hash of the tree that was written."
 
 (defn add-blob
   "Adds a blob to a tree. Automatically creates containing directories. Throws
-an ex-info if an entry at the given path already exists, or if a blob exists in
-place of a containing directory.
-path: the path, as a sequence of Strings, to the blob. The last String is the
-    actually name of the blob.
-blob-data: the blob-data, which is passed as the 'data' argument to write-blob
-tree: the tree to add the blob to. If omitted, effectively creates a new tree
-    with a single blob and as many levels of containing directories as needed to
-    realize the given path. This is a tree that should be returned from
-    read-tree."
-  ([path blob-data]
-     (let [pcount (count path)]
-       (if (zero? pcount)
-         blob-data
-         (lazy-seq
-          [[(if (= 1 pcount) "100644" "40000")
-            (first path)
-            nil
-            (add-blob (rest path) blob-data)]]))))
-  ([path blob-data tree]
+  an ex-info if an entry at the given path already exists, or if a blob exists
+  in place of a containing directory.
+  path: the path, as a sequence of Strings, to the blob. The last String is the
+      actually name of the blob.
+  blob-hash: the hash of the blob. If omitted, defaults to nil. This should
+      generally only be omitted if blob-data is supplied.
+  blob-data: the blob-data, which is passed as the 'data' argument to
+      write-blob.
+  tree: the tree to add the blob to. If omitted, effectively creates a new tree
+      with a single blob and as many levels of containing directories as needed
+      to realize the given path. This is a tree that should be returned from
+      read-tree."
+  ([path blob-data] (add-blob path nil blob-data []))
+  ([path blob-data tree] (add-blob path nil blob-data tree))
+  ([path blob-hash blob-data tree]
      (lazy-seq
-      (if (empty? tree)
-        (add-blob path blob-data)
+      (if (seq tree)
         (let [[[this-type this-name _ this-data]] tree]
           (cond
            (not= this-name (first path))
-            (cons (first tree) (add-blob path blob-data (rest tree)))
+           ,(cons (first tree) (add-blob path blob-hash blob-data (rest tree)))
            (or (= 1 (count path))
                (not= this-type "40000"))
-            (throw (ex-info
+           ,(throw (ex-info
                     (str "Cannot add blob or tree with name " (first path)
-                         " because a tree or blob with that name already exists.")
-                    {:path path :blob-data blob-data :tree tree}))
+                         " because a tree or blob with that name already"
+                         " exists.")
+                    {:path path :blob-hash blob-hash :blob-data blob-data
+                     :tree tree}))
            :else
-            (cons ["40000"
+           ,(cons ["40000"
                    this-name
                    nil
-                   (add-blob (rest path) blob-data this-data)]
-                  (rest tree))))))))
+                   (add-blob (rest path) blob-hash blob-data this-data)]
+                  (rest tree))))
+        (case (count path)
+          0 blob-data
+          1 [["100644"
+              (first path)
+              blob-hash
+              blob-data]]
+          [["40000"
+            (first path)
+            nil
+            (add-blob (rest path) blob-hash blob-data [])]])))))
 
 (defn remove-entry
   "Removes an entry (blob or tree) from a tree. Throws an ex-info if an entry at

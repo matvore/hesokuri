@@ -317,6 +317,7 @@
                   "or blob with that name already exists.")
              (.getMessage e)))
       (is (= {:path ["bar"]
+              :blob-hash nil
               :blob-data "asdf"
               :tree [["100644" "bar" nil "asdf"]]}
              (ex-data e))))))
@@ -335,6 +336,7 @@
                     "or blob with that name already exists.")
                (.getMessage e)))
         (is (= {:path ["bar"]
+                :blob-hash nil
                 :blob-data "asdf"
                 :tree [existing-tree]}
                (ex-data e)))))))
@@ -351,11 +353,14 @@
                      [["100644" "other-file" nil "existing blob"]]]]))))
 
 (deftest test-add-blob-two-blobs-into-same-tree
-  (is (= [["40000" "a" nil [["100644" "b" nil "blob1"]
-                            ["100644" "c" nil "blob2"]]]]
-         (->> []
-              (add-blob ["a" "b"] "blob1")
-              (add-blob ["a" "c"] "blob2")))))
+  (are [blob1-hash blob1-data]
+    (= [["40000" "a" nil [["100644" "b" blob1-hash blob1-data]
+                          ["100644" "c" nil "blob2"]]]]
+       (->> []
+            (add-blob ["a" "b"] blob1-hash blob1-data)
+            (add-blob ["a" "c"] "blob2")))
+    *hash-a* nil
+    nil "blob1"))
 
 (deftest test-remove-entry
   (let [foo-tree ["40000" "foo" *hash-d*
