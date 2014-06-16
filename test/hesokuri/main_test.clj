@@ -27,7 +27,7 @@
             (cjio/file hesoroot "hesobase-git-dir")
             (cjio/file hesoroot "ssh-key-file")
             "not actually a key!"
-            (git/author 1234)))
+            1234))
 
 (deftest test-cmd-init-bad-port-number
   (is (= ["Invalid port number: 'forty-two'\n" *err* 1]

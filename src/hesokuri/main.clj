@@ -104,20 +104,21 @@ lein run init MACHINE-NAME [PORT]
       the command line.
   hesobase-git-dir - .git directory of the hesobase configuration repo to
       create. After this function returns, it will be a bare git repository with
-       a single commit on the 'master' branch.
+      a single commit on the 'master' branch.
   ssh-key-file - path to store the key pair
   key-pair - the key pair representing this machine. See
       hesokuri.ssh/new-key-pair.
-  author - the author string for the first commit's author and committer line.
-      See hesokuri.git/author."
-  [machine-name prot-port-str hesobase-git-dir ssh-key-file key-pair author]
+  timestamp-ms - value returned by System/currentTimeMillis."
+  [machine-name prot-port-str hesobase-git-dir ssh-key-file key-pair
+   timestamp-ms]
   (let [prot-port (if prot-port-str
                     (try (Integer. prot-port-str)
                          (catch NumberFormatException _ nil))
                     default-prot-port)
         already-exists (->> [hesobase-git-dir ssh-key-file]
                             (filter #(.exists (cjio/file %)))
-                            first)]
+                            first)
+        author (git/author (quot timestamp-ms 1000))]
     (cond
      (nil? prot-port) [(str "Invalid port number: '" prot-port-str "'\n")
                        *err* 1]
@@ -133,10 +134,15 @@ lein run init MACHINE-NAME [PORT]
             (.setReadable false false)
             (.setReadable true true))
           (hesobase/init hesobase-git-dir machine-name prot-port key-pair
-                         author)
+                         author timestamp-ms)
           [(str "Initialized hesobase in: " hesobase-git-dir "\n"
                 "Wrote this machine's key to: " ssh-key-file "\n")
            *out* 0]))))
+
+(def startup-ms
+  "When the Hesokuri process started, as the value returned by
+  System/currentTimeMillis."
+  (System/currentTimeMillis))
 
 (defn -main
   "Starts up Hesokuri or performs some administration task."
@@ -164,6 +170,6 @@ lein run init MACHINE-NAME [PORT]
                (do
                  (.mkdirs (cjio/file hesoroot))
                  (cmd-init machine-name prot-port hesobase-git-dir ssh-key-file
-                           (ssh/new-key-pair) (git/author))))))
+                           (ssh/new-key-pair) startup-ms)))))
    (= ["help"] args) (exit usage *out* 0)
    :else (exit usage *err* 1)))
