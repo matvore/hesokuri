@@ -13,17 +13,17 @@
 ; limitations under the License.
 
 (ns hesokuri.heso-test
-  (:use [clojure.java.io :only [file]]
-        clojure.test
-        hesokuri.heso
-        hesokuri.testing.data
-        hesokuri.testing.mock
-        hesokuri.testing.temp
-        hesokuri.util)
-  (:require [hesokuri.peer :as peer]
+  (:require [clojure.java.io :refer [file]]
+            [clojure.test :refer :all]
+            [hesokuri.heso :refer :all]
+            [hesokuri.peer :as peer]
             [hesokuri.repo :as repo]
             [hesokuri.source :as source]
-            [hesokuri.source-def :as source-def]))
+            [hesokuri.source-def :as source-def]
+            [hesokuri.testing.data :refer :all]
+            [hesokuri.testing.mock :refer :all]
+            [hesokuri.testing.temp :refer :all]
+            [hesokuri.util :refer :all]))
 
 (deftest test-new-heso-make-heartbeats
   (let [initial-heartbeats #(-> *sources-eg* with-config :heartbeats)

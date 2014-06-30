@@ -14,10 +14,10 @@
 
 (ns hesokuri.dynamic-config-test
   (:import [java.io File])
-  (:use clojure.test
-        hesokuri.dynamic-config
-        hesokuri.testing.waiting
-        hesokuri.util))
+  (:require [clojure.test :refer :all]
+            [hesokuri.dynamic-config :refer :all]
+            [hesokuri.testing.waiting :refer :all]
+            [hesokuri.util :refer :all]))
 
 (def ^:dynamic *config-file* nil)
 

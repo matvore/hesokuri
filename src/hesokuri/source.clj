@@ -19,14 +19,14 @@
   source-def - the definition of this source (see hesokuri.source-def).
   peers - a map of hostnames to the corresponding peer object.
   local-identity - the hostname or IP of this system."
-  (:use [clojure.java.io :only [file]]
-        [clojure.java.shell :only [with-sh-dir sh]]
-        [clojure.string :only [trim]]
-        hesokuri.util)
-  (:require [hesokuri.branch :as branch]
+  (:require [clojure.java.io :refer [file]]
+            [clojure.java.shell :refer [with-sh-dir sh]]
+            [clojure.string :refer [trim]]
+            [hesokuri.branch :as branch]
             [hesokuri.peer :as peer]
             [hesokuri.repo :as repo]
             [hesokuri.source-def :as source-def]
+            [hesokuri.util :refer :all]
             [hesokuri.watcher :as watcher]))
 
 (defn- refresh

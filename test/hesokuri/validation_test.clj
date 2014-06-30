@@ -13,9 +13,9 @@
 ; limitations under the License.
 
 (ns hesokuri.validation-test
-  (:use [clojure.string :only [split]]
-        clojure.test
-        hesokuri.validation))
+  (:require [clojure.string :refer [split]]
+            [clojure.test :refer :all]
+            [hesokuri.validation :refer :all]))
 
 (deftest test-combine
   (are [all-strings result]

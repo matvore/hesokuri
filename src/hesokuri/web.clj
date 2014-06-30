@@ -14,19 +14,19 @@
 
 (ns hesokuri.web
   "Defines web pages that show and allow manipulation of hesokuri state."
-  (:use [clojure.java.io :only [file]]
-        [compojure.core :only [defroutes GET POST]]
-        [compojure.route :only [not-found resources]]
-        hesokuri.see
-        hesokuri.util
-        hiccup.page
-        [hiccup.util :only [escape-html]]
-        [noir.response :only [redirect]])
   (:import [java.text DateFormat]
            [java.util Date])
-  (:require clojure.pprint
+  (:require [clojure.java.io :refer [file]]
+            clojure.pprint
+            [compojure.core :refer [defroutes GET POST]]
+            [compojure.route :refer [not-found resources]]
             [hesokuri.branch :as branch]
-            [hesokuri.heso :as heso]))
+            [hesokuri.heso :as heso]
+            [hesokuri.see :refer :all]
+            [hesokuri.util :refer :all]
+            [hiccup.page :refer :all]
+            [hiccup.util :refer [escape-html]]
+            [noir.response :refer [redirect]]))
 
 (defn- url-encode [s] (java.net.URLEncoder/encode s "UTF-8"))
 

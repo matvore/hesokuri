@@ -13,17 +13,17 @@
 ; limitations under the License.
 
 (ns hesokuri.git-test
-  (:require [clojure.java.io :as cjio]
-            [hesokuri.transact :as transact])
-  (:use [clojure.string :only [trim]]
-        clojure.test
-        hesokuri.git
-        hesokuri.testing.data
-        hesokuri.testing.mock
-        hesokuri.testing.temp)
   (:import [clojure.lang ExceptionInfo]
            [java.io ByteArrayOutputStream]
-           [hesokuri.git ArrayBackedHash]))
+           [hesokuri.git ArrayBackedHash])
+  (:require [clojure.java.io :as cjio]
+            [clojure.string :refer [trim]]
+            [clojure.test :refer :all]
+            [hesokuri.git :refer :all]
+            [hesokuri.testing.data :refer :all]
+            [hesokuri.testing.mock :refer :all]
+            [hesokuri.testing.temp :refer :all]
+            [hesokuri.transact :as transact]))
 
 (defn cycle-bytes [b count] (byte-array (take count (cycle b))))
 (defn cycle-bytes-hash [b] (new ArrayBackedHash (cycle-bytes b 20)))
@@ -269,7 +269,12 @@
       [["40000" "middle" *hash-b*
         [["40000" "bottom" *hash-c*
           [["100644" "blob" *hash-d*]]]]]]]]
-    [[["top" "middle" "bottom" "blob"] *hash-d*]]))
+    [[["top" "middle" "bottom" "blob"] *hash-d*]]
+
+    [[["a" "b" "c"] *hash-a*]
+     [["a" "b" "d"] *hash-b*]]
+    [[["a" "b" "c"] *hash-a*]
+     [["a" "b" "d"] *hash-b*]]))
 
 (deftest test-write-tree-entry
   (are [expected-bytes entry]
@@ -312,6 +317,7 @@
                   "or blob with that name already exists.")
              (.getMessage e)))
       (is (= {:path ["bar"]
+              :blob-hash nil
               :blob-data "asdf"
               :tree [["100644" "bar" nil "asdf"]]}
              (ex-data e))))))
@@ -330,6 +336,7 @@
                     "or blob with that name already exists.")
                (.getMessage e)))
         (is (= {:path ["bar"]
+                :blob-hash nil
                 :blob-data "asdf"
                 :tree [existing-tree]}
                (ex-data e)))))))
@@ -346,11 +353,14 @@
                      [["100644" "other-file" nil "existing blob"]]]]))))
 
 (deftest test-add-blob-two-blobs-into-same-tree
-  (is (= [["40000" "a" nil [["100644" "b" nil "blob1"]
-                            ["100644" "c" nil "blob2"]]]]
-         (->> []
-              (add-blob ["a" "b"] "blob1")
-              (add-blob ["a" "c"] "blob2")))))
+  (are [blob1-hash blob1-data]
+    (= [["40000" "a" nil [["100644" "b" blob1-hash blob1-data]
+                          ["100644" "c" nil "blob2"]]]]
+       (->> []
+            (add-blob ["a" "b"] blob1-hash blob1-data)
+            (add-blob ["a" "c"] "blob2")))
+    *hash-a* nil
+    nil "blob1"))
 
 (deftest test-remove-entry
   (let [foo-tree ["40000" "foo" *hash-d*
@@ -413,6 +423,35 @@
        [["unmatching"] ["100644" "blob3" nil "blob3-data"]]
       ["topdir" "subdir" "blobx"]
        [["blobx"] subdir])))
+
+(deftest test-can-add-blob?-yes
+  (are [path tree]
+    (can-add-blob? (get-entry path tree))
+    ["a" "b"] []
+    ["a" "b"] [["100644" "b"]]
+    ["a" "b"] [["40000" "a" nil []]]
+    ["a" "b"] [["40000" "a" nil [["100644" "c" nil "asdf"]]]]))
+
+(deftest test-can-add-blob?-no
+  (let [tree-with-sources [["40000" "peer" nil
+                            [["40000" "a" nil
+                              [["40000" "source" nil
+                                [["100644" "sn" nil "sn"]]]]]
+                             ["40000" "b" nil
+                              [["40000" "source" nil
+                                [["100644" "sn" nil "sn"]]]]]]]]]
+    (are [path tree]
+      (not (can-add-blob? (get-entry path tree)))
+      [] []
+      [] [["100644" "a" nil "asdf"]]
+      ["a"] [["100644" "a" nil "asdf"]]
+      ["a" "b"] [["100644" "a" nil "asdf"]]
+      ["a" "b"] [["40000" "a" nil [["100644" "b" nil "asdf"]]]]
+      ["a" "b"] [["40000" "a" nil
+                  [["40000" "b" nil
+                    [["100644" "c" nil "asdf"]]]]]]
+      ["peer" "a" "source" "sn"] tree-with-sources
+      ["peer" "b" "source" "sn"] tree-with-sources)))
 
 (def person "John Doe <jdoe@google.com> 1398561813 -0700")
 

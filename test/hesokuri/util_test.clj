@@ -15,9 +15,9 @@
 (ns hesokuri.util-test
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream
             ObjectInputStream])
-  (:use clojure.test
-        hesokuri.util
-        hesokuri.testing.mock))
+  (:require [clojure.test :refer :all]
+            [hesokuri.util :refer :all]
+            [hesokuri.testing.mock :refer :all]))
 
 (deftest test-cb
   (let [x 10
@@ -79,3 +79,11 @@
     {} [:a] 4 #{1 2 3} {:a #{1 2 3 4}}
     {:a {}} [:a :b] 4 [3 2 1 0] {:a {:b [3 2 1 0 4]}}
     [] [0 :a] 42 '(7 6) [{:a '(42 7 6)}]))
+
+(deftest test-like
+  (are [convert f args result]
+    (= result (apply like convert f args))
+
+    int + [\a 1] 98
+    int - [\a 1] 96
+    str vector [1 2 3 []] ["1" "2" "3" "[]"]))

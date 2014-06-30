@@ -13,8 +13,8 @@
 ; limitations under the License.
 
 (ns hesokuri.branch-test
-  (:use clojure.test
-        hesokuri.branch))
+  (:require [clojure.test :refer :all]
+            [hesokuri.branch :refer :all]))
 
 (deftest test-of
   (is (= {:name "foo"} (of "foo"))

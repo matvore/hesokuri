@@ -17,12 +17,12 @@
   have logic that is specific to Hesokuri, so it can be easily replaced with a
   more performant git access layer later. Currently it just shells out to 'git'
   on the command line)."
-  (:require [hesokuri.git :as git]
-            [hesokuri.watcher :as watcher]
-            clojure.tools.logging)
-  (:use [clojure.java.io :only [file]]
-        [clojure.string :only [split trim]]
-        hesokuri.util))
+  (:require [clojure.java.io :refer [file]]
+            [clojure.string :refer [split trim]]
+            clojure.tools.logging
+            [hesokuri.git :as git]
+            [hesokuri.util :refer :all]
+            [hesokuri.watcher :as watcher]))
 
 (defn with-dir
   "Returns a repo object that operates through the git command-line tool."

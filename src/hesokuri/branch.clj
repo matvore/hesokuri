@@ -15,7 +15,7 @@
 (ns hesokuri.branch
   "Defines the branch object. A branch has a name and an (optional) peer name
   from which it originates."
-  (:use [clojure.string :only [split]]))
+  (:require [clojure.string :refer [split]]))
 
 (defn of [name & [peer]]
   {:pre [name]}

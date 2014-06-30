@@ -13,8 +13,8 @@
 ; limitations under the License.
 
 (ns hesokuri.peer-repo-test
-  (:use clojure.test
-        hesokuri.peer-repo))
+  (:require [clojure.test :refer :all]
+            [hesokuri.peer-repo :refer :all]))
 
 (deftest test-push-str
   (are [peer-repo combined]

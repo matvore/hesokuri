@@ -13,8 +13,8 @@
 ; limitations under the License.
 
 (ns hesokuri.see-test
-  (:use clojure.test
-        hesokuri.see))
+  (:require [clojure.test :refer :all]
+            [hesokuri.see :refer :all]))
 
 (deftest printable-fn-non-funcs
   (are [expr]

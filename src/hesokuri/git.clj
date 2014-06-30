@@ -18,10 +18,10 @@ to Hesokuri logic."
   (:import [java.io File InputStream OutputStream])
   (:require [clojure.java.io :as cjio]
             clojure.java.shell
-            [hesokuri.transact :as transact])
-  (:use [clojure.string :only [blank? join split trim]]
-        clojure.tools.logging
-        hesokuri.util))
+            [clojure.string :refer [blank? join split trim]]
+            [clojure.tools.logging :refer :all]
+            [hesokuri.transact :as transact]
+            [hesokuri.util :refer :all]))
 
 (declare args
          error?
@@ -53,11 +53,10 @@ value."
   "Returns the integral value of a hex digit for c in the range of 0-9 or a-f.
 Returns nil for non hex characters and capitalized hex characters (A-F)."
   [c]
-  (let [c (int c)]
-    (cond
-     (<= (int \0) c (int \9)) (- c (int \0))
-     (<= (int \a) c (int \f)) (-> c (- (int \a)) (+ 10))
-     :else nil)))
+  (cond
+   (like int <= \0 c \9) (like int - c \0)
+   (like int <= \a c \f) (+ 10 (like int - c \a))
+   :else nil))
 
 (defprotocol Hash
   (write-binary-hash [this ^OutputStream out]
@@ -206,8 +205,15 @@ returns nil."
   tree - The tree as returned by read-tree.
   path-prefix - A sequence (usually vector) representing the path up to the
       entry.
-  entry - A single tree entry, such as [\"100644\" \"blob\" ...]."
-  ([tree] (mapcat blobs (repeat []) tree))
+  entry - A single tree entry, such as [\"100644\" \"blob\" ...].
+
+  If tree is already a sequence of blobs, this function just returns that
+  sequence."
+  ([tree]
+     (cond
+      (empty? tree) []
+      (string? (first (first tree))) (mapcat blobs (repeat []) tree)
+      :else tree))
   ([path-prefix entry]
      (let [[type name & detail] entry
            path (conj path-prefix name)]
@@ -252,44 +258,51 @@ returns the Hash of the tree that was written."
 
 (defn add-blob
   "Adds a blob to a tree. Automatically creates containing directories. Throws
-an ex-info if an entry at the given path already exists, or if a blob exists in
-place of a containing directory.
-path: the path, as a sequence of Strings, to the blob. The last String is the
-    actually name of the blob.
-blob-data: the blob-data, which is passed as the 'data' argument to write-blob
-tree: the tree to add the blob to. If omitted, effectively creates a new tree
-    with a single blob and as many levels of containing directories as needed to
-    realize the given path. This is a tree that should be returned from
-    read-tree."
-  ([path blob-data]
-     (let [pcount (count path)]
-       (if (zero? pcount)
-         blob-data
-         (lazy-seq
-          [[(if (= 1 pcount) "100644" "40000")
-            (first path)
-            nil
-            (add-blob (rest path) blob-data)]]))))
-  ([path blob-data tree]
+  an ex-info if an entry at the given path already exists, or if a blob exists
+  in place of a containing directory.
+  path: the path, as a sequence of Strings, to the blob. The last String is the
+      actually name of the blob.
+  blob-hash: the hash of the blob. If omitted, defaults to nil. This should
+      generally only be omitted if blob-data is supplied.
+  blob-data: the blob-data, which is passed as the 'data' argument to
+      write-blob.
+  tree: the tree to add the blob to. If omitted, effectively creates a new tree
+      with a single blob and as many levels of containing directories as needed
+      to realize the given path. This is a tree that should be returned from
+      read-tree."
+  ([path blob-data] (add-blob path nil blob-data []))
+  ([path blob-data tree] (add-blob path nil blob-data tree))
+  ([path blob-hash blob-data tree]
      (lazy-seq
-      (if (empty? tree)
-        (add-blob path blob-data)
+      (if (seq tree)
         (let [[[this-type this-name _ this-data]] tree]
           (cond
            (not= this-name (first path))
-            (cons (first tree) (add-blob path blob-data (rest tree)))
+           ,(cons (first tree) (add-blob path blob-hash blob-data (rest tree)))
            (or (= 1 (count path))
                (not= this-type "40000"))
-            (throw (ex-info
+           ,(throw (ex-info
                     (str "Cannot add blob or tree with name " (first path)
-                         " because a tree or blob with that name already exists.")
-                    {:path path :blob-data blob-data :tree tree}))
+                         " because a tree or blob with that name already"
+                         " exists.")
+                    {:path path :blob-hash blob-hash :blob-data blob-data
+                     :tree tree}))
            :else
-            (cons ["40000"
+           ,(cons ["40000"
                    this-name
                    nil
-                   (add-blob (rest path) blob-data this-data)]
-                  (rest tree))))))))
+                   (add-blob (rest path) blob-hash blob-data this-data)]
+                  (rest tree))))
+        (case (count path)
+          0 blob-data
+          1 [["100644"
+              (first path)
+              blob-hash
+              blob-data]]
+          [["40000"
+            (first path)
+            nil
+            (add-blob (rest path) blob-hash blob-data [])]])))))
 
 (defn remove-entry
   "Removes an entry (blob or tree) from a tree. Throws an ex-info if an entry at
@@ -317,20 +330,20 @@ tree: the tree to add the blob to. If omitted, effectively creates a new tree
 
 (defn get-entry
   "Finds an entry in a tree returned by read-tree.
-path: sequence of strings representing the path to the entry to find
-tree: a tree as returned by read-tree
+  path: sequence of strings representing the path to the entry to find
+  tree: a tree as returned by read-tree
 
-The return value is a sequence with at least two elements: the remaining,
-unmatched path; and the tree entry data corresponding to the final entry found.
-The second value will be nil if no items in 'path' could be matched.
+  The return value is a sequence with at least two elements: the remaining,
+  unmatched path; and the tree entry data corresponding to the final entry
+  found. The second value will be nil if no items in 'path' could be matched.
 
-The first value is the unmatched part of the path. If this is empty, the entry
-can considered to be successfully found.
+  The first value is the unmatched part of the path. If this is empty, the entry
+  can considered to be successfully found.
 
-The second value corresponds to a value returned by read-tree-entry, plus the
-additional data returned by read-tree appended to the end, if available. This
-second value can be used to make sure the type of the entry is expected (i.e. a
-blob or tree) by checking the first element in the sequence."
+  The second value corresponds to a value returned by read-tree-entry, plus the
+  additional data returned by read-tree appended to the end, if available. This
+  second value can be used to make sure the type of the entry is expected (i.e.
+  a blob or tree) by checking the first element in the sequence."
   ([path tree] (get-entry path tree nil))
   ([path tree last-matching]
      (if (or (empty? path) (empty? tree))
@@ -338,11 +351,22 @@ blob or tree) by checking the first element in the sequence."
        (let [[type name _ data :as entry] (first tree)]
          (cond
           (not= (first path) name)
-           (recur path (rest tree) last-matching)
-          (not= "40000" type)
-           [(rest path) entry]
+          ,(recur path (rest tree) last-matching)
+          (= "40000" type)
+          ,(recur (rest path) data entry)
           :else
-           (recur (rest path) data entry))))))
+          ,[(rest path) entry])))))
+
+(defn can-add-blob?
+  "Detects whether a blob can be safely added at some path, given the return
+  value of the 'get-entry' function."
+  [get-entry-result]
+  (let [[unmatch-path entry] get-entry-result]
+    (cond
+     (empty? unmatch-path) false
+     (nil? entry) true
+     (= "40000" (first entry)) true
+     :else false)))
 
 (defn read-commit
   "Reads commit information lazily from an InputStream or by invoking git.

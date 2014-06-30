@@ -31,6 +31,7 @@ is represented by a directory:
 /peer/{name}   # contains information on peer named {name}
 /source/       # contains all sources (synced repos)
 /source/{name} # contains information on source named {name}
+/log/...       # a command log, used for merging (see COMMAND LOG)
 
 {name} for source and peer is percent-encoded. The {name} of a peer corresponds
 exactly with the address used to access the peer.
@@ -75,6 +76,25 @@ name and SHA-1 hash. It will probably be very common for each branch-name to
 only have a single SHA listed, but by allowing multiple SHAs, you can later
 re-use the same branch name for newer work.
 
+COMMAND LOG
+-----------
+
+For each command that caused the hesobase to change, information about the
+command is stored in order to facilitate merging later on. This information
+includes the timestamp of the action, the command name, the arguments, and (if
+applicable) the error message. Each command is represented by a single blob. The
+blob itself is empty if the command was successful; otherwise, it is a
+human-readable error message. The blob path is as follows:
+
+/log/{timestamp}/{cmd}/{args}
+
+{timestamp} is 16 path segments, each a single, lowercase hex character. This
+corresponds to a 64-bit value which is the timestamp in milliseconds (see
+java.lang.System.currentTimeMillis). {cmd} is a single path segment representing
+the command name, and {args} is a single path segment representing the arguments
+to the command, which may be anything, including for instance a percent-encoded
+Clojure vector literal.
+
 FUTURE IMPROVEMENTS
 -------------------
 
@@ -83,16 +103,114 @@ addresses or allow the name to be mnemonic in cases where the address is an IP
 or something arbitrary.)
 ***
 There are some instances of 'empty files.' Each empty file may some day be
-changed to a directory or a non-empty file to hold more information.
-***
-Merge conflicts that cannot be resolved automatically should be summarized in
-some kind of log in the source, so in the off-chance it happens, the user can
-recover."
+changed to a directory or a non-empty file to hold more information."
   (:require [clojure.java.io :as cjio]
             [hesokuri.git :as git]
             [hesokuri.ssh :as ssh]
             [hesokuri.transact :as transact]
             [hesokuri.util :refer :all]))
+
+(defn log-blob-path
+  "Returns the path to place a log blob. See the COMMAND LOG section of the
+  hesobase namespace documentation for detailed information. The path is
+  returned as a vector of path segments."
+  [timestamp cmd args]
+  (concat ["log"]
+          (map str (seq (format "%016x" timestamp)))
+          [(%-encode (pr-str args))]))
+
+(defn source-name?
+  "Detects whether the given value can be used as a source name. See
+  source-name-spec for values that this function will return true for."
+  [name]
+  (and (string? name)
+       (not-empty name)
+       (every? #(or (like int <= \a % \z)
+                    (like int <= \A % \Z)
+                    (like int <= \0 % \9)
+                    (= \- %)
+                    (= \_ %))
+               name)))
+
+(def source-name-spec
+  "Human-readable string describing what is allowed in a source name."
+  (str "A source name is a non-empty string containing alpha-numeric "
+       "characters, hyphens (-), and/or underscores (_)."))
+
+(defn peer-names
+  "Returns the names of every peer in the hesobase given by 'tree'."
+  [tree]
+  (let [[unmatched [_ _ _ peer-tree]] (git/get-entry ["peer"] tree)]
+    (if (not-empty unmatched)
+      []
+      (map #(nth % 1) peer-tree))))
+
+(def cmd-map
+  "Maps each command name to a function that implements it. A command is an
+  atomic hesobase operation that may fail and is comprehensible to a human.
+  Each one corresponds to an action that a user may perform to configure
+  Hesokuri.
+
+  The command names - or keys - of this map are Strings. The mapped values are
+  functions that take a tree corresponding to the hesobase repo followed by any
+  number of String arguments.
+
+  Each function returns either the new tree of the hesobase repo, or an error
+  message as a String. The function does NOT add a log entry."
+  {"add-peer"
+   (fn [tree machine-name port key]
+     (if (git/can-add-blob? (git/get-entry ["peer" machine-name] tree))
+       (->> tree
+            (git/add-blob ["peer" machine-name "port"] port)
+            (git/add-blob ["peer" machine-name "key"] key))
+       (str "There is already a machine named: " machine-name)))
+
+   "new-source"
+   ;;; Adds a source to every peer. The path of the source is equal to the name
+   ;;; of the source. Error if no peers exist, or all peers already have the
+   ;;; given source.
+   (fn [tree source-name]
+     (if-not (source-name? source-name)
+       (format "Not a valid source name. %s (%s)" source-name-spec source-name)
+       (loop [tree tree
+              to-add (peer-names tree)
+              added 0]
+         (if (empty? to-add)
+           (if (zero? added)
+             (str "No peers to add source to: " source-name)
+             tree)
+           (let [source-blob-path
+                 ["peer" (first to-add) "source" source-name]]
+             (if (git/can-add-blob? (git/get-entry source-blob-path tree))
+               (recur (git/add-blob source-blob-path source-name tree)
+                      (rest to-add)
+                      (inc added))
+               (recur tree
+                      (rest to-add)
+                      added)))))))})
+
+(defn cmd
+  "Executes a command, usually one in the cmd-map, altering the given tree (if
+  successful) and adding a log entry.
+
+  cmd-result, log-path - Give if the command has already been run. cmd-result is
+      the result of calling a function in cmd-map, and log-path is a value
+      returned by log-blob-path.
+
+  cmd-name - Name of the command to execute.
+  timestamp-ms - When the command is executing. See System/currentTimeMillis.
+  args - Vector of Strings representing the arguments to the command.
+  tree - The tree representing the hesobase before the command was executed."
+  ([cmd-result log-path tree]
+     (if (string? cmd-result)
+       [(git/add-blob log-path cmd-result tree) cmd-result]
+       [(git/add-blob log-path "" cmd-result) ""]))
+  ([cmd-name timestamp-ms args tree]
+     {:pre [(vector? args)
+            (every? string? args)]}
+     (cmd (apply (cmd-map cmd-name) tree args)
+          (log-blob-path timestamp-ms cmd-name args)
+          tree)))
 
 (defn init
   "Initializes the hesobase repository with the information of a single peer.
@@ -104,17 +222,20 @@ recover."
   key - the key of the first peer. Before storing, this will be coerced with
       ssh/public-key-str.
   author - the author string of the first commit in the hesobase repo. See
-      hesokuri.git/author."
-  [git-ctx machine-name port key author]
+      hesokuri.git/author.
+  timestamp - value returned by System/currentTimeMillis."
+  [git-ctx machine-name port key author timestamp]
   (git/throw-if-error (git/invoke-with-summary git-ctx "init" ["--bare"]))
-  (let [tree (->> (git/add-blob ["peer" machine-name "port"] (str port))
-                  (git/add-blob ["peer" machine-name "key"]
-                                (ssh/public-key-str key)))
+  (let [port (str port)
+        key (ssh/public-key-str key)
+        [tree err-msg] (cmd "add-peer" timestamp [machine-name port key] [])
         commit-hash
         ,(git/write-commit git-ctx [["tree" nil tree]
                                     ["author" author]
                                     ["committer" author]
                                     [:msg "executing hesobase/init\n"]])]
+    (when (seq err-msg)
+      (throw (ex-info err-msg {})))
     (git/throw-if-error
      (git/invoke-with-summary
       git-ctx "update-ref" ["refs/heads/master" (str commit-hash) ""]))

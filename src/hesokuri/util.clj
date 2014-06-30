@@ -16,8 +16,8 @@
   (:import [java.io ByteArrayOutputStream ObjectInputStream ObjectOutputStream
             OutputStream OutputStreamWriter]
            [java.net URLDecoder URLEncoder])
-  (:use clojure.tools.logging
-        [clojure.string :only [trim]]))
+  (:require [clojure.string :refer [trim]]
+            [clojure.tools.logging :refer :all]))
 
 (defmacro letmap
   "A macro that behaves like let, creating temporary bindings for variables, and
@@ -163,3 +163,10 @@ a String with str if it is not a String already."
   [m ks v default-coll]
   (let [orig-coll (get-in m ks default-coll)]
     (assoc-in m ks (conj orig-coll v))))
+
+(defn like
+  "Converts all args using convert, then calls f with them. For
+  instance:
+  (like int + \\a 1) => (+ (int \\a) (int 1)) => 98"
+  [convert f & args]
+  (apply f (map convert args)))
