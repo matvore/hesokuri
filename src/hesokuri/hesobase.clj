@@ -117,7 +117,22 @@ changed to a directory or a non-empty file to hold more information."
   [timestamp cmd args]
   (concat ["log"]
           (map str (seq (format "%016x" timestamp)))
-          [(%-encode (pr-str args))]))
+          [cmd (%-encode (pr-str args))]))
+
+(defn log-blob-time+cmd+args
+  "Given the path to a log blob, returns a sequence containing the timestamp,
+  command name, and arguments.
+  Note that (= [ts cmd args]
+               (log-blob-time+cmd+args (log-blob-path ts cmd args)))"
+  [path]
+  (let [path (vec (if (= "log" (first path))
+                    (rest path)
+                    path))]
+    [(Long/parseLong (apply str (take 16 path))
+                     16)
+     (path 16)
+     (binding [*read-eval* false]
+       (read-string (%-decode (path 17))))]))
 
 (defn source-name?
   "Detects whether the given value can be used as a source name. See
@@ -276,7 +291,8 @@ changed to a directory or a non-empty file to hold more information."
                                [:source-name-map source-name :unwanted-branches
                                 branch-name]
                                branch-hash
-                               []))))))
+                               []))))
+              "log" config))
           (add-sources-vector [config]
             (assoc config :sources (vec (vals (:source-name-map config)))))]
     (->> (git/blobs tree)

@@ -25,12 +25,25 @@
             [hesokuri.util :refer :all]))
 
 (deftest test-log-blob-path
-  (are [timestamp cmd args result]
-    (= (cons "log" result) (log-blob-path timestamp cmd args))
+  (are [timestamp cmd args path]
+    (= [(cons "log" path)
+        [timestamp cmd args]
+        [timestamp cmd args]]
+       [(log-blob-path timestamp cmd args)
+        (log-blob-time+cmd+args path)
+        (log-blob-time+cmd+args (cons "log" path))])
+
     0x123456789abcdef0 "do-stuff" [1 2 3]
-    ,(concat (map str (seq "123456789abcdef0")) [(%-encode "[1 2 3]")])
+    ,(concat (map str (seq "123456789abcdef0"))
+             ["do-stuff" (%-encode "[1 2 3]")])
     0x12345 "other-stuff" 456
-    ,(concat (repeat 11 "0") (map str (seq "12345")) ["456"])))
+    ,(concat (repeat 11 "0")
+             (map str (seq "12345"))
+             ["other-stuff" "456"])))
+
+(deftest command-names-do-not-need-%-encoding
+  (let [names (keys cmd-map)]
+    (is (= (map %-encode names) names))))
 
 (deftest test-source-name?-yes
   (are [n]
@@ -136,10 +149,10 @@
         port 1011
         author (git/author 42)
         commit-hash (init git-dir "machine-name" port *key-str-a* author 42)]
-    (is (= "b69bac9339dd313065628bd09bd5f25f8bfe53aa" commit-hash))
+    (is (= "8194030113dcab557f9455cfe3ce516a7562eb0d" commit-hash))
     (transact/transact
      (fn [trans]
-       (is (= [["tree" "c0563107ac6e15d670bd6214a2ee1545a328ca9f"]
+       (is (= [["tree" "367b7cfeff7d0a855b3478c130fbdc36855d0269"]
                ["author" author]
                ["committer" author]
                [:msg "executing hesobase/init\n"]]
@@ -176,6 +189,8 @@
       (= config (tree->config tree))
       (->> (git/add-blob ["peer" "bob" "port"] "42")
            (git/add-blob ["peer" "bob" "key"] *key-str-a*)
+           (git/add-blob (log-blob-path 42 "should-be-ignored" ["1" "2" "3"])
+                         "")
            (git/add-blob ["peer" "conan" "port"] "43")
            (git/add-blob ["peer" "conan" "key"] *key-str-b*))
       {:sources []
@@ -194,7 +209,9 @@
            (git/add-blob ["source" "bacon" "live-edit" "only" "crisp"] "")
            (git/add-blob ["source" "bacon" "live-edit" "only" "hot"] "")
            (git/add-blob ["source" "bacon" "unwanted" "used" *hash-a*] "")
-           (git/add-blob ["source" "bacon" "unwanted" "used" *hash-b*] ""))
+           (git/add-blob ["source" "bacon" "unwanted" "used" *hash-b*] "")
+           (git/add-blob (log-blob-path 42 "should-be-ignored" ["1" "2" "3"])
+                         ""))
       {:sources [bacon-source mushrooms-source]
        :host-to-port {"bob" 42}
        :source-name-map {"bacon" bacon-source
