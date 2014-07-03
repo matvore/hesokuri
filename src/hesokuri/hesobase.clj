@@ -170,24 +170,16 @@ changed to a directory or a non-empty file to hold more information."
    ;;; of the source. Error if no peers exist, or all peers already have the
    ;;; given source.
    (fn [tree source-name]
-     (if-not (source-name? source-name)
-       (format "Not a valid source name. %s (%s)" source-name-spec source-name)
-       (loop [tree tree
-              to-add (peer-names tree)
-              added 0]
-         (if (empty? to-add)
-           (if (zero? added)
-             (str "No peers to add source to: " source-name)
-             tree)
-           (let [source-blob-path
-                 ["peer" (first to-add) "source" source-name]]
-             (if (git/can-add-blob? (git/get-entry source-blob-path tree))
-               (recur (git/add-blob source-blob-path source-name tree)
-                      (rest to-add)
-                      (inc added))
-               (recur tree
-                      (rest to-add)
-                      added)))))))})
+     (let [add-paths
+           ,(->> (peer-names tree)
+                 (map #(list "peer" % "source" source-name))
+                 (filter #(git/can-add-blob? (git/get-entry % tree))))]
+       (cond
+        (not (source-name? source-name))
+        ,(format "Not a valid source name. %s (%s)"
+                 source-name-spec source-name)
+        (empty? add-paths) (str "No peers to add source to: " source-name)
+        :else (reduce #(git/add-blob %2 source-name %1) tree add-paths))))})
 
 (defn cmd
   "Executes a command, usually one in the cmd-map, altering the given tree (if
