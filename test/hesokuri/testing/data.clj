@@ -29,13 +29,28 @@
   {:comment "config comment"
    :sources *sources-eg*})
 
-(def ^:dynamic *hash-a* "a00000000000000000000000000000000000000a")
-(def ^:dynamic *hash-b* "b00000000000000000000000000000000000000b")
-(def ^:dynamic *hash-c* "c00000000000000000000000000000000000000c")
-(def ^:dynamic *hash-d* "d00000000000000000000000000000000000000d")
-(def ^:dynamic *hash-e* "e00000000000000000000000000000000000000e")
-(def ^:dynamic *hash-f* "f00000000000000000000000000000000000000f")
-(def ^:dynamic *hash-g* "0100000000000000000000000000000000000010")
+(defmacro thash
+  "Creates a test hash. 'base' should be a symbol that looks like a hexadecimal
+  SHA1 hash, but can be any length 1-40 and should not start with 0. It will be
+  left-padded with 0 to make a full hash."
+  [base]
+  (cond
+   (and (not (symbol? base)) (not (integer? base)))
+   ,(throw (ex-info (str "Must be symbol or integer: " base) {}))
+   (.startsWith (str base) "0")
+   ,(throw (ex-info (str "Cannot start with 0: " base) {}))
+   (some #(nil? (git/hex-char-val %)) (str base))
+   ,(throw (ex-info (str "Contains non-hex char: " base) {}))
+   :else
+   ,(.replace (format "%40s" base) " " "0")))
+
+(def ^:dynamic *hash-a* (thash a))
+(def ^:dynamic *hash-b* (thash b))
+(def ^:dynamic *hash-c* (thash c))
+(def ^:dynamic *hash-d* (thash d))
+(def ^:dynamic *hash-e* (thash e))
+(def ^:dynamic *hash-f* (thash f))
+(def ^:dynamic *hash-g* (thash 10))
 
 (def ^:dynamic *first-commit*
   [["tree" nil [["100644" "some-file" nil "contents\n"]]]

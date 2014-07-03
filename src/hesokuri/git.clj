@@ -221,6 +221,53 @@ returns nil."
          "100644" [(cons path detail)]
          "40000" (mapcat blobs (repeat path) (nth detail 1))))))
 
+(defn pop-entry
+  "Pops (extracts) a tree entry from a list of entries given its name. Returns a
+  sequence comprised of [entry entries], which is the popped entry and entries
+  without entry, respectively, or [nil entries], where entries is a sequence
+  containing all originally given entries.
+
+  entries - tree entries from which to pop
+  name - name of the entry to pop
+  dest - a sequence into which to conj the entries that are searched. Defaults
+      to an empty vector."
+  ([entries name] (pop-entry entries name []))
+  ([entries name dest]
+     (if (empty? entries)
+       [nil dest]
+       (let [[e & entries] entries]
+         (if (= name (second e))
+           [e (into dest entries)]
+           (recur entries name (conj dest e)))))))
+
+(defn tree-diff
+  "The 'difference' between two trees. The difference is composed of both trees
+  with all entries that are obviously shared between the two removed. Accepts
+  two trees and returns a sequence which is both trees with common elements
+  removed. Entries are equivalent if they have the same hash OR they are both
+  trees and have only common elements - the order in this case is not
+  significant."
+  ([entries1 entries2] (tree-diff entries1 entries2 [] []))
+  ([entries1 entries2 only1 only2]
+     (if (empty? entries1)
+       [only1 (into only2 entries2)]
+       (let [[[type1 name sha1 ext1 :as e1] & entries1] entries1
+             [[type2 _ sha2 ext2 :as e2] entries2] (pop-entry entries2 name)]
+         (cond
+          (nil? e2)
+          ,(recur entries1 entries2 (conj only1 e1) only2)
+          (and sha1 sha2 (like str = sha1 sha2))
+          ,(recur entries1 entries2 only1 only2)
+          (and (= "40000" type1 type2) ext1 ext2)
+          ,(let [[sub-only1 sub-only2]
+                 ,(for [sub (tree-diff ext1 ext2)]
+                    (when (seq sub) [["40000" name nil sub]]))]
+             (recur entries1 entries2
+                    (into only1 sub-only1)
+                    (into only2 sub-only2)))
+          :else
+          ,(recur entries1 entries2 (conj only1 e1) only2))))))
+
 (defn write-tree-entry
   "Write a tree entry to an output stream."
   [^OutputStream out [type name sha]]

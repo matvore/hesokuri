@@ -13,9 +13,6 @@
 ; limitations under the License.
 
 (ns hesokuri.git-test
-  (:import [clojure.lang ExceptionInfo]
-           [java.io ByteArrayOutputStream]
-           [hesokuri.git ArrayBackedHash])
   (:require [clojure.java.io :as cjio]
             [clojure.string :refer [trim]]
             [clojure.test :refer :all]
@@ -23,10 +20,18 @@
             [hesokuri.testing.data :refer :all]
             [hesokuri.testing.mock :refer :all]
             [hesokuri.testing.temp :refer :all]
-            [hesokuri.transact :as transact]))
+            [hesokuri.transact :as transact])
+  (:import [clojure.lang ExceptionInfo]
+           [java.io ByteArrayOutputStream]
+           [hesokuri.git ArrayBackedHash]))
 
 (defn cycle-bytes [b count] (byte-array (take count (cycle b))))
 (defn cycle-bytes-hash [b] (new ArrayBackedHash (cycle-bytes b 20)))
+
+(defmacro tblob
+  "Generates a test blob tree entry."
+  [base]
+  ["100644" (str base) `(thash ~base)])
 
 (deftest test-hex-char-val
   (are [ch exp] (= exp (hex-char-val ch))
@@ -275,6 +280,51 @@
      [["a" "b" "d"] *hash-b*]]
     [[["a" "b" "c"] *hash-a*]
      [["a" "b" "d"] *hash-b*]]))
+
+(deftest test-pop-entry
+  (are [entries name args-rest res-e res-entries]
+    (= [res-e res-entries] (apply pop-entry entries name args-rest))
+
+    [] "foo" [] nil []
+    [(tblob a)] "foo" [] nil [(tblob a)]
+    [(tblob a)] "a" [] (tblob a) []
+
+    ;;; Specifying initial "extras" collection (with and without match)
+    [(tblob a) (tblob b)] "foo" ['(initial)]
+    nil [(tblob b) (tblob a) 'initial]
+
+    [(tblob a) (tblob b) (tblob c)] "b" ['(initial)]
+    (tblob b) [(tblob c) (tblob a) 'initial]
+
+    [(tblob a) (tblob b) (tblob c)] "c" [#{'initial}]
+    (tblob c) #{(tblob a) (tblob b) 'initial}))
+
+(deftest test-tree-diff
+  (are [entries1 entries2 args-rest only1 only2]
+    (= [only1 only2] (apply tree-diff entries1 entries2 args-rest))
+
+    [(tblob a) (tblob b) (tblob c)] [(tblob d)] []
+    [(tblob a) (tblob b) (tblob c)] [(tblob d)]
+
+    [(tblob a) (tblob b) (tblob c)] [(tblob c) (tblob d)] []
+    [(tblob a) (tblob b)] [(tblob d)]
+
+    ;; Partially-shared subtrees
+    [(tblob a) (tblob b) (tblob c) ["40000" "subt" nil [(tblob a7) (tblob b7)]]]
+    [(tblob c) (tblob d) ["40000" "subt" nil [(tblob b7) (tblob c7)]]]
+    []
+    [(tblob a) (tblob b) ["40000" "subt" nil [(tblob a7)]]]
+    [["40000" "subt" nil [(tblob c7)]] (tblob d)]
+
+    ;; Identical subtrees
+    [(tblob a) ["40000" "subt" nil [(tblob a7) (tblob b7)]]]
+    [(tblob b) ["40000" "subt" nil [(tblob b7) (tblob a7)]]]
+    []
+    [(tblob a)] [(tblob b)]
+
+    ;; Specify initial "only" collection
+    [(tblob a) (tblob b) (tblob c)] [(tblob c) (tblob d)] ['(initial) #{'initial}]
+    [(tblob b) (tblob a) 'initial] #{(tblob d) 'initial}))
 
 (deftest test-write-tree-entry
   (are [expected-bytes entry]
