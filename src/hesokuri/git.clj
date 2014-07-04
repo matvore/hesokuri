@@ -245,8 +245,8 @@ returns nil."
   with all entries that are obviously shared between the two removed. Accepts
   two trees and returns a sequence which is both trees with common elements
   removed. Entries are equivalent if they have the same hash OR they are both
-  trees and have only common elements - the order in this case is not
-  significant."
+  blobs and have equal, non-null content, OR they are both trees and have only
+  common elements - the order in this case is not significant."
   ([entries1 entries2] (tree-diff entries1 entries2 [] []))
   ([entries1 entries2 only1 only2]
      (if (empty? entries1)
@@ -256,7 +256,8 @@ returns nil."
          (cond
           (nil? e2)
           ,(recur entries1 entries2 (conj only1 e1) only2)
-          (and sha1 sha2 (like str = sha1 sha2))
+          (or (and sha1 sha2 (like str = sha1 sha2))
+              (and (some? ext1) (= "100644" type1 type2) (= ext1 ext2)))
           ,(recur entries1 entries2 only1 only2)
           (and (= "40000" type1 type2) ext1 ext2)
           ,(let [[sub-only1 sub-only2]

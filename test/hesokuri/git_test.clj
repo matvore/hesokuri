@@ -324,7 +324,13 @@
 
     ;; Specify initial "only" collection
     [(tblob a) (tblob b) (tblob c)] [(tblob c) (tblob d)] ['(initial) #{'initial}]
-    [(tblob b) (tblob a) 'initial] #{(tblob d) 'initial}))
+    [(tblob b) (tblob a) 'initial] #{(tblob d) 'initial}
+
+    ;; No hash, but blob data matches.
+    [["100644" "foo" nil "bar"]]
+    [["100644" "foo" nil "bar"]]
+    []
+    [] []))
 
 (deftest test-write-tree-entry
   (are [expected-bytes entry]
