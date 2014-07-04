@@ -213,8 +213,11 @@ changed to a directory or a non-empty file to hold more information."
        [(git/add-blob log-path cmd-result tree) cmd-result]
        [(git/add-blob log-path "" cmd-result) ""]))
   ([cmd-name timestamp-ms args tree]
+     (cmd cmd-name timestamp-ms args tree cmd-map))
+  ([cmd-name timestamp-ms args tree cmd-map]
      {:pre [(vector? args)
-            (every? string? args)]}
+            (every? string? args)
+            (contains? cmd-map cmd-name)]}
      (cmd (apply (cmd-map cmd-name) tree args)
           (log-blob-path timestamp-ms cmd-name args)
           tree)))
@@ -298,3 +301,38 @@ changed to a directory or a non-empty file to hold more information."
     (->> (git/blobs tree)
          (reduce reducer {:source-name-map (sorted-map)})
          add-sources-vector)))
+
+(defn apply-log-blob
+  "Runs a command represented by a log blob entry on the given hesobase tree.
+
+  log-blob - an element of the sequence returned by hesokuri.git/blobs.
+  cmd-map - an alternative command-map. If omitted, uses the global cmd-map
+      value."
+  ([tree log-blob] (apply-log-blob tree log-blob cmd-map))
+  ([tree log-blob cmd-map]
+     (let [[blob-path _ blob-data] log-blob]
+       (first
+        (if (= "" blob-data)
+          (let [[log-time log-cmd log-args] (log-blob-time+cmd+args blob-path)]
+            (cmd log-cmd log-time log-args tree cmd-map))
+          (cmd blob-data blob-path tree))))))
+
+(defn log-tree
+  "Returns the log subtree of the given hesobase tree."
+  [tree]
+  (let [[_ [_ _ _ subtree]] (git/get-entry ["log"] tree)]
+    subtree))
+
+(defn merge-trees
+  "Returns a hesobase tree that is the result of applying all commands applied
+  to tree1 and tree2 but not yet to merge-base - to merge-base in chronological
+  order."
+  [tree1 tree2 merge-base]
+  (let [merge-base-log (log-tree merge-base)
+        [only1] (git/tree-diff (log-tree tree1) merge-base-log)
+        [only2] (git/tree-diff (log-tree tree2) merge-base-log)]
+    (reduce apply-log-blob
+            merge-base
+            (sort #(compare (first %1) (first %2))
+                  (concat (git/blobs only1)
+                          (git/blobs only2))))))

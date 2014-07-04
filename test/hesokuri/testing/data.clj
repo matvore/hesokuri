@@ -65,7 +65,15 @@
                               [:msg "hesokuri.git/test-change\n"]])
 
 ;;; Keys take a non-trivial amount of time to generate. DO NOT generate them in
-;;; unit tests.
+;;; unit tests. Evaluate the following code to generate another public key.
+(comment
+  (do
+    (require 'clojure.pprint 'hesokuri.ssh)
+    (clojure.pprint/pprint
+     (cons 'str (map #(apply str %)
+                     (partition 57 57 [] (hesokuri.ssh/public-key-str
+                                          (hesokuri.ssh/new-key-pair)))))))
+)
 
 (def ^:dynamic *key-str-a*
   (str "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtkP4D+a8xsr6W"
@@ -84,3 +92,21 @@
        "2R3qLJ5GdRl2ZFXy3hQ+h72FXkyCbqqTT0Jzre7lo0mgWr3/EA2lGbuLf"
        "Te3fM1L7J2tENOUTVZsEXrAtrBGa9BiLG4SPJkiJ6lLgE9S7fXF9M3Rkf"
        "wO6OpXO4OS+DRRD+n+f4sR4RgWsMXuc7ksT50M6B+pVQIDAQAB"))
+
+(def ^:dynamic *key-str-c*
+  (str "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAl/e4GPxW+3qQu"
+       "YTzJSQlyQEiWTyhC2k0JsFaSR3QYoN3Yx3s8wK/ftPzscxIlMOHqGWiyC"
+       "QbRfjGJhZtX6bPEwtrX9trJBcj0psXbGBxbq8coJrlYlQUCeIcjVv4Vnj"
+       "Ic2AovRRbr+vKoWk+HVKlT6lC50JpnGpeX18k6W9lj5dNWuIscaxVHkbi"
+       "7fOml1GXOVIJxvMUuFK8XDvDXwUN3X6jXQzGMC/z9nGuWHqDXhpuXdn5s"
+       "hvESsJD9eSxh+CzUBkwjLkhwxXxPMtANwVnyMq87eWXC/e42fk45xurAr"
+       "4LqVZUnZ9h6oIS9qK8K6C99GpKN2l+qGFSbxGy9f66lwIDAQAB"))
+
+(def ^:dynamic *key-str-d*
+  (str "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAox0ZJuMfPZQ6p"
+       "1w/yLbgUFsHS2Cy2AMycrWWTk6+9s7UPEIm7YZB1caQ1fLmP7INz8pa7b"
+       "T1vf/BjhCLcGp5LI0evM9mU4SW1aT85Ch8O0rsHP91FudKBCi1V50B+Wg"
+       "IMF4u5J8oa8STFZpsk4EifR0I95Z7SlvY717ba7ffdEiVqiQDFJb2tBMc"
+       "zo0wDc7B0Dg74yZG+jSikb6+Vrw/xbFNVZevz+h2goi36WUoE0Ct9EePk"
+       "/990hXGCSsh7nxjREd99etVDId+X/mMs2YsvUGtGA/u7Fyynwj2Wn9tRh"
+       "mmvk4rn34XiUrLUZRg2vrMhkBE9eYCZFU9vskvil6SJwIDAQAB"))

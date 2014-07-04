@@ -232,3 +232,59 @@
        :host-to-port {alice 1337}
        :host-to-key {alice (ssh/public-key *key-str-a*)}
        :source-name-map {top-secret-source-name top-secret-source}})))
+
+(deftest test-apply-log-blob
+  (let [cmd-map
+        ,{"add-blob-1" (fn [tree dir] (git/add-blob [dir] "blob-1" tree))
+          "add-blob-2" (fn [tree dir] (git/add-blob [dir] "blob-2" tree))}]
+    (are [tree blob-path blob-data result]
+      (= result (apply-log-blob tree [blob-path nil blob-data] cmd-map))
+
+      [] (log-blob-path 42 "add-blob-1" ["foo"]) ""
+      (->> (git/add-blob ["foo"] "blob-1")
+           (git/add-blob (log-blob-path 42 "add-blob-1" ["foo"]) ""))
+
+      [["100644" "blob" nil "blob"]] (log-blob-path 43 "add-blob-2" ["foo"]) ""
+      (->> [["100644" "blob" nil "blob"]]
+           (git/add-blob ["foo"] "blob-2")
+           (git/add-blob (log-blob-path 43 "add-blob-2" ["foo"]) ""))
+
+      [] (log-blob-path 44 "add-blob-1" ["dir"]) "bam!"
+      (git/add-blob (log-blob-path 44 "add-blob-1" ["dir"]) "bam!"))))
+
+(deftest test-log-tree
+  (are [tree result]
+    (= result (log-tree tree))
+    [] nil
+    (git/add-blob ["log" "foo"] "blob") (git/add-blob ["foo"] "blob")))
+
+(deftest test-merge-trees
+  (let [fcmd (comp first cmd)
+        merge-base (->> (fcmd "add-peer" 42 ["m1" "5555" *key-str-a*] [])
+                        (fcmd "add-peer" 43 ["m2" "5556" *key-str-b*]))]
+    (are [tree1 tree2 result]
+      (= result (merge-trees tree1 tree2 merge-base))
+
+      (fcmd "add-peer" 45 ["m3" "5557" *key-str-c*] merge-base)
+      (fcmd "new-source" 44 ["the-source"] merge-base)
+      (->> merge-base
+           (fcmd "new-source" 44 ["the-source"])
+           (fcmd "add-peer" 45 ["m3" "5557" *key-str-c*]))
+
+      merge-base merge-base merge-base
+
+      (fcmd "new-source" 44 ["the-source"] merge-base)
+      merge-base
+      (fcmd "new-source" 44 ["the-source"] merge-base)
+
+      (->> merge-base
+           (fcmd "add-peer" 44 ["m3" "5557" *key-str-c*])
+           (fcmd "new-source" 46 ["the-source-1"]))
+      (->> merge-base
+           (fcmd "new-source" 45 ["the-source-2"])
+           (fcmd "add-peer" 47 ["m4" "5557" *key-str-d*]))
+      (->> merge-base
+           (fcmd "add-peer" 44 ["m3" "5557" *key-str-c*])
+           (fcmd "new-source" 45 ["the-source-2"])
+           (fcmd "new-source" 46 ["the-source-1"])
+           (fcmd "add-peer" 47 ["m4" "5557" *key-str-d*])))))
