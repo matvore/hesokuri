@@ -119,25 +119,32 @@ a String and returned.)"
                  (finally (.close stdout)))
                (throw-if-error cat-blob)]))))
 
+(defn write-blob-data
+  "Writes blob data to a stream. The data can be one of the following, checked
+  in this order:
+  1. a function which, when called with an OutputStream, writes the blob data to
+     that stream. The function can close or flush the stream, but it need not.
+     write-blob-data will return whatever this function returns.
+  2. an argument that is passed as the first argument to clojure.java.io/copy to
+     write the blob data. 'data' can be any type accepted by that function.
+     write-blob-data will return whatever clojure.java.io/copy returns, which is
+     nil as of this writing."
+  [data ^OutputStream dest]
+  (if (fn? data)
+    (data dest)
+    (cjio/copy data dest)))
+
 (defn write-blob
-  "Writes a blob to the given Git repository. data represents the blob data. It
-can be one of the following, checked in this order:
-1. a function which, when called with an OutputStream, writes the blob data to
-   that stream. The function can close or flush the stream, but it need not.
-2. an argument that is passed as the first argument to clojure.java.io/copy to
-   write the blob data. 'data' can be any type accepted by that function."
-  ([ctx data]
-     (let [[blob-in blob-out :as hash-blob]
-           ,(invoke-streams ctx "hash-object" ["-w" "--stdin"])]
-       (try
-         (try
-           (if (fn? data)
-             (data blob-in)
-             (cjio/copy data blob-in))
-           (finally (.close blob-in)))
-         (first [(trim (slurp blob-out))
-                 (throw-if-error hash-blob)])
-         (finally (.close blob-out))))))
+  "Writes a blob to the given Git repository. data represents the blob data, and
+  is written using write-blob-data. Returns the SHA1 hash of the written blob."
+  [ctx data]
+  (let [[blob-in blob-out :as hash-blob]
+        ,(invoke-streams ctx "hash-object" ["-w" "--stdin"])]
+    (try (try (write-blob-data data blob-in)
+              (finally (.close blob-in)))
+         (try (trim (slurp blob-out))
+              (finally (throw-if-error hash-blob)))
+         (finally (.close blob-out)))))
 
 (defn read-tree-entry
   "Reads an entry from a Git tree object. Returns a sequence with at least three

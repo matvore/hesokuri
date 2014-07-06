@@ -139,6 +139,19 @@
           result (read-blob git-dir blob-hash #(.read %))]
       (is (= (int \A) result)))))
 
+(deftest test-write-blob-data
+  (letfn [(do-write [blob-data]
+            (let [baos (ByteArrayOutputStream.)
+                  write-return (write-blob-data blob-data baos)]
+              [(String. (.toByteArray baos) "UTF-8") write-return]))]
+    (are [data result return]
+      (= [result return] (do-write data))
+
+      "" "" nil
+      "asdf" "asdf" nil
+      (constantly :foo) "" :foo
+      #(.write % (.getBytes "foo" "UTF-8")) "foo" nil)))
+
 (deftest test-write-blob-success
   (with-temp-repo [git-dir]
     (let [blob-hash (write-blob git-dir "asdf")]
@@ -153,7 +166,7 @@
       (is (not= -1 (.indexOf (.getMessage e) "hash-object -w --stdin")))
       (is (not= -1 (.indexOf ((ex-data e) :err) "Not a git repository"))))))
 
-(deftest test-write-blob-data-is-fn
+(deftest test-write-blob-where-data-is-fn
   (with-temp-repo [git-dir]
     (let [data-fn #(.write % (.getBytes "foo" "UTF-8"))
           blob-hash (write-blob git-dir data-fn)]
