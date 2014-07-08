@@ -56,6 +56,9 @@ The presence of the file indicates that the peer has a copy of the source named
 source on the peer. If the path is relative, it is relative to hesoroot on that
 peer.
 
+The path indicates the location of the working directory (for non-bare
+repositories), or the location of the .git directory (for bare repositories).
+
 FOR EACH SOURCE
 ---------------
 
