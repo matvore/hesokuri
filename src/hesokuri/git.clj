@@ -19,7 +19,7 @@ to Hesokuri logic."
   (:require [clojure.java.io :as cjio]
             clojure.java.shell
             [clojure.string :refer [blank? join split trim]]
-            [clojure.tools.logging :refer :all]
+            [clojure.tools.logging :as ctl]
             [hesokuri.transact :as transact]
             [hesokuri.util :refer :all]))
 
@@ -738,6 +738,18 @@ that takes a context."
   ([ctx sub-cmd cmd-args]
      (invoke-with-summary
       (cmd ctx) (args (git-dir ctx) (cons sub-cmd cmd-args)))))
+
+(defn log
+  "Takes the result of invoke-streams or invoke-with-summary, logs the summary,
+  and returns the exit code."
+  [res]
+  (let [[{:keys [exit]} summary] (if (invoke-result? (first res))
+                                   res
+                                   [@(nth res 2) (nth res 3)])]
+    (if (zero? exit)
+      (ctl/info summary)
+      (ctl/warn summary))
+    exit))
 
 (comment
   ;; Recursively read a tree at the given hash

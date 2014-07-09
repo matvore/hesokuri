@@ -19,7 +19,7 @@
   on the command line)."
   (:require [clojure.java.io :refer [file]]
             [clojure.string :refer [split trim]]
-            clojure.tools.logging
+            [clojure.tools.logging :as ctl]
             [hesokuri.git :as git]
             [hesokuri.util :refer :all]
             [hesokuri.watcher :as watcher]))
@@ -64,15 +64,6 @@
   (let [args (concat (if bare [] [(str "--work-tree=" dir)]) args)]
     (git/invoke-with-summary "git" (git/args (git-dir repo) args))))
 
-(defn- log
-  "Takes the result of invoke-git, logs the summary, and returns the exit code."
-  [invoke-git-result]
-  (let [[{:keys [exit]} summary] invoke-git-result]
-    (if (zero? exit)
-      (clojure.tools.logging/info summary)
-      (clojure.tools.logging/warn summary))
-    exit))
-
 (defn working-area-clean
   "Returns true if this repo's working area is clean, or it is bare. It is clean
   if there are no untracked files, unstaged changes, or uncommitted changes."
@@ -92,7 +83,7 @@
     ;; git-branch can return error even though some branches were read
     ;; correctly, so if there was an error just log a warning and try to parse
     ;; the output anyway.
-    (when (not= 0 exit) (clojure.tools.logging/warn (second res-sum)))
+    (when-not (zero? exit) (ctl/warn (second res-sum)))
     (into {} (git/branch-and-hash-list out))))
 
 (defn checked-out-branch
@@ -116,7 +107,7 @@
   not yet merged to its upstream branch."
   [{:keys [init] :as repo} branch-name & [force]]
   {:pre [(string? branch-name) init]}
-  (log (invoke-git repo ["branch" (if force "-D" "-d") branch-name]))
+  (git/log (invoke-git repo ["branch" (if force "-D" "-d") branch-name]))
   nil)
 
 (defn hard-reset
@@ -124,14 +115,14 @@
   failure."
   [{:keys [init] :as repo} ref]
   {:pre [(string? ref) init]}
-  (log (invoke-git repo ["reset" "--hard" ref])))
+  (git/log (invoke-git repo ["reset" "--hard" ref])))
 
 (defn rename-branch
   "Renames the given branch, allowing overwrites if specified. Returns 0 for
   success, non-zero for failure."
   [{:keys [init] :as repo} from to allow-overwrite]
   {:pre [(string? from) (string? to) init]}
-  (log (invoke-git repo ["branch" (if allow-overwrite "-M" "-m") from to])))
+  (git/log (invoke-git repo ["branch" (if allow-overwrite "-M" "-m") from to])))
 
 (defn fast-forward?
   "Equivalent to hesokuri.git/fast-forward? but for repo objects."
@@ -144,9 +135,9 @@
   [repo peer-repo local-ref remote-branch allow-non-ff]
   {:pre [(string? peer-repo) (string? local-ref) (string? remote-branch)
          (:init repo)]}
-  (log (invoke-git repo `("push" ~peer-repo
-                          ~(str local-ref ":refs/heads/" remote-branch)
-                          ~@(if allow-non-ff ["-f"] [])))))
+  (git/log (invoke-git repo `("push" ~peer-repo
+                              ~(str local-ref ":refs/heads/" remote-branch)
+                              ~@(if allow-non-ff ["-f"] [])))))
 
 (defn watch-refs-heads-dir
   "Sets up a watcher for the refs/heads directory and returns an object like

@@ -133,8 +133,7 @@
                      [{:exit 1 :out "" :err ""} "summary"])
         repo-1 {:dir "repodir" :init true}
         repo-2 {:dir "repodir2" :init true}]
-    (with-redefs [hesokuri.repo/invoke-git invoke-git
-                  hesokuri.repo/log (fn [[{:keys [exit]}]] exit)]
+    (with-redefs [hesokuri.repo/invoke-git invoke-git]
       (delete-branch repo-1 "byebye")
       (delete-branch repo-2 "ohnooo" true)
       (is (= [[repo-1 ["branch" "-d" "byebye"]]
@@ -200,8 +199,7 @@
 
                           [repo ["push" test-peer from-to-ref]]
                           [[{:exit 44 :err "" :out ""} ""]]})]
-    (with-redefs [hesokuri.repo/invoke-git invoke-git
-                  hesokuri.repo/log (comp :exit first)]
+    (with-redefs [hesokuri.repo/invoke-git invoke-git]
       (is (= 42 (push-to-branch repo test-peer local-ref remote-branch true)))
       (is (= 44 (push-to-branch repo test-peer local-ref remote-branch
                                 false))))))
