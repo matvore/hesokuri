@@ -18,7 +18,8 @@
   (:require [clojure.test :refer :all]
             [clojure.tools.logging :refer :all]
             [hesokuri.ssh :refer :all]
-            [hesokuri.testing.data :refer :all]))
+            [hesokuri.testing.data :refer :all]
+            [hesokuri.util :refer :all]))
 
 (defn free-port []
   (let [socket (new java.net.ServerSocket 0)
@@ -53,53 +54,66 @@ the trailing newline."
 (deftest test-public-key-coersion-from-private-throws-exception
   (is (thrown? ExceptionInfo (public-key (.getPrivate (new-key-pair))))))
 
-(defmacro with-connection [[new-connection-fn] & body]
-  `(let [new-connection-fn# ~new-connection-fn
-         server-port# (free-port)
-         client-key-pair# (new-key-pair)
-         server-key-pair# (new-key-pair)
+(def client-key-pair (new-key-pair))
+(def server-key-pair (new-key-pair))
 
-         server#
-         (listen-connect server-port# server-key-pair#
-                         (partial = (.getPublic client-key-pair#))
-                         new-connection-fn#)
-
-         client-channel#
-         (connect-to "127.0.0.1" server-port# client-key-pair#
-                     (partial = (.getPublic server-key-pair#)))
-
-         [~'client-in ~'client-out ~'client-err]
-         (channel-streams client-channel#)]
-     (try
-       ~@body
-       (finally
-         (.close client-channel# false)
-         (.stop server#)))))
+(defmacro test-connection [server-connection-fn client-connection-fn]
+  `(let-try [server-connection-fn# ~server-connection-fn
+             client-connection-fn# ~client-connection-fn
+             server-port# (free-port)
+             server#
+             ,(listen-connect server-port# server-key-pair
+                              (partial = (.getPublic client-key-pair))
+                              server-connection-fn#)]
+     (is (= :ok (connect-to "127.0.0.1" server-port# client-key-pair
+                            (partial = (.getPublic server-key-pair))
+                            client-connection-fn#
+                            nil)))
+     (finally (.stop server#))))
 
 (deftest connect-stdout-stderr
-  (with-connection
-    [(fn [_ out err]
-       (spit out "stdout from server\n")
-       (spit err "stderr from server\n")
-       0)]
-    (is (= "stdout from server" (read-line-stream client-out)))
-    (is (= "stderr from server" (read-line-stream client-err)))))
+  (test-connection
+   (fn [_ out err]
+     (spit out "stdout from server\n")
+     (spit err "stderr from server\n")
+     0)
+   (fn [_ out err _]
+     (is (= "stdout from server" (read-line-stream out)))
+     (is (= "stderr from server" (read-line-stream err)))
+     [false :ok])))
 
 (deftest connect-stdin
   (let [read-from-stdin (promise)]
-    (with-connection
-      [(fn [in _ _]
-         (deliver read-from-stdin (read-line-stream in))
-         0)]
-      (spit client-in "stdin from client\n")
-      (is (= "stdin from client" @read-from-stdin)))))
+    (test-connection
+     (fn [in _ _]
+       (deliver read-from-stdin (read-line-stream in))
+       0)
+     (fn [in _ _ _]
+       (spit in "stdin from client\n")
+       (is (= "stdin from client" @read-from-stdin))
+       [false :ok]))))
 
 (deftest connect-stdin-one-char
   (let [read-char (promise)]
-    (with-connection
-      [(fn [in _ _]
-         (deliver read-char (.read in))
-         0)]
-      (.write client-in 42)
-      (.flush client-in)
-      (is (= 42 @read-char)))))
+    (test-connection
+     (fn [in _ _]
+       (deliver read-char (.read in))
+       0)
+     (fn [in _ _ _]
+       (.write in 42)
+       (.flush in)
+       (is (= 42 @read-char))
+       [false :ok]))))
+
+(deftest connect-multiple-sessions
+  (let [counter (atom 0)]
+    (test-connection
+     (fn [_ out _]
+       (spit out (str (swap! counter inc) "\n"))
+       0)
+     (fn [_ out _ acc]
+       (let [acc (conj acc (read-line-stream out))]
+         (if (>= (count acc) 3)
+           (do (is (= ["3" "2" "1"] acc))
+               [false :ok])
+           [true acc]))))))

@@ -20,6 +20,7 @@ public/private key pairs only. All keys use RSA algorithm."
            [java.security.spec X509EncodedKeySpec])
   (:require [clojure.data.codec.base64 :as b64]
             [clojure.java.io :as cjio]
+            [hesokuri.util :refer :all]
             [ring.util.io :as ruio]))
 
 (defn new-key-pair []
@@ -73,39 +74,73 @@ default encoding."
 
 (defn connect-to
   "Tries to connect to a peer with SSH authentication. This machine acts as the
-SSH client. Returns an already-opened instance of org.apache.sshd.ClientChannel
-corresponding to a Hesokuri SSH channel. Returns nil if any error occurred.
-"
-  [host port key-pair known-server-key?]
-  (let [client (org.apache.sshd.SshClient/setUpDefaultClient)
-        connect-future (delay (.awaitUninterruptibly
-                               (.connect client host port)))
-        session (delay (.getSession @connect-future))
-        channel (delay (.createShellChannel @session))]
-    (doto client
-      (.setServerKeyVerifier
-       (reify org.apache.sshd.client.ServerKeyVerifier
-         (verifyServerKey [_ _ _ server-key]
-           (boolean (known-server-key? server-key)))))
-      (.setKeyPairProvider (rsa-key-pair-provider key-pair))
-      (.start))
-    (when (and (.isConnected @connect-future)
-               (.isSuccess (.awaitUninterruptibly
-                            (.authPublicKey @session "hesokuri_user" key-pair)))
-               (.isOpened (-> @channel .open .awaitUninterruptibly)))
-       @channel)))
+  SSH client. Returns an already-opened instance of org.apache.sshd.ClientChannel
+  corresponding to a Hesokuri SSH channel. Returns the value of the accumulator
+  after the last successful operation if any error occurred.
+
+  This function returns the final value of the accumulator.
+
+  host - String representing the host to connect to
+  port - port on the host to connect to
+  key-pair - key pair with which to authenticate this client
+  known-server-key? - a function that accepts a java.security.PublicKey and
+      returns truthy iff a server with that key should be authenticated
+  client-session - authenticated client session instance
+  connection-fn - a function that takes the following arguments, in this order:
+      1. OutputStream corresponding to stdin
+      2. InputStream corresponding to stdout
+      3. InputStream corresponding to stderr
+      4. acc - value of the accumulator
+
+      This function returns a sequence with at least two values: first, truthy
+      to create another connection, or falsey to stop. Second, the new
+      accumulator value.
+  acc - the initial value of the accumulator."
+  ([^org.apache.sshd.ClientSession client-session connection-fn acc]
+     (let [channel (.createShellChannel client-session)]
+       (if-not (-> channel .open .awaitUninterruptibly .isOpened)
+         acc
+         (let [[continue new-acc]
+               ,(try (connection-fn (.getInvertedIn channel)
+                                    (.getInvertedOut channel)
+                                    (.getInvertedErr channel)
+                                    acc)
+                     (finally (.close channel false)))]
+           (if-not continue
+             new-acc
+             (recur client-session connection-fn new-acc))))))
+  ([host port key-pair known-server-key? connection-fn acc]
+     (let [client (org.apache.sshd.SshClient/setUpDefaultClient)]
+       (doto client
+         (.setServerKeyVerifier
+          (reify org.apache.sshd.client.ServerKeyVerifier
+            (verifyServerKey [_ _ _ server-key]
+              (boolean (known-server-key? server-key)))))
+         (.setKeyPairProvider (rsa-key-pair-provider key-pair))
+         .start)
+       (let-try [connect-future
+                 ,(.awaitUninterruptibly (.connect client host port))]
+         (if-not (.isConnected connect-future)
+           acc
+           (let-try [session (.getSession connect-future)]
+             (if-not (.isSuccess
+                      (.awaitUninterruptibly
+                       (.authPublicKey session "hesokuri_user" key-pair)))
+               acc
+               (connect-to session connection-fn acc))
+             (finally (.close session false))))
+         (finally (.stop client))))))
 
 (defn listen-connect
-  "Accepts incoming Hesokuri connections. new-connection-fn is a function that
-takes these arguments in this order:
-  1. InputStream corresponding to stdin
-  2. OutputStream corresponding to stdout
-  3. OutputStream corresponding to stderr
-And returns the exit value as an integer (i.e. 0 for success).
-Returns the org.apache.sshd.SshServer instance, which can be used to stop the
-server.
-"
-  [port key-pair known-client-key? new-connection-fn]
+  "Accepts incoming Hesokuri connections. connection-fn is a function that
+  takes these arguments in this order:
+      1. InputStream corresponding to stdin
+      2. OutputStream corresponding to stdout
+      3. OutputStream corresponding to stderr
+  And returns the exit value as an integer (i.e. 0 for success).
+  Returns the org.apache.sshd.SshServer instance, which can be used to stop the
+  server."
+  [port key-pair known-client-key? connection-fn]
   (doto (org.apache.sshd.SshServer/setUpDefaultServer)
     (.setPort port)
     (.setPublickeyAuthenticator
@@ -128,6 +163,6 @@ server.
              (start [_ _]
                (let [{:keys [in out err exit]} @streams]
                  (future
-                   (.onExit exit (new-connection-fn in out err))))))))))
+                   (.onExit exit (connection-fn in out err))))))))))
     (.setKeyPairProvider (rsa-key-pair-provider key-pair))
     (.start)))
