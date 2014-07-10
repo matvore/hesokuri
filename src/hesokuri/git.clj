@@ -112,12 +112,11 @@ stream-fn returns. If stream-fn is omitted, slurp is used (the blob is read into
 a String and returned.)"
   ([ctx blob-hash] (read-blob ctx blob-hash slurp))
   ([ctx blob-hash stream-fn]
-     (let [[_ stdout :as cat-blob]
-           ,(invoke-streams ctx "cat-file" ["blob" (str blob-hash)])]
-       (first [(try
-                 (stream-fn stdout)
-                 (finally (.close stdout)))
-               (throw-if-error cat-blob)]))))
+     (let-try [[_ stdout :as cat-blob]
+               ,(invoke-streams ctx "cat-file" ["blob" (str blob-hash)])]
+       (stream-fn stdout)
+       (finally (.close stdout)
+                (throw-if-error cat-blob)))))
 
 (defn write-blob-data
   "Writes blob data to a stream. The data can be one of the following, checked
@@ -138,13 +137,14 @@ a String and returned.)"
   "Writes a blob to the given Git repository. data represents the blob data, and
   is written using write-blob-data. Returns the SHA1 hash of the written blob."
   [ctx data]
-  (let [[blob-in blob-out :as hash-blob]
-        ,(invoke-streams ctx "hash-object" ["-w" "--stdin"])]
-    (try (try (write-blob-data data blob-in)
-              (finally (.close blob-in)))
-         (try (trim (slurp blob-out))
-              (finally (throw-if-error hash-blob)))
-         (finally (.close blob-out)))))
+  (let-try [[blob-in blob-out :as hash-blob]
+            ,(invoke-streams ctx "hash-object" ["-w" "--stdin"])]
+    (write-blob-data data blob-in)
+    (.close blob-in)
+    (try (trim (slurp blob-out))
+         (finally (throw-if-error hash-blob)))
+    (finally (.close blob-in)
+             (.close blob-out))))
 
 (defn read-tree-entry
   "Reads an entry from a Git tree object. Returns a sequence with at least three
@@ -295,21 +295,20 @@ each tree that must be updated, the original tree structure (usually after the
 hash) has been replaced with a different one of the same format. This function
 returns the Hash of the tree that was written."
   ([ctx tree]
-     (let [[stdin stdout :as cat-tree]
-           ,(invoke-streams ctx "hash-object" ["-w" "--stdin" "-t" "tree"])]
-       (try
-         (doseq [[type name hash replace] tree]
-           (let [new-hash
-                 (cond
-                  hash hash
-                  (= type "40000") (write-tree ctx replace)
-                  :else (write-blob ctx replace))]
-             (write-tree-entry stdin [type name new-hash])))
-         (.close stdin)
-         (first [(trim (slurp stdout))
-                 (throw-if-error cat-tree)])
-         (finally (.close stdin)
-                  (.close stdout))))))
+     (let-try [[stdin stdout :as cat-tree]
+               ,(invoke-streams ctx "hash-object" ["-w" "--stdin" "-t" "tree"])]
+       (doseq [[type name hash replace] tree]
+         (let [new-hash
+               (cond
+                hash hash
+                (= type "40000") (write-tree ctx replace)
+                :else (write-blob ctx replace))]
+           (write-tree-entry stdin [type name new-hash])))
+       (.close stdin)
+       (try (trim (slurp stdout))
+            (finally (throw-if-error cat-tree)))
+       (finally (.close stdin)
+                (.close stdout)))))
 
 (defn add-blob
   "Adds a blob to a tree. Automatically creates containing directories. Throws
@@ -529,22 +528,22 @@ can be written with write-commit-entry."
   "Writes a commit to the given repository, possibly writing the parent and tree
 fields if their hashes are nil and the corresponding data follows the nil hash."
   ([ctx com]
-     (let [[stdin stdout :as hash-commit]
-           ,(invoke-streams ctx "hash-object" ["-w" "--stdin" "-t" "commit"])]
-       (first [(try
-                 (doseq [[name value data :as entry] com]
-                   (write-commit-entry
-                    stdin
-                    [name
-                     (cond
-                      (some? value) value
-                      (= name "parent") (write-commit ctx data)
-                      (= name "tree") (write-tree ctx data))]))
-                 (.close stdin)
-                 (trim (slurp stdout))
-                 (finally (.close stdin)
-                          (.close stdout)))
-               (throw-if-error hash-commit)]))))
+     (let-try [[stdin stdout :as hash-commit]
+               ,(invoke-streams
+                 ctx "hash-object" ["-w" "--stdin" "-t" "commit"])]
+       (doseq [[name value data :as entry] com]
+         (write-commit-entry
+          stdin
+          [name
+           (cond
+            (some? value) value
+            (= name "parent") (write-commit ctx data)
+            (= name "tree") (write-tree ctx data))]))
+       (.close stdin)
+       (try (trim (slurp stdout))
+            (finally (throw-if-error hash-commit)))
+       (finally (.close stdin)
+                (.close stdout)))))
 
 (defn change
   "Changes a ref by transforming the tree of its commit with a function, making

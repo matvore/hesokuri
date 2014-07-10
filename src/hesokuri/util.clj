@@ -170,3 +170,9 @@ a String with str if it is not a String already."
   (like int + \\a 1) => (+ (int \\a) (int 1)) => 98"
   [convert f & args]
   (apply f (map convert args)))
+
+(defmacro let-try
+  "Wraps a try with a let block. The only expression in the let body is the try
+  block."
+  [bindings & try-body]
+  `(let ~bindings (try ~@try-body)))
