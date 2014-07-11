@@ -59,6 +59,15 @@
         (.write out buffer)
         (recur in out include-size)))))
 
+;;; TODO: Remove magic lines in receive-pack logic. In particular, the calls to
+;;; pipe-packets in respond and push are magical and determined by trial and
+;;; error. There may be scenarios where this does not work.
+
+;;; There are three pipe-packets calls on each side:
+;;; 1. advertise-refs data, sent from server to client
+;;; 2. actual packed data, sent from client to server
+;;; 3. summary, sent from server to client
+
 (defn respond
   "Responds to a command sent by a client. The server does this by default
   whenever a channel is opened. Returns 0 for success, non-zero for error.
