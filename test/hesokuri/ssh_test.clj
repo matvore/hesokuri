@@ -19,13 +19,8 @@
             [clojure.tools.logging :refer :all]
             [hesokuri.ssh :refer :all]
             [hesokuri.testing.data :refer :all]
+            [hesokuri.testing.ssh :refer :all]
             [hesokuri.util :refer :all]))
-
-(defn free-port []
-  (let [socket (new java.net.ServerSocket 0)
-        port (.getLocalPort socket)]
-    (.close socket)
-    port))
 
 (defn read-line-stream
   "Reads a line from the given java.io.InputStream and returns a String without
@@ -53,23 +48,6 @@ the trailing newline."
 
 (deftest test-public-key-coersion-from-private-throws-exception
   (is (thrown? ExceptionInfo (public-key (.getPrivate (new-key-pair))))))
-
-(def client-key-pair (new-key-pair))
-(def server-key-pair (new-key-pair))
-
-(defmacro test-connection [server-connection-fn client-connection-fn]
-  `(let-try [server-connection-fn# ~server-connection-fn
-             client-connection-fn# ~client-connection-fn
-             server-port# (free-port)
-             server#
-             ,(listen-connect server-port# server-key-pair
-                              (partial = (.getPublic client-key-pair))
-                              server-connection-fn#)]
-     (is (= :ok (connect-to "127.0.0.1" server-port# client-key-pair
-                            (partial = (.getPublic server-key-pair))
-                            client-connection-fn#
-                            nil)))
-     (finally (.stop server#))))
 
 (deftest connect-stdout-stderr
   (test-connection

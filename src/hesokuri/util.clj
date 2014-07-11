@@ -176,3 +176,10 @@ a String with str if it is not a String already."
   block."
   [bindings & try-body]
   `(let ~bindings (try ~@try-body)))
+
+(defmacro copy+
+  "Runs clojure.java.io/copy on the given arguments, then runs one more method
+  on the destination, which is usually .flush or .close."
+  [src dest extra]
+  `(do (cjio/copy ~src ~dest)
+       (~extra ~dest)))

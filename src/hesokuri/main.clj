@@ -91,8 +91,7 @@ lein run init MACHINE-NAME [PORT]
 (defn exit
   "Prints some text to the given stream and exits with the given exit code."
   [message out code]
-  (cjio/copy message out)
-  (.flush out)
+  (copy+ message out .flush)
   (System/exit code))
 
 (defn cmd-init
