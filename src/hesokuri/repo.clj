@@ -76,15 +76,9 @@
 
 (defn branches
   "Returns a map of refs/heads branches to their hashes."
-  [{:keys [dir init] :as repo}]
-  {:pre [init]}
-  (let [res-sum (invoke-git repo ["branch" "-v" "--no-abbrev"])
-        [{:keys [out exit]}] res-sum]
-    ;; git-branch can return error even though some branches were read
-    ;; correctly, so if there was an error just log a warning and try to parse
-    ;; the output anyway.
-    (when-not (zero? exit) (ctl/warn (second res-sum)))
-    (into {} (git/branch-and-hash-list out))))
+  [repo]
+  {:pre [(:init repo)]}
+  (git/branches (git-dir repo)))
 
 (defn checked-out-branch
   "Returns the name of the currently checked-out branch, or nil if no local

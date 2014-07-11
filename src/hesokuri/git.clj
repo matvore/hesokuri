@@ -594,6 +594,17 @@ Returns the hash corresponding to the new commit."
         :when (and hash (full-hash? hash) (not= name ""))]
     [name hash]))
 
+(defn branches
+  "Returns a map of refs/heads branches to their hashes."
+  [ctx]
+  (let [[{:keys [out exit]} :as res-sum]
+        ,(invoke-with-summary ctx "branch" ["-v" "--no-abbrev"])]
+    ;; git-branch can return error even though some branches were read
+    ;; correctly, so if there was an error just log a warning and try to parse
+    ;; the output anyway.
+    (when-not (zero? exit) (ctl/warn (second res-sum)))
+    (into {} (branch-and-hash-list out))))
+
 (defn git-hash
   "Coerces to a hash. To coerce to a hash string, call str on the result."
   [ctx ref]
