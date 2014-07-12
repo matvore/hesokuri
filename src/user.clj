@@ -17,39 +17,39 @@
 ;;;; probably move into the real app but is still experimental or is not
 ;;;; thoroughly unit tested.
 
-(require '[clojure.data.codec.base64 :as b64])
-(require '[clojure.java.io :as cjio])
-(require '[clojure.pprint :as cppr])
-(require '[clojure.reflect :as cref])
-(require '[clojure.string :as cstr])
-(require '[clojure.tools.logging :as ctl])
-(require '[hesokuri.branch :as branch])
-(require '[hesokuri.config :as config])
-(require '[hesokuri.dynamic-config :as dynamic-config])
-(require '[hesokuri.git :as git])
-(require '[hesokuri.heartbeats :as heartbeats])
-(require '[hesokuri.heso :as heso])
-(require '[hesokuri.hesobase :as hesobase])
-(require '[hesokuri.main :as main])
-(require '[hesokuri.peer :as peer])
-(require '[hesokuri.peer-repo :as peer-repo])
-(require '[hesokuri.repo :as repo])
-(require '[hesokuri.see :as see])
-(require '[hesokuri.source :as source])
-(require '[hesokuri.source-def :as source-def])
-(require '[hesokuri.ssh :as ssh])
-(require '[hesokuri.transact :as transact])
-(require '[hesokuri.util :refer :all])
-(require '[hesokuri.validation :as validation])
-(require '[hesokuri.watcher :as watcher])
-(require '[hesokuri.web :as web])
-(require '[ring.util.io :as ruio])
-
-(import '[java.io ByteArrayOutputStream ObjectOutputStream OutputStream])
-(import '[java.security KeyFactory])
-(import '[java.security.spec X509EncodedKeySpec])
-
-(use 'clojure.repl)
+(ns user
+  (:require [clojure.data.codec.base64 :as b64]
+            [clojure.java.io :as cjio]
+            [clojure.pprint :as cppr]
+            [clojure.repl :refer :all]
+            [clojure.reflect :as cref]
+            [clojure.string :as cstr]
+            [clojure.tools.logging :as ctl]
+            [hesokuri.branch :as branch]
+            [hesokuri.config :as config]
+            [hesokuri.dynamic-config :as dynamic-config]
+            [hesokuri.git :as git]
+            [hesokuri.heartbeats :as heartbeats]
+            [hesokuri.heso :as heso]
+            [hesokuri.hesobase :as hesobase]
+            [hesokuri.hesoprot :as hesoprot]
+            [hesokuri.main :as main]
+            [hesokuri.peer :as peer]
+            [hesokuri.peer-repo :as peer-repo]
+            [hesokuri.repo :as repo]
+            [hesokuri.see :as see]
+            [hesokuri.source :as source]
+            [hesokuri.source-def :as source-def]
+            [hesokuri.ssh :as ssh]
+            [hesokuri.transact :as transact]
+            [hesokuri.util :refer :all]
+            [hesokuri.validation :as validation]
+            [hesokuri.watcher :as watcher]
+            [hesokuri.web :as web]
+            [ring.util.io :as ruio])
+  (:import [java.io ByteArrayOutputStream ObjectOutputStream OutputStream]
+           [java.security KeyFactory]
+           [java.security.spec X509EncodedKeySpec]))
 
 (defn add-peer
   "Adds a new peer to a configuration, and returns a new configuration that can
