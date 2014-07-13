@@ -51,7 +51,7 @@ flag (to pass to git when operating on the repo) to the git-dir-flag symbol."
        (doseq [args# [[~git-dir-flag "init"]
                       [~git-dir-flag "config" "user.name" "Hesokuri Tester"]
                       [~git-dir-flag "config" "user.email" "test@hesokuri"]]]
-         (git/throw-if-error (git/invoke-with-summary "git" args#)))
+         (git/invoke+throw "git" args#))
        ~@body)))
 
 (defn make-first-commit
@@ -61,5 +61,4 @@ that points to it."
   (is (= *first-commit-hash* (git/write-commit git-dir *first-commit*)))
   (->> ["update-ref" "refs/heads/master" *first-commit-hash*]
        (git/args git-dir)
-       (git/invoke-with-summary "git")
-       git/throw-if-error))
+       (git/invoke+throw "git")))

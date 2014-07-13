@@ -238,7 +238,7 @@ changed to a directory or a non-empty file to hold more information."
       hesokuri.git/author.
   timestamp - value returned by System/currentTimeMillis."
   [git-ctx machine-name port key author timestamp]
-  (git/throw-if-error (git/invoke-with-summary git-ctx "init" ["--bare"]))
+  (git/invoke+throw git-ctx "init" ["--bare"])
   (let [port (str port)
         key (ssh/public-key-str key)
         [tree err-msg] (cmd "add-peer" timestamp [machine-name port key] [])
@@ -249,9 +249,8 @@ changed to a directory or a non-empty file to hold more information."
                                     [:msg "executing hesobase/init\n"]])]
     (when (seq err-msg)
       (throw (ex-info err-msg {})))
-    (git/throw-if-error
-     (git/invoke-with-summary
-      git-ctx "update-ref" ["refs/heads/master" (str commit-hash) ""]))
+    (git/invoke+throw
+     git-ctx "update-ref" ["refs/heads/master" (str commit-hash) ""])
     commit-hash))
 
 (defn tree->config

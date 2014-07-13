@@ -47,8 +47,7 @@
   ["master:master_copy"
    "master2:master2_copy"]
   [(make-first-commit client-git-dir)
-   (git/throw-if-error
-    (git/invoke-with-summary client-git-dir "branch" ["master2"]))
+   (git/invoke+throw client-git-dir "branch" ["master2"])
    (git/change client-git-dir "refs/heads/master2"
                #(git/add-blob ["dir" "blob"] "foo\n" %)
                *commit-tail*)]

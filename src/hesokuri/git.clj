@@ -28,6 +28,7 @@ to Hesokuri logic."
          error?
          throw-if-error
          invoke
+         invoke+throw
          invoke-streams
          invoke-with-summary)
 
@@ -574,10 +575,8 @@ commit-tail - the commit data to use in the new commit, minus the parent and
 
 Returns the hash corresponding to the new commit."
   ([ctx ref tree-fn commit-tail]
-     (let [[{:keys [out]} :as get-orig-ref-hash]
-           ,(invoke-with-summary ctx "rev-parse" [ref])
+     (let [[{:keys [out]}] (invoke+throw ctx "rev-parse" [ref])
            orig-ref-hash (trim out)]
-       (throw-if-error get-orig-ref-hash)
        (let [new-commit-hash
              ,(transact/transact
                (fn [trans]
@@ -623,8 +622,7 @@ Returns the hash corresponding to the new commit."
   [ctx ref]
   (if (full-hash? ref)
     ref
-    (let [res-sum
-          ,(throw-if-error (invoke-with-summary ctx "rev-parse" [(str ref)]))]
+    (let [res-sum (invoke+throw ctx "rev-parse" [(str ref)])]
       (trim (:out (first res-sum))))))
 
 (defn fast-forward?
@@ -637,9 +635,7 @@ invoking git."
         to-hash (str (git-hash ctx to-hash))]
     (if (= from-hash to-hash)
       when-equal
-      (let [res-sum (throw-if-error
-                     (invoke-with-summary
-                      ctx "merge-base" [from-hash to-hash]))]
+      (let [res-sum (invoke+throw ctx "merge-base" [from-hash to-hash])]
         (= from-hash (trim (:out (first res-sum))))))))
 
 (defn invoke-result?
@@ -780,6 +776,11 @@ Returns the res argument if there was no error."
 (def invoke+log
   "Do invoke-with-summary, then log, and return the result of log."
   (comp log invoke-with-summary))
+
+(def invoke+throw
+  "Do invoke-with-summary, then throw-if-error, and return the result of
+  throw-if-error."
+  (comp throw-if-error invoke-with-summary))
 
 (comment
   ;; Recursively read a tree at the given hash

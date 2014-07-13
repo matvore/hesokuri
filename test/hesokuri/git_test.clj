@@ -669,7 +669,7 @@
                                          first-com-hash])
           second-com-hash "8d410286cba8ae75c9c7225264132b28b5a7b7f2"]
       (is (= "7e980a15b3aac54a97aecd59b28d6cd7cffd368d" first-com-hash))
-      (throw-if-error (invoke-with-summary "git" set-branch-args))
+      (invoke+throw "git" set-branch-args)
       (is (= second-com-hash
              (change git-dir "refs/heads/master"
                      #(->> %
