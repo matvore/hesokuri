@@ -712,9 +712,9 @@ strings to pass to git."
 
 (defn error?
   "Determines if the given invoke result indicates an error. The result can be
-the result of invoke or the realized future returned by invoke-with-streams. A
-subprocess is considered to terminate in error if stderr is non-empty or the
-exit code is non-zero."
+  the result of invoke or the realized future returned by invoke-streams. A
+  subprocess is considered to terminate in error if stderr is non-empty or the
+  exit code is non-zero."
   [{:keys [err exit]}]
   (or (not= exit 0) (not (empty? err))))
 
