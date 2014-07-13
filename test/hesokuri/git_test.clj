@@ -728,17 +728,17 @@
   (let [dir "/srcdir"
         dir-flag "--git-dir=/srcdir"
         git-result (fn [output] (repeat 10 {:err "" :out output :exit 0}))
-        invoke-mock (mock {["git" [dir-flag "merge-base" *hash-a* *hash-b*]]
-                           (git-result *hash-c*)
-                           ["git" [dir-flag "merge-base" *hash-b* *hash-a*]]
-                           (git-result *hash-c*)
-                           ["git" [dir-flag "merge-base" *hash-d* *hash-e*]]
-                           (git-result *hash-e*)
-                           ["git" [dir-flag "merge-base" *hash-e* *hash-d*]]
-                           (git-result *hash-e*)
-                           ["git" [dir-flag "merge-base" *hash-f* *hash-g*]]
-                           (git-result *hash-f*)})]
-    (with-redefs [invoke invoke-mock]
+        sh-mock (mock {["git" dir-flag "merge-base" *hash-a* *hash-b*]
+                       (git-result *hash-c*)
+                       ["git" dir-flag "merge-base" *hash-b* *hash-a*]
+                       (git-result *hash-c*)
+                       ["git" dir-flag "merge-base" *hash-d* *hash-e*]
+                       (git-result *hash-e*)
+                       ["git" dir-flag "merge-base" *hash-e* *hash-d*]
+                       (git-result *hash-e*)
+                       ["git" dir-flag "merge-base" *hash-f* *hash-g*]
+                       (git-result *hash-f*)})]
+    (with-redefs [clojure.java.shell/sh sh-mock]
       (are [from-hash to-hash when-equal res]
            (= (boolean res)
               (boolean (fast-forward? dir from-hash to-hash when-equal)))

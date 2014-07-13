@@ -665,14 +665,6 @@ nothing to do with whether the result indicates a successful invocation."
                  [(str "--work-tree=" wd)])))
   ([ctx more-args] (concat (args ctx) more-args)))
 
-(defn invoke
-  "Invokes git with the given arguments, and returns a value in the same form as
-clojure.java.shell/sh. 'git' is the Git object to use. 'args' is a sequence of
-strings to pass to git."
-  [git args]
-  {:pre [(args? args)]}
-  (apply clojure.java.shell/sh git args))
-
 (defn invoke-streams
   "Invokes git with the given arguments. The semantics of the arguments are
   identical to the invoke function. The return value is a sequence of at least
@@ -751,15 +743,18 @@ Returns the res argument if there was no error."
           (:exit invoke-result)))
 
 (defn invoke-with-summary
-  "Calls invoke and returns two items in a sequence: the result of invoke
-followed by a string which is the summary. The summary part of the sequence is
-lazy.
+  "Invokes git and returns two items in a sequence: the result of
+  clojure.java.shell/sh followed by a string which is the summary. The summary
+  part of the sequence is lazy.
 
-See the documentation for invoke-streams for information on using the overload
-that takes a context."
+  git - the executable corresponding to git. This can just be the String 'git'.
+  args - command-line arguments to pass to git
+
+  See the documentation for invoke-streams for information on using the overload
+  that takes a context."
   ([git args]
      {:pre [(args? args)]}
-     (let [result (invoke git args)]
+     (let [result (apply clojure.java.shell/sh git args)]
        (cons result (lazy-seq [(summary args result)]))))
   ([ctx sub-cmd cmd-args]
      (invoke-with-summary (cmd ctx) (args ctx (cons sub-cmd cmd-args)))))
@@ -775,6 +770,12 @@ that takes a context."
       (ctl/info summary)
       (ctl/warn summary))
     exit))
+
+(def invoke
+  "Similar to invoke-with-summary, but only returns the first element of the
+  sequence returned by invoke-with-summary, which is the result of
+  clojure.java.shell/sh."
+  (comp first invoke-with-summary))
 
 (def invoke+log
   "Do invoke-with-summary, then log, and return the result of log."

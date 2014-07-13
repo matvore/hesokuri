@@ -204,8 +204,8 @@
        (let [repo {:init true :bare false :dir (cjio/file "/fake-repo")}
              invoke-mock
              ,(mock {[repo "rev-parse" ["--symbolic-full-name" "HEAD"]]
-                    [[git-invoke-result "summary"]]})]
-         (with-redefs [hesokuri.git/invoke-with-summary invoke-mock]
+                     [git-invoke-result]})]
+         (with-redefs [hesokuri.git/invoke invoke-mock]
            (is (= result (checked-out-branch repo)))))
        {:out "refs/heads/foo\n" :err "" :exit 0} "foo"
        {:out "not-local-branch\n" :err "" :exit 0} nil

@@ -47,12 +47,10 @@
 (deftest retrying-unresponsive-peer
   (let [peer (push-but-fail-ping peer/default)]
     (with-redefs [peer-repo/accessible (mock {(accessible-args) [true]})
-
                   current-time-millis
-                  (mock {[] [(+ 46 (peer/default :minimum-retry-interval))]})
-
-                  git/invoke
-                  (constantly {:exit 0 :out "mock out\n" :err "mock err\n"})]
+                  ,(mock {[] [(+ 46 (peer/default :minimum-retry-interval))]})
+                  clojure.java.shell/sh
+                  ,(constantly {:exit 0 :out "mock out\n" :err "mock err\n"})]
       (let [peer (push peer)]
         (is (= "hash" (get-in peer
                               [:pushed [(:dir local-repo) "branch-name"]])))

@@ -59,7 +59,7 @@
   [{:keys [bare init] :as repo}]
   {:pre [init]}
   (or bare
-      (let [[status] (git/invoke-with-summary repo "status" ["--porcelain"])]
+      (let [status (git/invoke repo "status" ["--porcelain"])]
         (and (= 0 (:exit status))
              (= "" (:out status))))))
 
@@ -68,10 +68,8 @@
   branch is checked out."
   [repo]
   {:pre [(:init repo)]}
-  (let [[{:keys [out exit]}]
-        ,(git/invoke-with-summary repo
-                                  "rev-parse"
-                                  ["--symbolic-full-name" "HEAD"])
+  (let [{:keys [out exit]}
+        ,(git/invoke repo "rev-parse" ["--symbolic-full-name" "HEAD"])
         out (trim out)
         local-branch-prefix "refs/heads/"]
     (cond
