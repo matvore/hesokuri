@@ -17,7 +17,7 @@
 ;;;; probably move into the real app but is still experimental or is not
 ;;;; thoroughly unit tested.
 
-(ns user
+(ns repl
   (:require [clojure.data.codec.base64 :as b64]
             [clojure.java.io :as cjio]
             [clojure.pprint :as cppr]
