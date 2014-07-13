@@ -793,8 +793,15 @@
        '("checkout" "branch")))
 
 (deftest test-args
-  (is (= ["--git-dir=foodir" "a" "b" "c"]
-         (args "foodir" ["a" "b" "c"]))))
+  (are [args-to-args res]
+    (= res (apply args args-to-args))
+
+    ["foodir" ["a" "b" "c"]] ["--git-dir=foodir" "a" "b" "c"]
+    [{:hesokuri.git/git-dir "foodir"} ["e" "f"]] ["--git-dir=foodir" "e" "f"]
+    [{:hesokuri.git/git-dir "a/.git"
+      :hesokuri.git/work-tree "wt"}
+     ["g" "h"]]
+    ,["--git-dir=a/.git" "--work-tree=wt" "g" "h"]))
 
 (deftest test-invoke
   (with-temp-repo [repo-dir git-dir-flag]
@@ -872,3 +879,22 @@
     (is (invoke-result? (first result)))
     (is (string? (second result)))
     (is (= 2 (count result)))))
+
+(deftest test-log-returns-exit-code
+  (are [invoke-res log-res]
+    (= log-res (log invoke-res))
+
+    [{:exit 123 :out "stdout" :err "stderr"}
+     "the summary"]
+    ,123
+    [:ignored
+     :ignored
+     (delay {:exit 122 :out "stdout" :err "stderr"})
+     "the summary"]
+    ,122))
+
+(deftest test-invoke+log-returns-exit-code
+  (with-temp-repo [git-dir]
+    (make-first-commit git-dir)
+    (is (= 0 (invoke+log git-dir "branch" ["new-branch"])))
+    (is (= 128 (invoke+log git-dir "branch" ["new-branch"])))))

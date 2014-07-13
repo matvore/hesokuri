@@ -591,8 +591,7 @@ Returns the hash corresponding to the new commit."
                                           commit-tail)]
                    (write-commit ctx new-commit))))
              update-ref-args
-             ,(args (git-dir ctx)
-                    ["update-ref" ref new-commit-hash orig-ref-hash])]
+             ,(args ctx ["update-ref" ref new-commit-hash orig-ref-hash])]
          (if (error? (invoke (cmd ctx) update-ref-args))
            (recur ctx ref tree-fn commit-tail)
            new-commit-hash)))))
@@ -661,8 +660,10 @@ nothing to do with whether the result indicates a successful invocation."
 
 (defn args
   "Helper for building arguments when invoking git."
-  [git-dir args]
-  (cons (str "--git-dir=" git-dir) args))
+  ([ctx] (cons (str "--git-dir=" (git-dir ctx))
+               (when-let [wd (work-tree ctx)]
+                 [(str "--work-tree=" wd)])))
+  ([ctx more-args] (concat (args ctx) more-args)))
 
 (defn invoke
   "Invokes git with the given arguments, and returns a value in the same form as
@@ -674,18 +675,19 @@ strings to pass to git."
 
 (defn invoke-streams
   "Invokes git with the given arguments. The semantics of the arguments are
-identical to the invoke function. The return value is a sequence of at least
-four elements: an OutputStream corresponding to stdin, an InputStream
-corresponding to stdout, a future that will realize when the process
-terminates, and the summary as a string. The future is a map with two keys:
-:exit and :err, whose values correspond to the values of the same keys in the
-invoke return value. The summary part of the returned sequence is lazy.
+  identical to the invoke function. The return value is a sequence of at least
+  four elements: an OutputStream corresponding to stdin, an InputStream
+  corresponding to stdout, a future that will realize when the process
+  terminates, and the summary as a string. The future is a map with two keys:
+  :exit and :err, whose values correspond to the values of the same keys in the
+  invoke return value. The summary part of the returned sequence is lazy.
 
-The two-argument overload simply takes the path to git and the args to pass to
-it. The three-argument overload composes the non-sub-command arguments to git
-itself based on which sub-command is being used. For instance, for the cat-file
-sub-command, only --git-dir needs to be passed besides the arguments specific to
-cat-file."
+  The two-argument overload simply takes the path to git and the args to pass to
+  it. The three-argument overload composes the non-sub-command arguments to git
+  itself using whatever data is available in the context. For instance, the
+  context should always have a value for git-dir, so the three-argument overload
+  will always add the --git-dir flag. It may also add the --work-tree flag if
+  one is available."
   ([git args]
      {:pre [(args? args)]}
      (let [process (new ProcessBuilder (into [git] args))]
@@ -706,7 +708,7 @@ cat-file."
                        (format "execute: %s %s\nstderr:\n%sexit: %d\n"
                                git (join " " args) err exit))])))))
   ([ctx sub-cmd cmd-args]
-     (invoke-streams (cmd ctx) (args (git-dir ctx) (cons sub-cmd cmd-args)))))
+     (invoke-streams (cmd ctx) (args ctx (cons sub-cmd cmd-args)))))
 
 (defn error?
   "Determines if the given invoke result indicates an error. The result can be
@@ -760,8 +762,7 @@ that takes a context."
      (let [result (invoke git args)]
        (cons result (lazy-seq [(summary args result)]))))
   ([ctx sub-cmd cmd-args]
-     (invoke-with-summary
-      (cmd ctx) (args (git-dir ctx) (cons sub-cmd cmd-args)))))
+     (invoke-with-summary (cmd ctx) (args ctx (cons sub-cmd cmd-args)))))
 
 (defn log
   "Takes the result of invoke-streams or invoke-with-summary, logs the summary,
@@ -774,6 +775,10 @@ that takes a context."
       (ctl/info summary)
       (ctl/warn summary))
     exit))
+
+(def invoke+log
+  "Do invoke-with-summary, then log, and return the result of log."
+  (comp log invoke-with-summary))
 
 (comment
   ;; Recursively read a tree at the given hash
