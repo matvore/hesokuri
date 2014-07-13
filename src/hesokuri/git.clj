@@ -15,7 +15,8 @@
 (ns hesokuri.git
   "Module that facilitates invoking git, and other Git utility code not specific
 to Hesokuri logic."
-  (:import [java.io File InputStream OutputStream])
+  (:import [java.io File InputStream OutputStream]
+           [java.util Map])
   (:require [clojure.java.io :as cjio]
             clojure.java.shell
             [clojure.string :refer [blank? join split trim]]
@@ -37,17 +38,30 @@ repository is the repository whose .git directory is the file specified by this
 value."
   (cmd [this]
     "Returns the path to the git executable. This could just be 'git'.")
-  (git-dir [this] "Returns the path to the .git directory."))
+  (git-dir [this] "Returns the path to the .git directory.")
+  (work-tree [this]
+    "Returns the path to the work tree of the repo. If the work tree is not
+    needed, unknown, or the repo is bare, this should return nil."))
 
 (extend-type String
   Context
   (cmd [_] "git")
-  (git-dir [this] (cjio/file this)))
+  (git-dir [this] (cjio/file this))
+  (work-tree [this] (work-tree (cjio/file this))))
 
 (extend-type File
   Context
   (cmd [_] "git")
-  (git-dir [this] this))
+  (git-dir [this] this)
+  (work-tree [this]
+    (when (= ".git" (.getName this))
+      (.getParent this))))
+
+(extend-type Map
+  Context
+  (cmd [this] (get this ::cmd "git"))
+  (git-dir [this] (get this ::git-dir))
+  (work-tree [this] (get this ::work-tree)))
 
 (defn hex-char-val
   "Returns the integral value of a hex digit for c in the range of 0-9 or a-f.
