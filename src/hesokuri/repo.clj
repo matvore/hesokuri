@@ -17,7 +17,7 @@
   have logic that is specific to Hesokuri, so it can be easily replaced with a
   more performant git access layer later. Currently it just shells out to 'git'
   on the command line)."
-  (:require [clojure.java.io :refer [file]]
+  (:require [clojure.java.io :as cjio]
             [clojure.string :refer [split trim]]
             [clojure.tools.logging :as ctl]
             [hesokuri.git :as git]
@@ -27,42 +27,31 @@
 (defn with-dir
   "Returns a repo object that operates through the git command-line tool."
   [dir]
-  {:dir (file dir)})
+  {:dir (cjio/file dir)})
 
 (defn init
   "Initializes the repository if it does not exist. Returns a new repo object."
   [{:keys [dir init bare] :as self}]
   (cond
    init self
+   (-> (git/invoke "git" [(str "--git-dir=" dir) "rev-parse"])
+       :exit
+       zero?)
+   ,(assoc self
+      :bare true
+      :init true
+      :hesokuri.git/git-dir (cjio/file dir)
+      :hesokuri.git/work-tree nil)
    :else
-   (let [existing-bare
-         (-> (git/invoke "git" (git/args dir ["rev-parse"]))
-             :exit
-             zero?)]
-     (if existing-bare
-       (assoc self :bare true :init true)
-       (let [init-args `["init" ~@(if bare ["--bare"] []) ~(str dir)]
-             res-sum (git/invoke-with-summary "git" init-args)]
-         (when-not (zero? (:exit (first res-sum)))
-           (throw (java.io.IOException. (second res-sum))))
-         (assoc self
-           :bare (boolean bare)
-           :init true))))))
-
-(defn git-dir
-  "Returns the git directory (.git) of the repo as a java.io.File object. If it
-  is a bare repository, it is equal to the :dir value."
-  [{:keys [dir bare init] :as repo}]
-  {:pre [init]}
-  (if bare dir (file dir ".git")))
-
-(defn invoke-git
-  "Invokes git with the given arguments, the correct --git-dir flag, and (if
-  applicable) the correct --work-tree flag. Uses git/invoke-with-summary."
-  [{:keys [dir bare] :as repo} args]
-  {:pre [(every? string? args)]}
-  (let [args (concat (if bare [] [(str "--work-tree=" dir)]) args)]
-    (git/invoke-with-summary "git" (git/args (git-dir repo) args))))
+   ,(let [init-args `["init" ~@(if bare ["--bare"] []) ~(str dir)]
+          res-sum (git/invoke-with-summary "git" init-args)]
+      (when-not (zero? (:exit (first res-sum)))
+        (throw (java.io.IOException. (second res-sum))))
+      (assoc self
+        :bare (boolean bare)
+        :init true
+        :hesokuri.git/git-dir (if bare dir (cjio/file dir ".git"))
+        :hesokuri.git/work-tree (when-not bare dir)))))
 
 (defn working-area-clean
   "Returns true if this repo's working area is clean, or it is bare. It is clean
@@ -70,15 +59,9 @@
   [{:keys [bare init] :as repo}]
   {:pre [init]}
   (or bare
-      (let [[status] (invoke-git repo ["status" "--porcelain"])]
+      (let [[status] (git/invoke-with-summary repo "status" ["--porcelain"])]
         (and (= 0 (:exit status))
              (= "" (:out status))))))
-
-(defn branches
-  "Returns a map of refs/heads branches to their hashes."
-  [repo]
-  {:pre [(:init repo)]}
-  (git/branches (git-dir repo)))
 
 (defn checked-out-branch
   "Returns the name of the currently checked-out branch, or nil if no local
@@ -86,7 +69,9 @@
   [repo]
   {:pre [(:init repo)]}
   (let [[{:keys [out exit]}]
-        (invoke-git repo ["rev-parse" "--symbolic-full-name" "HEAD"])
+        ,(git/invoke-with-summary repo
+                                  "rev-parse"
+                                  ["--symbolic-full-name" "HEAD"])
         out (trim out)
         local-branch-prefix "refs/heads/"]
     (cond
@@ -101,7 +86,7 @@
   not yet merged to its upstream branch."
   [{:keys [init] :as repo} branch-name & [force]]
   {:pre [(string? branch-name) init]}
-  (git/log (invoke-git repo ["branch" (if force "-D" "-d") branch-name]))
+  (git/invoke+log repo "branch" [(if force "-D" "-d") branch-name])
   nil)
 
 (defn hard-reset
@@ -109,29 +94,23 @@
   failure."
   [{:keys [init] :as repo} ref]
   {:pre [(string? ref) init]}
-  (git/log (invoke-git repo ["reset" "--hard" ref])))
+  (git/invoke+log repo "reset" ["--hard" ref]))
 
 (defn rename-branch
   "Renames the given branch, allowing overwrites if specified. Returns 0 for
   success, non-zero for failure."
   [{:keys [init] :as repo} from to allow-overwrite]
   {:pre [(string? from) (string? to) init]}
-  (git/log (invoke-git repo ["branch" (if allow-overwrite "-M" "-m") from to])))
-
-(defn fast-forward?
-  "Equivalent to hesokuri.git/fast-forward? but for repo objects."
-  [repo & args]
-  {:pre [(:init repo)]}
-  (apply git/fast-forward? (git-dir repo) args))
+  (git/invoke+log repo "branch" [(if allow-overwrite "-M" "-m") from to]))
 
 (defn push-to-branch
   "Performs a push. Returns 0 for success, non-zero for failure."
   [repo peer-repo local-ref remote-branch allow-non-ff]
   {:pre [(string? peer-repo) (string? local-ref) (string? remote-branch)
          (:init repo)]}
-  (git/log (invoke-git repo `("push" ~peer-repo
-                              ~(str local-ref ":refs/heads/" remote-branch)
-                              ~@(if allow-non-ff ["-f"] [])))))
+  (git/invoke+log repo "push" `(~peer-repo
+                                ~(str local-ref ":refs/heads/" remote-branch)
+                                ~@(if allow-non-ff ["-f"] []))))
 
 (defn watch-refs-heads-dir
   "Sets up a watcher for the refs/heads directory and returns an object like
@@ -139,5 +118,5 @@
   that takes no arguments and is called when a change is detected."
   [repo on-change-cb]
   {:pre [(:init repo)]}
-  (watcher/for-dir (file (git-dir repo) "refs" "heads")
-                   (cb [on-change-cb] [_] (cbinvoke on-change-cb))))
+  (watcher/for-dir (cjio/file (git/git-dir repo) "refs" "heads")
+                   (fn [_] (on-change-cb))))

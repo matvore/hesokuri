@@ -23,6 +23,7 @@
             [clojure.java.shell :refer [with-sh-dir sh]]
             [clojure.string :refer [trim]]
             [hesokuri.branch :as branch]
+            [hesokuri.git :as git]
             [hesokuri.peer :as peer]
             [hesokuri.repo :as repo]
             [hesokuri.source-def :as source-def]
@@ -39,7 +40,7 @@
      branches
      (into {}
       (map (fn [[branch hash]] [(branch/parse-underscored-name branch) hash])
-           (repo/branches repo)))
+           (git/branches repo)))
 
      working-area-clean (repo/working-area-clean repo)
 
@@ -65,7 +66,7 @@
                   (or working-area-clean
                       (not checked-out-branch-local))
                   (or (not local-hash)
-                      (repo/fast-forward? repo local-hash hash true)))
+                      (git/fast-forward? repo local-hash hash true)))
 
            (let [branch (branch/underscored-name branch)
                  branch-local (branch/underscored-name branch-local)]
@@ -97,7 +98,7 @@
 
 (defn- advance-bc [{:keys [repo] :as self}]
   (doseq [branch (branches-to-delete
-                  self #(repo/fast-forward? repo %1 %2 true))]
+                  self #(git/fast-forward? repo %1 %2 true))]
     (repo/delete-branch repo (branch/underscored-name branch) :force))
   self)
 
