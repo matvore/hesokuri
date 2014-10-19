@@ -132,12 +132,14 @@
     *_hesokr_*, force push to (BRANCH_NAME)_hesokr_(MY_HOSTNAME)"
   [{:keys [peers branches local-identity repo source-def] :as self}
    peer-host]
-  (doseq [branch (keys branches)]
+  (doseq [:let [peer-path ((source-def/host-to-path source-def) peer-host)]
+          :when peer-path
+          branch (keys branches)]
     (send-off
      (peers peer-host)
      peer/push
      repo
-     {:host peer-host, :path ((source-def/host-to-path source-def) peer-host)}
+     {:host peer-host, :path peer-path}
      branch
      (branches branch)
      (let [force-args (-> branch

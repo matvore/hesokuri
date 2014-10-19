@@ -49,3 +49,13 @@
        #{["foo-remote-hash" "bar-local-hash"]
          ["bar-remote-hash" "bar-local-hash"]}
        #{{:name "bar", :peer "p1"}}))
+
+(deftest test-push-for-peer-noop-if-repo-not-on-peer
+  (with-redefs [clojure.core/send-off
+                (fn [& args]
+                  (throw (ex-info "Should not be called." {:args args})))]
+    (#'hesokuri.source/do-push-for-peer
+     {:source-def {"different-host" "/different/host/path"}
+      :branches {{:name "branch"} "hash"}
+      :peers {"the-host" (agent {})}}
+     "the-host")))
