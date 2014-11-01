@@ -18,7 +18,19 @@
   repo - The repo object for accessing the repo on disk.
   source-def - the definition of this source (see hesokuri.source-def).
   peers - a map of hostnames to the corresponding peer object.
-  local-identity - the hostname or IP of this system."
+  local-identity - the hostname or IP of this system.
+
+  optional fields:
+  advance-fn - The custom advance function for this repository. This function is
+      called by the advance function in this namespace in place of the default
+      advance logic. The 'refresh' function in this namespace is always called
+      before this.
+  branches - a map of hesokuri.branch objects to hesokuri.git/Hash objects
+      representing the branches that exist in this repository.
+  working-area-clean - a value which is truthy iff
+      hesokuri.repo/working-area-clean returns true.
+  checked-out-branch - the hesokuri.branch object corresponding to the currently
+      checked-out branch, or nil if there is no branched currently checked out."
   (:require [clojure.java.io :refer [file]]
             [clojure.java.shell :refer [with-sh-dir sh]]
             [clojure.string :refer [trim]]
@@ -30,7 +42,7 @@
             [hesokuri.util :refer :all]
             [hesokuri.watcher :as watcher]))
 
-(defn- refresh
+(defn refresh
   "Updates values of the source object based on the state of the repo."
   [{:keys [repo] :as self}]
   (into self
@@ -108,7 +120,7 @@
   [{:keys [repo] :as self}]
   (assoc self :repo (repo/init repo)))
 
-(def advance
+(defn advance
   "Checks for local branches that meet the following criteria, and performs
   the given operation, 'advancing' when appropriate.
   a) If some live-edit branch LEB is not checked out, or it is checked out but
@@ -120,7 +132,10 @@
   c) For any branch specified as unwanted in the source-def, delete it with
      'git branch -D'. For instance, if 'foo' is unwanted, then any branch named
      'foo' or 'foo_hesokr_*' will be deleted."
-  #(-> % refresh advance-a advance-bc))
+  [self]
+  (let [self (refresh self)
+        advance-fn (or (:advance-fn self) (comp advance-bc advance-a))]
+    (advance-fn self)))
 
 (defn- do-push-for-peer
   "Push all branches as necessary to keep a peer up-to-date.
