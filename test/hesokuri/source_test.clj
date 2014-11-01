@@ -13,8 +13,13 @@
 ; limitations under the License.
 
 (ns hesokuri.source-test
-  (:require [clojure.test :refer :all]
-            [hesokuri.source :refer :all]))
+  (:require [clojure.java.io :as cjio]
+            [clojure.test :refer :all]
+            [hesokuri.git :as git]
+            [hesokuri.repo :as repo]
+            [hesokuri.source :refer :all]
+            [hesokuri.testing.data :refer :all]
+            [hesokuri.testing.temp :refer :all]))
 
 (deftest test-branches-to-delete
   (are [branches unwanted-branches ff-pairs expected-result]
@@ -59,3 +64,61 @@
       :branches {{:name "branch"} "hash"}
       :peers {"the-host" (agent {})}}
      "the-host")))
+
+(deftest test-refresh-bare-source
+  (with-temp-repo [dir git-dir-flag]
+    (make-first-commit dir "refs/heads/b1")
+    (make-first-commit dir "refs/heads/b1_hesokr_peer")
+    (let [orig {:repo (repo/init {:dir dir})
+                :source-def {}}]
+      (is (= (into orig
+                   {:branches {{:name "b1"} *first-commit-hash*
+                               {:name "b1" :peer "peer"} *first-commit-hash*}
+                    :working-area-clean true
+                    :checked-out-branch nil})
+             (refresh orig))))))
+
+(deftest test-refresh-branch-checked-out
+  (with-temp-repo [dir git-dir-flag true]
+    (let [git-dir (cjio/file dir ".git")]
+      (make-first-commit git-dir "refs/heads/b1")
+      (make-first-commit git-dir "refs/heads/b1_hesokr_peer")
+      (git/invoke+log git-dir "checkout" ["b1_hesokr_peer"])
+      (let [orig {:repo (repo/init {:dir dir})
+                  :source-def {}}]
+        (is (= (into orig
+                     {:branches {{:name "b1"} *first-commit-hash*
+                                 {:name "b1" :peer "peer"} *first-commit-hash*}
+                      :working-area-clean true
+                      :checked-out-branch {:name "b1" :peer "peer"}})
+               (refresh orig)))))))
+
+(deftest test-advance-custom-advance-fn
+  (with-temp-repo [dir]
+    (make-first-commit dir "refs/heads/master")
+    (is (= {{:name "master"} *first-commit-hash*}
+           (advance {:repo (repo/init {:dir dir})
+                     :source-def {}
+                     :advance-fn :branches})))))
+
+(deftest test-advance-default-advance-a
+  (with-temp-repo [dir]
+    (make-first-commit dir "refs/heads/b1")
+    (make-first-commit dir "refs/heads/b1_hesokr_peer")
+    (git/change dir "refs/heads/b1_hesokr_peer"
+                #(git/add-blob ["dir" "blob"] "foo\n" %)
+                *commit-tail*)
+    (git/invoke+log dir "checkout" ["b1"])
+    (let [source {:repo (repo/init {:dir dir})
+                  :source-def {:live-edit-branches {:only #{"b1"}}}}]
+      (is (= {{:name "b1"} "12c7cbcab8e2ccf0c5cd77b8ff83ccf4a53f97dc"}
+             (:branches (refresh (advance source))))))))
+
+(deftest test-advance-default-advance-c
+  (with-temp-repo [dir]
+    (make-first-commit dir "refs/heads/delete_me")
+    (make-first-commit dir "refs/heads/b2")
+    (let [source {:repo (repo/init {:dir dir})
+                  :source-def {:unwanted-branches #{"delete_me"}}}]
+      (is (= {{:name "b2"} *first-commit-hash*}
+             (:branches (refresh (advance source))))))))

@@ -55,10 +55,15 @@ flag (to pass to git when operating on the repo) to the git-dir-flag symbol."
        ~@body)))
 
 (defn make-first-commit
-  "Writes *first-commit* to the given repository and creates a 'master' branch
-that points to it."
-  [git-dir]
-  (is (= *first-commit-hash* (git/write-commit git-dir *first-commit*)))
-  (->> ["update-ref" "refs/heads/master" *first-commit-hash*]
-       (git/args git-dir)
-       (git/invoke+throw "git")))
+  "Writes *first-commit* to the given repository and creates a branch
+  that points to it.
+
+  git-dir - the .git directory of the repository to commit to.
+  branch-name - the full name of the branch to create, which is
+      'refs/heads/master' by default."
+  ([git-dir] (make-first-commit git-dir "refs/heads/master"))
+  ([git-dir branch-name]
+     (is (= *first-commit-hash* (git/write-commit git-dir *first-commit*)))
+     (->> ["update-ref" branch-name *first-commit-hash*]
+          (git/args git-dir)
+          (git/invoke+throw "git"))))
