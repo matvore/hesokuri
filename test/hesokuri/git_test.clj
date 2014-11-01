@@ -726,7 +726,7 @@
 
 (deftest test-fast-forward
   (let [dir "/srcdir"
-        dir-flag "--git-dir=/srcdir"
+        dir-flag (str "--git-dir=" (cjio/file "/srcdir"))
         git-result (fn [output] (repeat 10 {:err "" :out output :exit 0}))
         sh-mock (mock {["git" dir-flag "merge-base" *hash-a* *hash-b*]
                        (git-result *hash-c*)
