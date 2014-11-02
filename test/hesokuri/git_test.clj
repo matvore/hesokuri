@@ -221,8 +221,8 @@
     (let [blob-1-hash (write-blob git-dir "blob-1")
           blob-2-hash (write-blob git-dir "blob-2")
           hash-args (args git-dir ["hash-object" "-w" "--stdin" "-t" "tree"])
-          [subt-in subt-out :as hash-subt] (invoke-streams "git" hash-args)
-          [tree-in tree-out :as hash-tree] (invoke-streams "git" hash-args)]
+          [subt-in subt-out :as hash-subt] (invoke-streams hash-args)
+          [tree-in tree-out :as hash-tree] (invoke-streams hash-args)]
       (future
         (write-tree-entry subt-in ["100644" "subfoo" blob-1-hash])
         (write-tree-entry subt-in ["100644" "subbar" blob-2-hash])
@@ -669,7 +669,7 @@
                                          first-com-hash])
           second-com-hash "8d410286cba8ae75c9c7225264132b28b5a7b7f2"]
       (is (= "7e980a15b3aac54a97aecd59b28d6cd7cffd368d" first-com-hash))
-      (invoke+throw "git" set-branch-args)
+      (invoke+throw set-branch-args)
       (is (= second-com-hash
              (change git-dir "refs/heads/master"
                      #(->> %
@@ -728,15 +728,15 @@
   (let [dir "/srcdir"
         dir-flag (str "--git-dir=" (cjio/file "/srcdir"))
         git-result (fn [output] (repeat 10 {:err "" :out output :exit 0}))
-        sh-mock (mock {["git" dir-flag "merge-base" *hash-a* *hash-b*]
+        sh-mock (mock {[default-cmd dir-flag "merge-base" *hash-a* *hash-b*]
                        (git-result *hash-c*)
-                       ["git" dir-flag "merge-base" *hash-b* *hash-a*]
+                       [default-cmd dir-flag "merge-base" *hash-b* *hash-a*]
                        (git-result *hash-c*)
-                       ["git" dir-flag "merge-base" *hash-d* *hash-e*]
+                       [default-cmd dir-flag "merge-base" *hash-d* *hash-e*]
                        (git-result *hash-e*)
-                       ["git" dir-flag "merge-base" *hash-e* *hash-d*]
+                       [default-cmd dir-flag "merge-base" *hash-e* *hash-d*]
                        (git-result *hash-e*)
-                       ["git" dir-flag "merge-base" *hash-f* *hash-g*]
+                       [default-cmd dir-flag "merge-base" *hash-f* *hash-g*]
                        (git-result *hash-f*)})]
     (with-redefs [clojure.java.shell/sh sh-mock]
       (are [from-hash to-hash when-equal res]
@@ -805,7 +805,7 @@
 
 (deftest test-invoke
   (with-temp-repo [repo-dir git-dir-flag]
-    (let [rev-parse-result (invoke "git" [git-dir-flag "rev-parse"])]
+    (let [rev-parse-result (invoke [git-dir-flag "rev-parse"])]
       (is (= rev-parse-result {:err "" :out "" :exit 0}))
       (is (invoke-result? rev-parse-result)))))
 
@@ -818,7 +818,7 @@
       (.close in)
       (is (= "ce013625030ba8dba906f756967f9e9ca394464a\n" (slurp out)))
       (is (= {:err "" :exit 0}) @finish)
-      (is (= (str "execute: git " git-dir-flag
+      (is (= (str "execute: " default-cmd " " git-dir-flag
                   " hash-object -w --stdin\nstderr:\nexit: 0"))
           (nth result 3)))))
 
@@ -828,7 +828,8 @@
           ,(invoke-streams repo-dir "cat-file" ["-t" "1234567"])
           err "fatal: Not a valid object name 1234567\n"]
       (is (= {:err err :exit 128} @result))
-      (is (= (str "execute: git " git-dir-flag " cat-file -t 1234567\nstderr:\n"
+      (is (= (str "execute: " default-cmd " " git-dir-flag
+                  " cat-file -t 1234567\nstderr:\n"
                   err "exit: 128\n")
              summary)))))
 
@@ -875,7 +876,7 @@
       (is (not= -1 (.indexOf result substr)) substr))))
 
 (deftest test-invoke-with-summary
-  (let [result (invoke-with-summary "git" ["--version"])]
+  (let [result (invoke-with-summary ["--version"])]
     (is (invoke-result? (first result)))
     (is (string? (second result)))
     (is (= 2 (count result)))))

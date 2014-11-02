@@ -44,15 +44,20 @@ value."
     "Returns the path to the work tree of the repo. If the work tree is not
     needed, unknown, or the repo is bare, this should return nil."))
 
+(def default-cmd
+  "The git command used by contexts that do not explicitly specify the git
+  command. This can be overridden by setting the HESOGIT environment variable."
+  (or (getenv "HESOGIT") "git"))
+
 (extend-type String
   Context
-  (cmd [_] "git")
+  (cmd [_] default-cmd)
   (git-dir [this] (cjio/file this))
   (work-tree [this] (work-tree (cjio/file this))))
 
 (extend-type File
   Context
-  (cmd [_] "git")
+  (cmd [_] default-cmd)
   (git-dir [this] this)
   (work-tree [this]
     (when (= ".git" (.getName this))
@@ -60,7 +65,7 @@ value."
 
 (extend-type Map
   Context
-  (cmd [this] (get this ::cmd "git"))
+  (cmd [this] (get this ::cmd default-cmd))
   (git-dir [this] (get this ::git-dir))
   (work-tree [this] (get this ::work-tree)))
 
@@ -676,6 +681,7 @@ nothing to do with whether the result indicates a successful invocation."
   context should always have a value for git-dir, so the three-argument overload
   will always add the --git-dir flag. It may also add the --work-tree flag if
   one is available."
+  ([args] (invoke-streams default-cmd args))
   ([git args]
      {:pre [(args? args)]}
      (let [process (new ProcessBuilder (into [git] args))]
@@ -748,6 +754,7 @@ Returns the res argument if there was no error."
 
   See the documentation for invoke-streams for information on using the overload
   that takes a context."
+  ([args] (invoke-with-summary default-cmd args))
   ([git args]
      {:pre [(args? args)]}
      (let [result (apply clojure.java.shell/sh git args)]
