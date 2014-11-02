@@ -630,6 +630,14 @@ Returns the hash corresponding to the new commit."
     (let [res-sum (invoke+throw ctx "rev-parse" [(str ref)])]
       (trim (:out (first res-sum))))))
 
+(defn merge-base
+  "Computes a single merge base for two or more refs using git merge-base.
+  Returns the merge base as a hash.
+
+  refs - a sequence of two or more refs whose merge base to compute."
+  [ctx refs]
+  (trim (:out (first (invoke+throw ctx "merge-base" refs)))))
+
 (defn fast-forward?
   "Returns true if the second hash is a fast-forward of the first hash. When
 the hashes are the same, returns when-equal. Returns false if the second hash
@@ -640,8 +648,7 @@ invoking git."
         to-hash (str (git-hash ctx to-hash))]
     (if (= from-hash to-hash)
       when-equal
-      (let [res-sum (invoke+throw ctx "merge-base" [from-hash to-hash])]
-        (= from-hash (trim (:out (first res-sum))))))))
+      (= from-hash (merge-base ctx [from-hash to-hash])))))
 
 (defn invoke-result?
   "Returns true iff x is a valid result of a call to invoke. Note that this has

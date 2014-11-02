@@ -724,6 +724,26 @@
     (is (= *first-commit-hash* (git-hash git-dir "refs/heads/master")))
     (is (thrown? ExceptionInfo (git-hash git-dir "refs/heads/oops")))))
 
+(deftest test-merge-base
+  (are [ref-count]
+    (with-temp-repo [git-dir]
+      (= *first-commit-hash*
+         (let [ref-names
+               ,(for [ref-no (range ref-count)]
+                  (str "refs/heads/b" ref-no))
+               ref-hashes
+               ,(map (fn [ref-name]
+                       (make-first-commit git-dir ref-name)
+                       (change git-dir ref-name
+                               #(add-blob ["dir" "blob"] ref-name %)
+                               *commit-tail*))
+                     ref-names)
+               alternate-head-name-hash
+               ,(interleave ref-names (reverse ref-hashes))]
+           (merge-base git-dir (take ref-count alternate-head-name-hash)))))
+
+    2 3 4 5 6))
+
 (deftest test-fast-forward
   (let [dir "/srcdir"
         dir-flag (str "--git-dir=" (cjio/file "/srcdir"))
