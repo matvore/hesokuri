@@ -108,7 +108,10 @@
                          (ff? hash local-hash)))]
     branch))
 
-(defn- advance-bc [{:keys [repo] :as self}]
+(defn advance-bc
+  "Deletes any branches in the source that are no longer needed, based on what
+  branches-to-delete returns."
+  [{:keys [repo] :as self}]
   (doseq [branch (branches-to-delete
                   self #(git/fast-forward? repo %1 %2 true))]
     (repo/delete-branch repo (branch/underscored-name branch) :force))

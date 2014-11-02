@@ -101,6 +101,19 @@
                      :source-def {}
                      :advance-fn :branches})))))
 
+(deftest test-advance-bc-deletes-fastforward
+  (with-temp-repo [dir]
+    (make-first-commit dir "refs/heads/b1_hesokr_peer")
+    (make-first-commit dir "refs/heads/b1")
+    (let [forward-hash (git/change dir
+                                   "refs/heads/b1"
+                                   #(git/add-blob ["dir" "blob"] "foo\n" %)
+                                   *commit-tail*)
+          source (refresh {:repo (repo/init {:dir dir})
+                           :source-def {}})]
+      (is (= source (advance-bc source)))
+      (is (= {{:name "b1"} forward-hash} (:branches (refresh source)))))))
+
 (deftest test-advance-default-advance-a
   (with-temp-repo [dir]
     (make-first-commit dir "refs/heads/b1")
