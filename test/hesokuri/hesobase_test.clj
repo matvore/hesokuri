@@ -258,33 +258,86 @@
     [] nil
     (git/add-blob ["log" "foo"] "blob") (git/add-blob ["foo"] "blob")))
 
+(def fcmd (comp first cmd))
+
+(def ^:dynamic *merge-base*
+  (->> (fcmd "add-peer" 42 ["m1" "5555" *key-str-a*] [])
+       (fcmd "add-peer" 43 ["m2" "5556" *key-str-b*])))
+
+(defmacro are-merging-right [are-args test]
+  `(are ~are-args
+     ~test
+     (fcmd "add-peer" 45 ["m3" "5557" *key-str-c*] *merge-base*)
+     (fcmd "new-source" 44 ["the-source"] *merge-base*)
+     (->> *merge-base*
+          (fcmd "new-source" 44 ["the-source"])
+          (fcmd "add-peer" 45 ["m3" "5557" *key-str-c*]))
+
+     *merge-base* *merge-base* *merge-base*
+
+     (fcmd "new-source" 44 ["the-source"] *merge-base*)
+     *merge-base*
+     (fcmd "new-source" 44 ["the-source"] *merge-base*)
+
+     (->> *merge-base*
+          (fcmd "add-peer" 44 ["m3" "5557" *key-str-c*])
+          (fcmd "new-source" 46 ["the-source-1"]))
+     (->> *merge-base*
+          (fcmd "new-source" 45 ["the-source-2"])
+          (fcmd "add-peer" 47 ["m4" "5557" *key-str-d*]))
+     (->> *merge-base*
+          (fcmd "add-peer" 44 ["m3" "5557" *key-str-c*])
+          (fcmd "new-source" 45 ["the-source-2"])
+          (fcmd "new-source" 46 ["the-source-1"])
+          (fcmd "add-peer" 47 ["m4" "5557" *key-str-d*]))))
+
 (deftest test-merge-trees
-  (let [fcmd (comp first cmd)
-        merge-base (->> (fcmd "add-peer" 42 ["m1" "5555" *key-str-a*] [])
-                        (fcmd "add-peer" 43 ["m2" "5556" *key-str-b*]))]
-    (are [tree1 tree2 result]
-      (= result (merge-trees tree1 tree2 merge-base))
+  (are-merging-right [tree1 tree2 result]
+    (= result (merge-trees tree1 tree2 *merge-base*))))
 
-      (fcmd "add-peer" 45 ["m3" "5557" *key-str-c*] merge-base)
-      (fcmd "new-source" 44 ["the-source"] merge-base)
-      (->> merge-base
-           (fcmd "new-source" 44 ["the-source"])
-           (fcmd "add-peer" 45 ["m3" "5557" *key-str-c*]))
-
-      merge-base merge-base merge-base
-
-      (fcmd "new-source" 44 ["the-source"] merge-base)
-      merge-base
-      (fcmd "new-source" 44 ["the-source"] merge-base)
-
-      (->> merge-base
-           (fcmd "add-peer" 44 ["m3" "5557" *key-str-c*])
-           (fcmd "new-source" 46 ["the-source-1"]))
-      (->> merge-base
-           (fcmd "new-source" 45 ["the-source-2"])
-           (fcmd "add-peer" 47 ["m4" "5557" *key-str-d*]))
-      (->> merge-base
-           (fcmd "add-peer" 44 ["m3" "5557" *key-str-c*])
-           (fcmd "new-source" 45 ["the-source-2"])
-           (fcmd "new-source" 46 ["the-source-1"])
-           (fcmd "add-peer" 47 ["m4" "5557" *key-str-d*])))))
+(deftest test-merge-branch
+  (are-merging-right [tree1 tree2 result]
+    (with-temp-repo [git-dir]
+      (let [merge-base-commit
+            ,(git/write-commit git-dir
+                               (concat [["tree" nil *merge-base*]]
+                                       *commit-tail*))
+            tree1-commit-hash
+            ,(git/write-commit git-dir
+                               (concat [["tree" nil tree1]
+                                        ["parent" merge-base-commit]]
+                                       *commit-tail*))
+            tree2-commit-hash
+            ,(git/write-commit git-dir
+                               (concat [["tree" nil tree2]
+                                        ["parent" merge-base-commit]]
+                                       *commit-tail*))]
+        (git/invoke+throw
+         git-dir "update-ref" ["refs/heads/master" tree1-commit-hash ""])
+        (let [merge-commit-hash
+              ,(merge-branch
+                git-dir "refs/heads/master" tree2-commit-hash *commit-tail*)]
+          (transact/transact
+           (fn [trans]
+             ;; Note - because we only compare hashes here, the error log will
+             ;; not show the actual merged tree if it is incorrect. This is hard
+             ;; to debug, which is unfortunate. It would be nice to fix that.
+             ;; The git dir is printed as a debug message (see third argument to
+             ;; 'is') so, assuming the JVM does not delete the directory upon
+             ;; termination, it can be used to debug the a failure.
+             (is (= (concat
+                     [["tree" (git/write-tree git-dir result)]]
+                     (if
+                      (or
+                       (git/fast-forward?
+                        git-dir tree1-commit-hash tree2-commit-hash true)
+                       (git/fast-forward?
+                        git-dir tree2-commit-hash tree1-commit-hash true))
+                      ,[["parent" merge-base-commit]]
+                      ,[["parent" tree1-commit-hash]
+                        ["parent" tree2-commit-hash]])
+                     *commit-tail*)
+                    (map #(take 2 %)
+                         (git/read-commit git-dir merge-commit-hash trans)))
+                 (str "git dir: " git-dir))))))
+      true)))

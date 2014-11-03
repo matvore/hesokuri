@@ -338,3 +338,42 @@ changed to a directory or a non-empty file to hold more information."
             (sort #(compare (first %1) (first %2))
                   (concat (git/blobs only1)
                           (git/blobs only2))))))
+
+(defn merge-branch
+  "Merges one (local) branch with some other ref and updates the (local) branch
+  ref. Returns the maybe-new hash of the (local) branch.
+
+  git-ctx - instance of hesokuri.git/Context
+  local-ref - a branch ref which can be converted to a hash with git rev-parse
+      and updated with update-ref. For example, 'heads/refs/master'.
+  other-ref - another ref. This does not need to be updated, so it can be any
+      kind of ref. It is converted to a hash with hesokuri.git/git-hash.
+  commit-tail - the commit data to use in the new commit, if such a commit is
+      made, minus the parent and tree fields."
+  [git-ctx local-ref other-ref commit-tail]
+  (loop []
+    (let [hash-loc (git/git-hash git-ctx local-ref)
+          hash-oth (git/git-hash git-ctx other-ref)
+          ;; Support merging when there is no merge base (assuming I am not
+          ;; supporting it already unknowingly).
+          hash-base (git/merge-base git-ctx [hash-loc hash-oth])]
+      (if (= hash-base hash-oth)
+        hash-loc
+        (let [merged-commit-hash
+              ,(transact/transact
+                (fn [trans]
+                  (let [read-tree #(git/read-tree git-ctx % trans git/read-blob)
+                        merged-tree (merge-trees (read-tree hash-loc)
+                                                 (read-tree hash-oth)
+                                                 (read-tree hash-base))
+                        merged-commit (concat [["tree" nil merged-tree]
+                                               ["parent" hash-loc]
+                                               ["parent" hash-oth]]
+                                              commit-tail)]
+                    (git/write-commit git-ctx merged-commit))))
+              update-result
+              ,(git/invoke git-ctx "update-ref"
+                           [local-ref merged-commit-hash hash-loc])]
+          (if (git/error? update-result)
+            merged-commit-hash
+            (recur)))))))
