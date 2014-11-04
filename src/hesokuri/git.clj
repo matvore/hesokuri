@@ -798,8 +798,52 @@ Returns the res argument if there was no error."
 
 (comment
   ;; Recursively read a tree at the given hash
+  ;; The tree is read lazily and any git process which is still alive is
+  ;; terminated once the 'transaction' is over.
   (let [hash "a9ef38249198b290668ebfb2e29ca5d528a88661"]
     (transact/transact
      (fn [trans]
        (clojure.pprint/pprint
-        (read-tree "/Users/matvore/hesokuri/.git" hash trans))))))
+        (read-tree "/Users/matvore/hesokuri/.git" hash trans)))))
+
+  (let [git-dir "/tmp/example-repo.git"]
+    ;; Create new repo
+    (invoke+throw git-dir "init" ["--bare"])
+
+    (let [;; Write a *first* commit
+          first-commit-hash
+          ,(write-commit git-dir
+                         [["tree" nil [["100644" "file" nil "File contents"]]]
+                          ["author" (author)]
+                          ["committer" (author)]
+                          [:msg "First commit\n"]])]
+      ;; Create a new branch that points to the new commit
+      (invoke+throw git-dir
+                    "update-ref"
+                    ["refs/heads/master" first-commit-hash ""]))
+
+    ;; Change the master branch by adding two other files and removing the first
+    ;; one
+    (change git-dir
+            "refs/heads/master"
+            (comp #(add-blob ["dir" "file2"] "File 2 contents" %)
+                  #(add-blob ["dir" "subdir" "file3"] "File 3 contents" %)
+                  #(remove-entry ["file"] %))
+            [["author" (author)]
+             ["committer" (author)]
+             [:msg "Second commit\n"]])
+
+    ;; Show a "flat" view of the tree pointed to by master - the full path to
+    ;; each blob is given but the tree structure is not recursive.
+    (transact/transact
+     (fn [trans]
+       (clojure.pprint/pprint
+        (blobs (read-tree git-dir "refs/heads/master" trans read-blob)))))
+
+    ;; This prints something like the following:
+    '((["dir" "subdir" "file3"]
+         "67f64a719e5eee3ef988d79dff0111cdc132ebdc"
+         "File 3 contents")
+      (["dir" "file2"]
+         "2db255175ec00ad5d52154a473dbfad206a6321f"
+         "File 2 contents"))))
