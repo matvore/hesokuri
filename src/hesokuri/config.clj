@@ -43,6 +43,10 @@
    (str "Data of type " (class data) " is not allowed in config files: " data)))
 
 (defn host-to-key-validation
+  "Performs validation on the :host-to-key entry in the configuration, which is
+  a map of host names (Strings) to their key (java.security.PublicKey). These
+  keys are intended to be used as both the client and host keys of a single peer
+  on the network."
   [host-to-key]
   (cond
    (nil? host-to-key) nil
@@ -50,7 +54,7 @@
    (not (every? string? (keys host-to-key)))
    ,"every host in :host-to-key must be a string"
    (not (every? #(instance? PublicKey %) (vals host-to-key)))
-   ,"every key in :host-to-key must be a java.security.PublicKey"))
+   ,"every value in :host-to-key must be a java.security.PublicKey"))
 
 (defn validation
   "Performs validation on the given config."
