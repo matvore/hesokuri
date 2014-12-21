@@ -102,7 +102,7 @@ and optional source parameters:
 
   {:host-to-path {"host-1" "/home/fbar/repo3"
                   "host-3" "/home/fbar/repo3"}
-   :live-edit-branches {:only #{"master"}}}]
+   :live-edit-branches {:only #{"master"}}}]}
 ```
 
 The syntax is identical to Clojure literal syntax. The important constructs are:
