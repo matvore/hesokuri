@@ -16,6 +16,7 @@
   (:import [java.io FileOutputStream])
   (:require [clojure.java.io :as cjio]
             [hesokuri.dynamic-config :as dynamic-config]
+            [hesokuri.env :as env]
             [hesokuri.git :as git]
             [hesokuri.heso :as heso]
             [hesokuri.hesobase :as hesobase]
@@ -31,10 +32,6 @@
 the hesokuri.web namespace."
   (Integer. (or (getenv "HESOPORT") "8080")))
 
-(def home
-  "The user's home directory. This is used as a default for some settings."
-  (cjio/file (System/getProperty "user.home")))
-
 (def heso-cfg-file
   "The configuration file for storing the Hesokuri configuration, which includes
 things like the address of each peer machine, the paths of each source on each
@@ -43,10 +40,10 @@ machine, which branches are live-edit, and which branches or unwanted.
 TODO(matvore): Consider removing support for this file once the hesobase is
 functional."
   (cjio/file (or (getenv "HESOCFG")
-                 (cjio/file home ".hesocfg"))))
+                 (cjio/file env/home ".hesocfg"))))
 
 (def hesoroot
-  (cjio/file (or (getenv "HESOROOT") home)))
+  (cjio/file (or (getenv "HESOROOT") env/home)))
 
 (def hesobase-git-dir
   "Location of the hesobase .git directory."

@@ -17,7 +17,9 @@
             [clojure.string :refer [split trim]]
             [clojure.tools.logging :refer :all]
             [hesokuri.config :as config]
+            [hesokuri.env :as env]
             [hesokuri.heartbeats :as heartbeats]
+            [hesokuri.key-files :as key-files]
             [hesokuri.peer :as peer]
             [hesokuri.repo :as repo]
             [hesokuri.source :as source]
@@ -116,15 +118,21 @@
   "Begins the automatic operations of this object asynchronously. This function
   returns the new state of the heso object. This can safely be called multiple
   times or after the object has already started."
-  [{:keys [active heartbeats peer-hostnames] :as self}]
-  (when-not active
-    (doseq [send-args (send-args-to-start-sources self)]
-      (apply send send-args))
-    (doseq [peer-hostname peer-hostnames]
-      (send heartbeats heartbeats/start 300000
-            (cb [self peer-hostname] []
-                (push-sources-for-peer self peer-hostname)))))
-  (assoc self :active true))
+  [self]
+  (let [{:keys [active config heartbeats peer-hostnames]} self
+        lines #(for [[file line] (:add-lines config)
+                     :when (= file %)]
+                 line)]
+    (when-not active
+      (doseq [send-args (send-args-to-start-sources self)]
+        (apply send send-args))
+      (doseq [peer-hostname peer-hostnames]
+        (send heartbeats heartbeats/start 300000
+              (cb [self peer-hostname] []
+                  (push-sources-for-peer self peer-hostname))))
+      (key-files/refresh env/known-hosts-file (lines :known-hosts))
+      (key-files/refresh env/authorized-keys-file (lines :authorized-keys)))
+    (assoc self :active true)))
 
 (defn stop
   "Terminates the automatic operations of this object. For instance, stops
