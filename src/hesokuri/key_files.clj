@@ -29,39 +29,30 @@
 
 (defn refresh
   "Makes sure the file at the given path has lines given in a sequence of
-  Strings. Every line not in the file is added to the end. If the given file
-  could not be locked, this function fails silently.
+  Strings. Every line not in the file is added to the end.
 
+  TODO: Consider locking the file. I've tried using FileChannel#tryLock, but it
+  hangs on one of my Mac systems, and only when not run in the REPL.
   TODO: do not add a line if it is already present without a prefix"
   [file lines]
   (let [file (cjio/file file)]
     (.createNewFile file)
-    (let-try [channel (FileChannel/open
-                       (.toPath file)
-                       (into-array [StandardOpenOption/WRITE]))
-              lock (.tryLock channel)]
-      (if-not lock
-        (ctl/error "Could not lock file " file)
-        (let-try [;; Lines already in the file.
-                  already-lines (remove #{""} (cstr/split (slurp file) #"\n"))
+    (let [;; Lines already in the file.
+          already-lines (remove #{""} (cstr/split (slurp file) #"\n"))
 
-                  lines (map #(str % line-suffix) lines)
+          lines (map #(str % line-suffix) lines)
 
-                  ;; Lines that are in the 'lines' sequence but are not in
-                  ;; file.
-                  missing-lines (remove (set already-lines) lines)
+          ;; Lines that are in the 'lines' sequence but are not in
+          ;; file.
+          missing-lines (remove (set already-lines) lines)
 
-                  lines (set lines)
-                  ;; Lines that are pre-existing AND should not be removed.
-                  vetted-lines (filter #(or (not (.endsWith % line-suffix))
-                                            (lines %))
-                                       already-lines)
+          lines (set lines)
+          ;; Lines that are pre-existing AND should not be removed.
+          vetted-lines (filter #(or (not (.endsWith % line-suffix))
+                                    (lines %))
+                               already-lines)
 
-                  combined-lines (concat vetted-lines missing-lines)]
-          (when (or (seq missing-lines)
-                    (not= (count already-lines) (count vetted-lines)))
-            (spit file (cstr/join "\n" combined-lines)))
-          (finally (.close lock))))
-
-      (finally (.close channel))))
-  nil)
+          combined-lines (concat vetted-lines missing-lines)]
+      (when (or (seq missing-lines)
+                (not= (count already-lines) (count vetted-lines)))
+        (spit file (cstr/join "\n" combined-lines))))))
