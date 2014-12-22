@@ -14,8 +14,6 @@
 
 (ns hesokuri.key-files
   "Provides functionality to update the authorized_keys and known_hosts files."
-  (:import [java.nio.file StandardOpenOption]
-           [java.nio.channels FileChannel])
   (:require [clojure.java.io :as cjio]
             [clojure.string :as cstr]
             [clojure.tools.logging :as ctl]
