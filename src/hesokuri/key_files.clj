@@ -53,4 +53,4 @@
           combined-lines (concat vetted-lines missing-lines)]
       (when (or (seq missing-lines)
                 (not= (count already-lines) (count vetted-lines)))
-        (spit file (cstr/join "\n" combined-lines))))))
+        (spit file (apply str (interleave combined-lines (repeat "\n"))))))))

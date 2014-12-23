@@ -27,32 +27,32 @@
 
     "" [] ""
     "a" ["a"] (str "a\n"
-                   "a" line-suffix)
+                   "a" line-suffix "\n")
 
     (str "a\n"
-         "b" line-suffix)
+         "b" line-suffix "\n")
     ["a"]
     (str "a\n"
-         "a" line-suffix)
+         "a" line-suffix "\n")
 
     (str "a\n"
-         "b" line-suffix)
+         "b" line-suffix "\n")
     ["b"]
     (str "a\n"
-         "b" line-suffix)
+         "b" line-suffix "\n")
 
     (str "b" line-suffix "\n"
-         "a")
+         "a\n")
     ["b"
      "c"]
     (str "b" line-suffix "\n"
          "a\n"
-         "c" line-suffix)
+         "c" line-suffix "\n")
 
     (str "b" line-suffix "\n"
-         "a")
+         "a\n")
     ["c"
      "b"]
     (str "b" line-suffix "\n"
          "a\n"
-         "c" line-suffix)))
+         "c" line-suffix "\n")))
