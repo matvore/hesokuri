@@ -15,8 +15,7 @@
 (ns hesokuri.heartbeats
   "Gives functinoality to run a repeated task at regular intervals, and allows
   stopping all associated with a heartbeats object at once."
-  (:require [clojure.tools.logging :refer :all]
-            [hesokuri.util :refer :all]))
+  (:require [hesokuri.util :refer :all]))
 
 (defn- beat
   [{:keys [interval-millis action-cb group] :as self} sleep-millis]

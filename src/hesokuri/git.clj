@@ -20,7 +20,7 @@ to Hesokuri logic."
   (:require [clojure.java.io :as cjio]
             clojure.java.shell
             [clojure.string :refer [blank? join split trim]]
-            [clojure.tools.logging :as ctl]
+            [hesokuri.log :as log]
             [hesokuri.transact :as transact]
             [hesokuri.util :refer :all]))
 
@@ -619,7 +619,8 @@ Returns the hash corresponding to the new commit."
     ;; git-branch can return error even though some branches were read
     ;; correctly, so if there was an error just log a warning and try to parse
     ;; the output anyway.
-    (when-not (zero? exit) (ctl/warn (second res-sum)))
+    (when-not (zero? exit)
+      (.warning (log/ger) (second res-sum)))
     (into {} (branch-and-hash-list out))))
 
 (defn git-hash
@@ -777,8 +778,8 @@ Returns the res argument if there was no error."
                                    res
                                    [@(nth res 2) (nth res 3)])]
     (if (zero? exit)
-      (ctl/info summary)
-      (ctl/warn summary))
+      (.info (log/ger) summary)
+      (.warning (log/ger) summary))
     exit))
 
 (def invoke

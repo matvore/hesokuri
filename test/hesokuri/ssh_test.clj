@@ -16,7 +16,6 @@
   (:import [clojure.lang ExceptionInfo]
            [java.security PublicKey])
   (:require [clojure.test :refer :all]
-            [clojure.tools.logging :refer :all]
             [hesokuri.ssh :refer :all]
             [hesokuri.testing.data :refer :all]
             [hesokuri.testing.ssh :refer :all]

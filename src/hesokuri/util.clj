@@ -17,7 +17,7 @@
             OutputStream OutputStreamWriter]
            [java.net URLDecoder URLEncoder])
   (:require [clojure.string :refer [trim]]
-            [clojure.tools.logging :refer :all]))
+            [hesokuri.log :as log]))
 
 (defmacro letmap
   "A macro that behaves like let, creating temporary bindings for variables, and
@@ -99,9 +99,9 @@
   `(try
      (do ~@body)
      (catch Exception e#
-       ;; For some reason, log needs *read-eval* enabled.
-       (binding [*read-eval* true]
-         (error e# "Error when: " ~description))
+       (log/error (log/ger)
+                  (str "Error when: " ~description)
+                  e#)
        nil)))
 
 (defmacro cb

@@ -16,7 +16,6 @@
   "Provides functionality to update the authorized_keys and known_hosts files."
   (:require [clojure.java.io :as cjio]
             [clojure.string :as cstr]
-            [clojure.tools.logging :as ctl]
             [hesokuri.util :refer :all]))
 
 (def line-suffix

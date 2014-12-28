@@ -14,8 +14,8 @@
 
 (ns hesokuri.dynamic-config
   (:require [clojure.java.io :refer [file]]
-            [clojure.tools.logging :refer :all]
             [hesokuri.config :as config]
+            [hesokuri.log :as log]
             [hesokuri.util :refer :all]
             [hesokuri.watcher :as watcher]))
 
@@ -29,8 +29,9 @@
         validation (and config (config/validation config))]
     (cond
      validation
-     (error "Not activating configuration from file " config-file
-            " because it is invalid: " validation)
+     (.severe (log/ger)
+              (str "Not activating configuration from file " config-file
+                   " because it is invalid: " validation))
 
      config
      (cbinvoke on-change-cb config))))

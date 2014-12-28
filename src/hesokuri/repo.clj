@@ -19,7 +19,6 @@
   on the command line)."
   (:require [clojure.java.io :as cjio]
             [clojure.string :refer [split trim]]
-            [clojure.tools.logging :as ctl]
             [hesokuri.git :as git]
             [hesokuri.util :refer :all]
             [hesokuri.watcher :as watcher]))

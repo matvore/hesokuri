@@ -15,11 +15,11 @@
 (ns hesokuri.heso
   (:require [clojure.java.shell :refer [sh]]
             [clojure.string :refer [split trim]]
-            [clojure.tools.logging :refer :all]
             [hesokuri.config :as config]
             [hesokuri.env :as env]
             [hesokuri.heartbeats :as heartbeats]
             [hesokuri.key-files :as key-files]
+            [hesokuri.log :as log]
             [hesokuri.peer :as peer]
             [hesokuri.repo :as repo]
             [hesokuri.source :as source]
@@ -151,5 +151,5 @@
   "Starts the heso again with the given config."
   [self config]
   (do (stop self)
-      (info "Starting new heso with config: " config)
+      (.info (log/ger) (str "Starting new heso with config: " config))
       (-> config with-config start)))
