@@ -24,8 +24,7 @@
             [hesokuri.branch :as branch]
             [hesokuri.heso :as heso]
             [hesokuri.see :as see]
-            [hesokuri.util :refer :all]
-            [noir.response :refer [redirect]]))
+            [hesokuri.util :refer :all]))
 
 (defn attr
   "Escapes text for use as an HTML attribute, and adds quotes."
@@ -55,6 +54,11 @@
    "</html>"))
 
 (defn url-encode [s] (java.net.URLEncoder/encode s "UTF-8"))
+
+(defn redirect [url]
+  {:status 302
+   :headers {"Location" url}
+   :body ""})
 
 (defonce ^:dynamic
   ^{:doc "The heso agent that should be shown in the web UI."}
