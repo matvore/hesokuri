@@ -19,7 +19,6 @@
   :license {:name "Apache 2.0"
             :url "http://www.apache.org/licenses/LICENSE-2.0"}
   :dependencies [[compojure "1.1.5"]
-                 [hiccup "1.0.4"]
                  [lib-noir "0.7.0"]
                  [net.java.dev.jna/jna "3.2.3"]
                  [org.clojure/clojure "1.6.0"]

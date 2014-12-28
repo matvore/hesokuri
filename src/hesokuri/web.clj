@@ -18,90 +18,182 @@
            [java.util Date])
   (:require [clojure.java.io :refer [file]]
             clojure.pprint
+            [clojure.string :as cstr]
             [compojure.core :refer [defroutes GET POST]]
             [compojure.route :refer [not-found resources]]
             [hesokuri.branch :as branch]
             [hesokuri.heso :as heso]
-            [hesokuri.see :refer :all]
+            [hesokuri.see :as see]
             [hesokuri.util :refer :all]
-            [hiccup.page :refer :all]
-            [hiccup.util :refer [escape-html]]
             [noir.response :refer [redirect]]))
 
-(defn- url-encode [s] (java.net.URLEncoder/encode s "UTF-8"))
+(defn attr
+  "Escapes text for use as an HTML attribute, and adds quotes."
+  [value]
+  (concat "\""
+          (cstr/escape value {\" "&quot;"})
+          "\""))
+
+(defn text
+  "Escapes text for use in the body of an HTML element."
+  [t]
+  (cstr/escape t
+               {\< "&lt;"
+                \> "&gt;"
+                \& "&amp;"
+                \" "&quot;"}))
+
+(defn page [title & code]
+  (concat
+   "<!DOCTYPE html>"
+   "<html>"
+   "  <link href='/css.css' rel='stylesheet' type='text/css'>"
+   "<head><title>" (text title) "</title></head>"
+   "  <body>"
+   (apply concat code)
+   "  </body>"
+   "</html>"))
+
+(defn url-encode [s] (java.net.URLEncoder/encode s "UTF-8"))
 
 (defonce ^:dynamic
   ^{:doc "The heso agent that should be shown in the web UI."}
   *web-heso*
   "Must set *web-heso* to heso agent.")
 
-(defn- navbar [heso & [url]]
-  (html5
-   (let [link (fn [link-url title]
-                (cond
-                 (= url link-url)
-                 [:div#nav-el title]
-                 :else
-                 [:div#nav-el [:a {:href link-url} title]]))]
-     [:div#nav
-      (link "/" "config")
-      (link "/peers" "peers")
-      (link "/sources" "sources")
-      (link "/dump" "dump")
-      [:div#nav-el "local-identity: " (heso :local-identity)]])))
+(defn navbar [heso & [url]]
+  (let [link (fn [link-url title]
+               (concat "<div id='nav-el'>"
+                       (cond
+                         (= url link-url) title
+                         :else (concat "<a href='" link-url "'>" title "</a>"))
+                       "</div>"))]
+    (concat
+     "<div id='nav'>"
+     (link "/" "config")
+     (link "/peers" "peers")
+     (link "/sources" "sources")
+     (link "/dump" "dump")
+     (concat "<div id='nav-el'>local-identity: "
+             (text (heso :local-identity))
+             "</div>")
+     "</div>")))
 
-(defn- errors [detail-link error]
-  (html5
-   (cond
-    (nil? error) [:div#no-errors "no errors"]
-    :else
-    [:div#errors [:a#error-link
-                  {:href detail-link}
-                  (-> error class .getName)]])))
+(defn errors [detail-link error]
+  (if (nil? error)
+    "<div id='no-errors'>no errors</div>"
+    (concat "<div id='errors'>"
+            "  <a id='error-link' href=" (attr detail-link) ">"
+            "    " (-> error class .getName text)
+            "  </a>"
+            "</div>")))
 
-(defn- pretty-print [data]
-  (html5
-   (let [pprint-writer (java.io.StringWriter.)
-         dump-str (do (clojure.pprint/pprint data pprint-writer)
-                      (.toString pprint-writer))]
-     [:pre (escape-html dump-str)])))
+(defn pretty-print [data]
+  (let [pprint-writer (java.io.StringWriter.)
+        dump-str (do (clojure.pprint/pprint data pprint-writer)
+                     (.toString pprint-writer))]
+    (concat "<pre>"
+            (text dump-str)
+            "</pre>")))
+
+(defn stack-trace [error]
+  (let [writer (java.io.StringWriter.)
+        printer (java.io.PrintWriter. writer)]
+    (.printStackTrace error printer)
+    (.flush printer)
+    (.toString writer)))
+
+(defn pushed-table-row [pushed-key sha peer-host peer-agent]
+  (let [peer @peer-agent
+        pushed ((peer :pushed) pushed-key)]
+    (if (not pushed)
+      ""
+      (concat
+       "<tr>"
+       "  <td>" (text peer-host) "</td>"
+       "  <td>" (if (= sha pushed) "ok" (text pushed)) "</td>"
+       "</tr>"))))
+
+(defn source-branch-info [peers dir branch sha]
+  (concat
+   "<div id='branch-info'>"
+   "  <div id='branch-heading'>"
+   "    " (text (branch/underscored-name branch))
+   "    <span id='branch-hash'>" sha "</span>"
+   "  </div>"
+   "  <table id='pushed'>"
+   (mapcat #(apply pushed-table-row [(file dir) branch] sha %) peers)
+   "  </table>"
+   "</div>"))
+
+(defn source-info [peers dir agt]
+  (let [source @agt]
+    (concat
+     "<div id='source-info-wrapper'>"
+     "<div id='source-heading'>" (text dir) "</div>"
+     (errors (str "/errors/source-agents/" (url-encode dir))
+             (agent-error agt))
+     (mapcat #(apply source-branch-info peers dir %) (source :branches))
+     "</div>")))
+
+(defn peer-info [id agt]
+  (concat
+   "<div id='peer-info-wrapper'>"
+   "  <div id='peer-heading'>" (text id) "</div>"
+   (errors (str "/errors/peers/" (url-encode id))
+           (agent-error agt))
+   (let [peer @agt
+         form-id (str "push-" id)]
+     (when (:last-fail-ping-time peer)
+       (concat
+        "<div id='last-fail-ping-time'>Last failed ping time: "
+        (.format (DateFormat/getTimeInstance DateFormat/MEDIUM)
+                 (Date. (:last-fail-ping-time peer)))
+        "  <form id=" (attr form-id) " action='/peers/push' method='post'>"
+        "    <input type='text' name='peer-id' value=" (attr id)
+        "        hidden='true'>"
+        "    <a href=" (attr (str "javascript: document.forms['"
+                                  form-id
+                                  "'].submit()"))
+        "        >"
+        "      push now"
+        "    </a>"
+        "  </form>"
+        "</div>")))
+   "</div>"))
 
 (defroutes heso-web-routes
   (GET "/" []
-    (html5
-     (include-css "/css.css")
-     [:head [:title "heso main"]]
-     [:body
-      (let [heso @*web-heso*]
-        [:div
-         (navbar heso "/")
-         [:h1 "config-file"]
-         (pretty-print (:config heso))])]))
+    (let [heso @*web-heso*]
+      (page
+       "heso main"
+
+       (navbar heso "/")
+       "<h1>config-file</h1>"
+       (pretty-print (:config heso)))))
 
   (GET "/errors/:type/:key" [type key]
     (let [heso @*web-heso*
           error (-> heso ((keyword type)) (get (str key)) agent-error)]
-      (html5
-       (include-css "/css.css")
-       [:head [:title (str "errors for " type " " key)]]
-       [:body
-        (navbar heso "")
-        (if (not error)
-          [:div#no-errors "no errors"]
-          [:div
-           [:form {:id "clear-form", :action "/errors/clear", :method "post"}
-            [:input {:type "text", :name "type", :value type, :hidden "true"}]
-            [:input {:type "text", :name "key", :value key, :hidden "true"}]
-            [:a
-             {:href "javascript: document.forms['clear-form'].submit()"}
-             "clear"]]
-           (let [err-string-writer (java.io.StringWriter.)
-                 string-printer (java.io.PrintWriter. err-string-writer)]
-             (.printStackTrace error string-printer)
-             (.println string-printer (apply str (repeat 80 "-")))
-             (.flush string-printer)
-             [:pre [:div#stack-trace
-                    (escape-html (.toString err-string-writer))]])])])))
+      (page
+       (str "errors for " type " " key)
+
+       (navbar heso "")
+       (if (not error)
+         "<div id='no-errors'>no errors</div>"
+         (concat
+          "<form id='clear-form' action='/errors/clear' method='post'>"
+          "  <input type='text' name='type'"
+          "      value=" (attr type) " hidden='true'>"
+          "  <input type='text' name='key'"
+          "      value=" (attr key) " hidden='true'>"
+          "  <a href=\"javascript: document.forms['clear-form'].submit()\">"
+          "    clear"
+          "  </a>"
+          "</form>"
+          "<pre><div id='stack-trace'>"
+          (text (stack-trace error))
+          "</div></pre>")))))
 
   (POST "/errors/clear" [type key]
     (let [agt (get-in @*web-heso* [(keyword type) key])]
@@ -110,58 +202,21 @@
       (redirect (format "/errors/%s/%s" (url-encode type) (url-encode key)))))
 
   (GET "/sources" []
-    (html5
-     (include-css "/css.css")
-     [:head [:title "heso sources"]]
-     (let [heso @*web-heso*]
-       [:body
-        (navbar heso "/sources")
-        (for [[source-dir source-agent] (heso :source-agents)
-              :let [source @source-agent]]
-          [:div#source-info-wrapper
-           [:div#source-heading source-dir]
-           (errors (str "/errors/source-agents/" (url-encode source-dir))
-                   (agent-error source-agent))
-           (for [[branch hash] (source :branches)]
-             [:div#branch-info
-              [:div#branch-heading
-               (branch/underscored-name branch) " "
-               [:span#branch-hash hash]]
-              [:table#pushed
-               (for [[peer-host peer-agent] (heso :peers)
-                     :let [peer @peer-agent
-                           pushed ((peer :pushed) [(file source-dir) branch])]
-                     :when pushed]
-                 [:tr
-                  [:td peer-host]
-                  [:td (if (= hash pushed) "ok" pushed)]])]])])])))
+    (let [heso @*web-heso*]
+      (page
+       "heso sources"
+
+       (navbar heso "/sources")
+       (mapcat #(apply source-info (heso :peers) %)
+               (heso :source-agents)))))
 
   (GET "/peers" []
-    (html5
-     (include-css "/css.css")
-     [:head [:title "heso peers"]]
-     (let [heso @*web-heso*]
-       [:body
-        (navbar heso "/peers")
-        (for [[peer-id peer-agent] (heso :peers)
-              :let [peer @peer-agent
-                    form-id (str "push-" peer-id)]]
-          [:div#peer-info-wrapper
-           [:div#peer-heading peer-id]
-           (errors (str "/errors/peers/" (url-encode peer-id))
-                   (agent-error peer-agent))
-           (when (:last-fail-ping-time peer)
-             [:div#last-fail-ping-time
-              "Last failed ping time: "
-              (.format (DateFormat/getTimeInstance DateFormat/MEDIUM)
-                       (Date. (:last-fail-ping-time peer)))
-              [:form {:id form-id :action "/peers/push" :method "post"}
-               [:input {:type "text", :name "peer-id",
-                        :value peer-id, :hidden true}]
-               [:a {:href (str "javascript: document.forms['"
-                               form-id
-                               "'].submit()")}
-                "push now"]]])])])))
+    (let [heso @*web-heso*]
+      (page
+       "heso peers"
+
+       (navbar heso "/peers")
+       (mapcat #(apply peer-info %) (heso :peers)))))
 
   (POST "/peers/push" [peer-id]
     (send *web-heso* heso/push-sources-for-peer peer-id)
@@ -170,15 +225,13 @@
   (GET "/dump" []
     (comment
       "Generates a pretty-printed page containing the snapshot of the entire
-      heso state. Currently, this is only used for debugging, when the normal
-      web UI does not give enough information.")
-    (html5
-     (include-css "/css.css")
-     [:head [:title "heso dump"]]
-     (let [heso @*web-heso*]
-       [:body
-        (navbar heso "/dump")
-        (pretty-print (shrink heso))])))
+      heso state. This can be used for debugging.")
+    (let [heso @*web-heso*]
+      (page
+       "heso dump"
+
+       (navbar heso "/dump")
+       (pretty-print (see/shrink heso)))))
 
   (resources "/")
   (not-found "<h1>Page not found</h1>"))
