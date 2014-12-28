@@ -18,8 +18,7 @@
 ;;;; thoroughly unit tested.
 
 (ns repl
-  (:require [clojure.data.codec.base64 :as b64]
-            [clojure.java.io :as cjio]
+  (:require [clojure.java.io :as cjio]
             [clojure.pprint :as cppr]
             [clojure.repl :refer :all]
             [clojure.reflect :as cref]
@@ -30,8 +29,6 @@
             [hesokuri.git :as git]
             [hesokuri.heartbeats :as heartbeats]
             [hesokuri.heso :as heso]
-            [hesokuri.hesobase :as hesobase]
-            [hesokuri.hesoprot :as hesoprot]
             [hesokuri.key-files :as key-files]
             [hesokuri.log :as log]
             [hesokuri.main :as main]
@@ -41,41 +38,10 @@
             [hesokuri.see :as see]
             [hesokuri.source :as source]
             [hesokuri.source-def :as source-def]
-            [hesokuri.ssh :as ssh]
             [hesokuri.transact :as transact]
             [hesokuri.util :refer :all]
             [hesokuri.validation :as validation]
             [hesokuri.watcher :as watcher]
             [hesokuri.web :as web]
             [ring.util.io :as ruio])
-  (:import [java.io ByteArrayOutputStream ObjectOutputStream OutputStream]
-           [java.security KeyFactory]
-           [java.security.spec X509EncodedKeySpec]))
-
-(defn add-peer
-  "Adds a new peer to a configuration, and returns a new configuration that can
-be passed to hesokuri.git/write-tree.
-
-name: the name of the new peer
-key: the key of the new peer. Will be coerced to a public key with the
-    public-key function
-port: the port that the new peer uses to listen for incoming connections.
-config-tree: the tree corresponding to the original configuration. Corresponds
-    to the the value returned by hesokuri.git/read-tree.
-"
-  [name key port config-tree]
-  (->> config-tree
-       (git/add-blob ["peer" name "key"] #(serialize % (ssh/public-key key)))
-       (git/add-blob ["peer" name "port"] (str port))))
-
-(defn read-config
-  "Reads a hesobase repo and converts it to the config format, which is defined
-  by hesokuri.config/validation.
-
-  git-ctx - Instance of hesokuri.git/Context.
-  ref - The ref to read. Defaults to refs/heads/master. Can be a tree or a
-      commit."
-  ([git-ctx] (read-config git-ctx "refs/heads/master"))
-  ([git-ctx ref]
-     (transact/transact
-      #(hesobase/tree->config (git/read-tree git-ctx ref % git/read-blob)))))
+  (:import [java.io ByteArrayOutputStream ObjectOutputStream OutputStream]))

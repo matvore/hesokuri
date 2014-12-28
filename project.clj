@@ -22,21 +22,7 @@
                  [lib-noir "0.7.0"]
                  [net.java.dev.jna/jna "3.2.3"]
                  [org.clojure/clojure "1.6.0"]
-                 [org.clojure/data.codec "0.1.0"]
                  [ring/ring-core "1.2.0"]
-                 [ring/ring-jetty-adapter "1.2.0"]
-
-                 ;; The items below are listed individually rather than the
-                 ;; top-level apache-sshd artifact because Leiningen is having
-                 ;; trouble downloading the top-level one. We may not need all
-                 ;; of them, and we may be able to replace with the top-level
-                 ;; artifact once the bug (?) is fixed in Leiningen.
-                 [org.apache.sshd/sshd-core "0.10.1"]
-                 [org.apache.sshd/sshd-pam "0.10.1"]
-                 [org.apache.sshd/sshd-sftp "0.10.1"]
-                 [org.bouncycastle/bcpg-jdk15on "1.49"]
-                 [org.bouncycastle/bcpkix-jdk15on "1.49"]
-                 [org.slf4j/slf4j-jdk14 "1.6.4"]
-                 [tomcat/tomcat-apr "5.5.23"]]
+                 [ring/ring-jetty-adapter "1.2.0"]]
   :java-source-paths ["third_party/barbarywatchservice/src"]
   :main hesokuri.main)

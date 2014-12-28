@@ -15,7 +15,6 @@
 (ns hesokuri.config-test
   (:require [clojure.test :refer :all]
             [hesokuri.config :refer :all]
-            [hesokuri.ssh :as ssh]
             [hesokuri.testing.data :refer :all]
             [hesokuri.testing.validation :refer :all]))
 
@@ -45,8 +44,7 @@
        ["(bad-value 1)" "(bad-value 2)"]
 
        {'(bad-key 1) :a '(bad-key 2) :b} false ["(bad-key 1)" "(bad-key 2)"]
-       {'(1) '(2) '(3) '(4)} false ["(1)" "(2)" "(3)" "(4)"]
-       [(ssh/public-key *key-str-a*)] true []))
+       {'(1) '(2) '(3) '(4)} false ["(1)" "(2)" "(3)" "(4)"]))
 
 (deftest test-validation-error
   (are [config okay substrings]
@@ -62,5 +60,4 @@
        #{"must be a map or vector"} false ["PersistentHashSet"]
        {:host-to-key [] :sources []} false [":host-to-key must be a map"]
        {:host-to-key {"a" "b"} :sources []} false
-       ,["must be a java.security.PublicKey"]
-       {:host-to-key {"a" (ssh/public-key *key-str-a*)} :sources []} true []))
+       ,["must be a java.security.PublicKey"]))
