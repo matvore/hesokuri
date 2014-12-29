@@ -1,6 +1,6 @@
 #Hesokuri
 
-Distributed Git repo backup and duplication daemon.
+Distributed Git repo synchronization tool.
 
 ##Intro
 Hesokuri synchronizes one or more Git source code repositories between multiple

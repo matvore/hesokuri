@@ -14,7 +14,7 @@
 
 (defproject hesokuri
   "SNAPSHOT"
-  :description "distributed git repo backup and duplication daemon"
+  :description "Distributed Git repo synchronization tool"
   :url "https://github.com/google/hesokuri"
   :license {:name "Apache 2.0"
             :url "http://www.apache.org/licenses/LICENSE-2.0"}
@@ -24,4 +24,5 @@
                  [ring/ring-core "1.2.0"]
                  [ring/ring-jetty-adapter "1.2.0"]]
   :java-source-paths ["third_party/barbarywatchservice/src"]
-  :main hesokuri.main)
+  :main hesokuri.main
+  :aot [hesokuri.main])

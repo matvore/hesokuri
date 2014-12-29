@@ -44,7 +44,7 @@ functional."
   (cjio/file (or (getenv "HESOROOT") env/home)))
 
 (def usage
-  (str "Hesokuri: The distributed Git repo synchronization tool
+  (str "Hesokuri: Distributed Git repo synchronization tool
 Copyright (C) 2014 Google Inc.
 
 USAGE
