@@ -16,6 +16,7 @@
   (:require [clojure.test :refer :all]
             [hesokuri.config :refer :all]
             [hesokuri.testing.data :refer :all]
+            [hesokuri.testing.temp :refer :all]
             [hesokuri.testing.validation :refer :all]))
 
 (deftest test-source-defs
@@ -61,3 +62,42 @@
        {:host-to-key [] :sources []} false [":host-to-key must be a map"]
        {:host-to-key {"a" "b"} :sources []} false
        ,["must be a java.security.PublicKey"]))
+
+(deftest test-normalize
+  (are [in out]
+    (= out (normalize in))
+
+    [] {:sources []}
+
+    [{"host" "/path"}]
+    {:sources [{:host-to-path {"host" "/path"}
+                :unwanted-branches {}}]}
+
+    [{"host1" "/path1"}
+     {:host-to-path {"host2" "/path2"}
+      :unwanted-branches #{"a"}}]
+    {:sources [{:host-to-path {"host1" "/path1"}
+                :unwanted-branches {}}
+               {:host-to-path {"host2" "/path2"}
+                :unwanted-branches {"a" ["*"]}}]}
+
+    {:comment "foo"
+     :sources [{"host" "/path"}]}
+    {:comment "foo"
+     :sources [{:host-to-path {"host" "/path"}
+                :unwanted-branches {}}]}))
+
+(deftest test-from-file
+  (are [contents out]
+    (= out (from-file (temp-file-containing contents)))
+
+    "invalid!" nil
+    "{:sources []" nil
+
+    "{:sources [{\"host\" \"/path\"}]}"
+    {:sources [{:host-to-path {"host" "/path"}
+                :unwanted-branches {}}]}
+
+    "{:sources [{:host-to-path {\"host\" \"/path\"}}]}"
+    {:sources [{:host-to-path {"host" "/path"}
+                :unwanted-branches {}}]}))

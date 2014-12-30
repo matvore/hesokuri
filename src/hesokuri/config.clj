@@ -14,8 +14,10 @@
 
 (ns hesokuri.config
   (:import [java.security PublicKey])
-  (:require [hesokuri.source-def :as source-def]
-            [hesokuri.util :as util]
+  (:require [clojure.java.io :as cjio]
+            [hesokuri.log :as log]
+            [hesokuri.source-def :as source-def]
+            [hesokuri.util :refer :all]
             [hesokuri.validation :as validation]))
 
 (defn source-defs
@@ -67,3 +69,29 @@
                              (source-defs config))
       (round-trip-validation-error config)
       (host-to-key-validation (:host-to-key config))])))
+
+(defn normalize
+  "Normalizes the given configuration by replacing legacy constructs with the
+  up-to-date syntax. This is recursive for each data structure. For instance,
+  the :unwanted-branches entry for each source will be converted from a set to a
+  map."
+  [config]
+  (let [sds (source-defs config)
+        config (if (map? config) config {})]
+    (assoc config
+           :sources
+           (vec (map source-def/normalize sds)))))
+
+(defn from-file
+  "Reads and validates the configuration in the given file. If the configuration
+  is not valid, logs the error and returns nil. If it is valid, returns that
+  configuration."
+  [f]
+  (let [f (cjio/file f)
+        config (maybe (str "Read config from " f)
+                      (normalize (read-string (slurp f))))
+        validation (and config (validation config))]
+    (when validation
+      (.severe (log/ger)
+               (str "Configuration in file " f " is invalid: " validation)))
+    config))

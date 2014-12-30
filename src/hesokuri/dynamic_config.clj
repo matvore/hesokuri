@@ -24,17 +24,11 @@
   If the configuration cannot be read or it is not valid, an error is logged and
   this function does nothing."
   [config-file on-change-cb]
-  (let [config (maybe (str "Read config from " config-file)
-                      (read-string (slurp config-file)))
-        validation (and config (config/validation config))]
-    (cond
-     validation
-     (.severe (log/ger)
-              (str "Not activating configuration from file " config-file
-                   " because it is invalid: " validation))
-
-     config
-     (cbinvoke on-change-cb config))))
+  (let [config (config/from-file config-file)]
+    (if config
+      (on-change-cb config)
+      (.severe (log/ger)
+               (str "Not activating configuration from file: " config-file)))))
 
 (defn of
   "Creates an instance.
