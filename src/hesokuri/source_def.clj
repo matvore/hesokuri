@@ -168,16 +168,29 @@
         (not (except branch-name))
         (only branch-name)))))
 
+(defn unwanted-branches
+  [def]
+  (let [ubs (:unwanted-branches def)]
+    (if (map? ubs)
+      ubs
+      (into {} (for [ub ubs] [ub ["*"]])))))
+
 (defn unwanted-branch?
   "Truthy if the branch name given should be deleted. This includes versions of
-the branch that originate on another peer. If the branch-hash is not given, and
-the unwanted-branches map specifies unwanted hashes, then this function will
-return falsey."
-  [{:keys [unwanted-branches] :as self} branch-name branch-hash]
-  (let [branch-name (str branch-name)
-        branch-hash (str branch-hash)]
-    (cond
-     (map? unwanted-branches)
-     ,(some #(= branch-hash (str %)) (unwanted-branches branch-name))
-     (set? unwanted-branches)
-     ,(unwanted-branches branch-name))))
+  the branch that originate on another peer. If the branch-hash is not given,
+  and the unwanted-branches map specifies unwanted hashes, then this function
+  will return falsey."
+  [def branch-name branch-hash]
+  (let [shas ((unwanted-branches def) (str branch-name))]
+    (some #{"*" (str branch-hash)}
+          (map str shas))))
+
+(defn normalize
+  [def]
+  (case (kind def)
+    :simple
+    ,(normalize {:host-to-path def})
+    :extensible
+    ,(assoc def
+            :unwanted-branches
+            (unwanted-branches def))))

@@ -84,7 +84,22 @@
        {:only #{"foobar"}} "foobar" true
        {:only #{"foo" "bar"}} "bar" true))
 
-(deftest test-unwanted-branch
+(deftest test-unwanted-branches
+  (are [def result]
+    (= result (unwanted-branches def))
+
+    {} {}
+    {:host-to-path {"host" "/path"}} {}
+    {:unwanted-branches #{}} {}
+    {:unwanted-branches #{"a" "b"}} {"a" ["*"], "b" ["*"]}
+    {:unwanted-branches {}} {}
+    {:unwanted-branches {"a" []}} {"a" []}
+
+    {:unwanted-branches
+     {"a" [(thash a1) (thash a2)] "b" [(thash b)]}}
+    {"a" [(thash a1) (thash a2)] "b" [(thash b)]}))
+
+(deftest test-unwanted-branch?
   (are [def branch-name branch-hash result]
     (= result (boolean (unwanted-branch? def branch-name branch-hash)))
     {"peer" "path"} "peer" *hash-a* false
@@ -96,4 +111,27 @@
     {:unwanted-branches {"foo" [*hash-a*]}} "master" *hash-a* false
     {:unwanted-branches {"master" [*hash-a*]}} "master" *hash-b* false
     {:unwanted-branches {"master" [*hash-a* *hash-b*]}} "master" *hash-a* true
-    {:unwanted-branches {"master" [*hash-a* *hash-b*]}} "master" *hash-b* true))
+    {:unwanted-branches {"master" [*hash-a* *hash-b*]}} "master" *hash-b* true
+
+    {:unwanted-branches {"foo" ["*"]}} "foo" *hash-a* true
+    {:unwanted-branches {"foo" ["*"], "bar" [*hash-a*]}} "bar" *hash-b* false
+    {:unwanted-branches {"foo" ["*"], "bar" [*hash-a* "*"]}} "bar" *hash-b*
+    ,true))
+
+(deftest test-normalize
+  (are [def result]
+    (= result (normalize def))
+
+    {"host" "/path"} {:host-to-path {"host" "/path"} :unwanted-branches {}}
+
+    {:host-to-path {} :unwanted-branches #{}}
+    {:host-to-path {} :unwanted-branches {}}
+
+    {:host-to-path {} :unwanted-branches #{"a"}}
+    {:host-to-path {} :unwanted-branches {"a" ["*"]}}
+
+    {:host-to-path {"host" "/path"}}
+    {:host-to-path {"host" "/path"} :unwanted-branches {}}
+
+    {:host-to-path {"host" "/path"} :unwanted-branches {"a" [*hash-a*]}}
+    {:host-to-path {"host" "/path"} :unwanted-branches {"a" [*hash-a*]}}))
