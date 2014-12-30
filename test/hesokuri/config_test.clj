@@ -93,6 +93,7 @@
 
     "invalid!" nil
     "{:sources []" nil
+    "{:sources [{:host-to-path {:fails-validation \"\"}}]}" nil
 
     "{:sources [{\"host\" \"/path\"}]}"
     {:sources [{:host-to-path {"host" "/path"}

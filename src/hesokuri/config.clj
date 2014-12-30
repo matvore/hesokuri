@@ -91,7 +91,9 @@
         config (maybe (str "Read config from " f)
                       (normalize (read-string (slurp f))))
         validation (and config (validation config))]
-    (when validation
-      (.severe (log/ger)
-               (str "Configuration in file " f " is invalid: " validation)))
-    config))
+    (if validation
+      (do
+        (.severe (log/ger)
+                 (str "Configuration in file " f " is invalid: " validation))
+        nil)
+      config)))
