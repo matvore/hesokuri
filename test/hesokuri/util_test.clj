@@ -87,3 +87,17 @@
     int + [\a 1] 98
     int - [\a 1] 96
     str vector [1 2 3 []] ["1" "2" "3" "[]"]))
+
+(deftest test-sorted-colls
+  (are [in out]
+    (= out (str (sorted-colls in)))
+
+    "foo" "foo"
+    {} "{}"
+    {:d 4 :c 3 :b 2 :a 1} "{:a 1, :b 2, :c 3, :d 4}"
+
+    {:d 4 :c 3 :b 2 :a #{:f :e :d :c :b :a}}
+    "{:a #{:a :b :c :d :e :f}, :b 2, :c 3, :d 4}"
+
+    {:d 4 :c 3 :b 2 :a [#{:f :e :d} #{:c :b :a}]}
+    "{:a [#{:d :e :f} #{:a :b :c}], :b 2, :c 3, :d 4}"))

@@ -183,3 +183,14 @@ a String with str if it is not a String already."
   [src dest extra]
   `(do (cjio/copy ~src ~dest)
        (~extra ~dest)))
+
+(defn sorted-colls
+  "Returns an instance of the data which is equivalent but with all maps and
+  sets converted to sorted maps and sorted sets. This is recursive but only into
+  maps, sets, and vectors."
+  [data]
+  (cond
+    (map? data) (into (sorted-map) (map sorted-colls data))
+    (set? data) (into (sorted-set) (map sorted-colls data))
+    (vector? data) (vec (map sorted-colls data))
+    true data))
