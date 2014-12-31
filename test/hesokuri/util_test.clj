@@ -16,6 +16,7 @@
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream
             ObjectInputStream])
   (:require [clojure.test :refer :all]
+            [clojure.java.io :as cjio]
             [hesokuri.util :refer :all]
             [hesokuri.testing.mock :refer :all]))
 
@@ -87,3 +88,30 @@
     int + [\a 1] 98
     int - [\a 1] 96
     str vector [1 2 3 []] ["1" "2" "3" "[]"]))
+
+(deftest test-inside?
+  (are [dir f result]
+    (= result
+       (inside? dir f)
+       (inside? (cjio/file dir) f)
+       (inside? dir (cjio/file f)))
+
+    "/foo/bar" "/foo/bar/baz" true
+    "/foo/bar" "/foo/bar/baz/bang" true
+    "/" "/etc" true
+    "/etc" "/" false
+
+    "/foo" "/foo" true))
+
+(deftest test-pretty-printed
+  (let [res (pretty-printed {:a :b
+                             :c :d
+                             :e :f
+                             :g :h
+                             ;; Make the string very long so we know it will
+                             ;; have a newline.
+                             :i (range 100)})]
+    (is (.contains res ",")
+        (str "pretty printed map should have comma: " res))
+    (is (.contains res "\n")
+        (str "pretty printed map should have newline: " res))))

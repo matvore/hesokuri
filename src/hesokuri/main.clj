@@ -15,6 +15,8 @@
 (ns hesokuri.main
   (:import [java.io FileOutputStream])
   (:require [clojure.java.io :as cjio]
+            [hesokuri.cmd.unwanted :as cmd.unwanted]
+            [hesokuri.config :as config]
             [hesokuri.dynamic-config :as dynamic-config]
             [hesokuri.env :as env]
             [hesokuri.git :as git]
@@ -30,16 +32,6 @@
 the hesokuri.web namespace."
   (Integer. (or (getenv "HESOPORT") "8080")))
 
-(def heso-cfg-file
-  "The configuration file for storing the Hesokuri configuration, which includes
-things like the address of each peer machine, the paths of each source on each
-machine, which branches are live-edit, and which branches or unwanted.
-
-TODO(matvore): Consider removing support for this file once the hesobase is
-functional."
-  (cjio/file (or (getenv "HESOCFG")
-                 (cjio/file env/home ".hesocfg"))))
-
 (def hesoroot
   (cjio/file (or (getenv "HESOROOT") env/home)))
 
@@ -54,6 +46,9 @@ lein run
 
 lein run help
   Shows this help.
+
+lein run unwanted BRANCH_NAME
+  Marks the given branch as unwanted in the configuration.
 "))
 
 (defn exit
@@ -67,13 +62,12 @@ lein run help
   [& args]
   ;; work around dangerous default behaviour in Clojure
   (alter-var-root #'*read-eval* (constantly false))
-  (cond
-   (empty? args)
-   ,(let [heso-agent (agent (heso/with-config []))
+
+  (if (empty? args)
+    (let [heso-agent (agent (heso/with-config []))
           dynamic-config-agent
-           (->> (cb [heso-agent] [config]
-                    (send heso-agent heso/update-config config))
-                (dynamic-config/of heso-cfg-file)
+          ,(->> #(send heso-agent heso/update-config %)
+                (dynamic-config/of env/heso-cfg-file)
                 agent)]
       (send dynamic-config-agent dynamic-config/start)
       (alter-var-root #'hesokuri.web/*web-heso* (constantly heso-agent))
@@ -81,5 +75,8 @@ lein run help
                      wrap-params)
                  {:port diag-ui-port :join? false}))
 
-   (= ["help"] args) (exit usage *out* 0)
-   :else (exit usage *err* 1)))
+    (apply exit
+           (cond
+             (= "unwanted" (first args)) (apply cmd.unwanted/invoke (rest args))
+             (= ["help"] args) [usage *out* 0]
+             true [usage *err* 1]))))

@@ -15,7 +15,10 @@
 (ns hesokuri.env
   "Contains environment settings, including environment variables, system
   properties, and values derived from them."
-  (:require [clojure.java.io :as cjio]))
+  (:require [clojure.java.io :as cjio]
+            [clojure.java.shell :as cjshell]
+            [clojure.string :as cstr]
+            [hesokuri.util :refer :all]))
 
 (def home
   "The user's home directory. This is used as a default for some settings."
@@ -25,3 +28,32 @@
 
 (def known-hosts-file (cjio/file ssh-dir "known_hosts"))
 (def authorized-keys-file (cjio/file ssh-dir "authorized_keys"))
+
+(def startup-dir
+  "The current working directory when Hesokuri started. This is used for
+  interactive commands."
+  (cjio/file (System/getProperty "user.dir")))
+
+(def heso-cfg-file
+  "The configuration file for storing the Hesokuri configuration, which includes
+  things like the address of each peer machine, the paths of each source on each
+  machine, which branches are live-edit, and which branches or unwanted."
+  (cjio/file (or (getenv "HESOCFG")
+                 (cjio/file home ".hesocfg"))))
+
+(defn ips
+  "Returns the IP addresses of all network interfaces as a sequence of strings."
+  []
+  (for [i (java.util.Collections/list (java.net.NetworkInterface/getNetworkInterfaces))
+        addr (and i (.getInterfaceAddresses i))
+        :when addr]
+    (-> addr .getAddress .getHostAddress (cstr/split #"%") first)))
+
+(defn local-identity
+  "Determines the local identity, which is this machine's hostname as used in
+  the configuration file. This uses the IP addresses for this machine to help
+  guess in some cases."
+  [hostname?]
+  (or (getenv "HESOHOST")
+      (some #(and (hostname? %) %) (ips))
+      (-> "hostname" cjshell/sh :out cstr/trim)))

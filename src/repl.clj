@@ -19,6 +19,7 @@
 
 (ns repl
   (:require [clojure.java.io :as cjio]
+            [clojure.java.shell :as cjshell]
             [clojure.pprint :as cppr]
             [clojure.repl :refer :all]
             [clojure.reflect :as cref]

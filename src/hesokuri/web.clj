@@ -17,7 +17,6 @@
   (:import [java.text DateFormat]
            [java.util Date])
   (:require [clojure.java.io :refer [file]]
-            clojure.pprint
             [clojure.string :as cstr]
             [compojure.core :refer [defroutes GET POST]]
             [compojure.route :refer [not-found resources]]
@@ -93,12 +92,9 @@
             "</div>")))
 
 (defn pretty-print [data]
-  (let [pprint-writer (java.io.StringWriter.)
-        dump-str (do (clojure.pprint/pprint data pprint-writer)
-                     (.toString pprint-writer))]
-    (concat "<pre>"
-            (text dump-str)
-            "</pre>")))
+  (concat "<pre>"
+          (text (pretty-printed data))
+          "</pre>"))
 
 (defn stack-trace [error]
   (let [writer (java.io.StringWriter.)
