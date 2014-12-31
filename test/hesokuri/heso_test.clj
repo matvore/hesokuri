@@ -83,8 +83,8 @@
               :source-agents source-agents})))))
 
 (deftest test-send-args-to-start-sources
-  (is (= [] (#'hesokuri.heso/send-args-to-start-sources {:source-agents {}}))
-      (= [[:a source/init-repo] [:a source/advance] [:a source/start-watching]
+  (is (= [] (#'hesokuri.heso/send-args-to-start-sources {:source-agents {}})))
+  (is (= [[:a source/init-repo] [:a source/advance] [:a source/start-watching]
           [:b source/init-repo] [:b source/advance] [:b source/start-watching]]
          (#'hesokuri.heso/send-args-to-start-sources
           {:source-agents {"a" :a, "b" :b}}))))
