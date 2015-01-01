@@ -42,12 +42,15 @@
 (defmacro with-temp-repo
   "Creates a repo, binding the directory to the dir symbol and the --git-dir
 flag (to pass to git when operating on the repo) to the git-dir-flag symbol."
-  [[dir git-dir-flag non-bare] & body]
-  (let [git-dir-flag (or git-dir-flag (gensym "git-dir-flag"))]
+  [[dir git-dir-flag non-bare git-ctx] & body]
+  (let [git-dir-flag (or git-dir-flag (gensym "git-dir-flag"))
+        git-ctx (or git-ctx (gensym "git-ctx"))]
     `(let [bare# (not ~non-bare)
            ~dir (create-temp-dir)
-           ;; _ (.makeDirectory)
-           ~git-dir-flag (str "--git-dir=" (file ~dir (if bare# "" ".git")))]
+           git-dir# (file ~dir (if bare# "" ".git"))
+           ~git-dir-flag (str "--git-dir=" git-dir#)
+           ~git-ctx (into {:hesokuri.git/git-dir git-dir#}
+                          (if bare# [] [[:hesokuri.git/work-tree ~dir]]))]
        (doseq [args# [[~git-dir-flag "init"]
                       [~git-dir-flag "config" "user.name" "Hesokuri Tester"]
                       [~git-dir-flag "config" "user.email" "test@hesokuri"]]]

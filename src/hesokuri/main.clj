@@ -15,6 +15,7 @@
 (ns hesokuri.main
   (:import [java.io FileOutputStream])
   (:require [clojure.java.io :as cjio]
+            [hesokuri.cmd.config :as cmd.config]
             [hesokuri.cmd.unwanted :as cmd.unwanted]
             [hesokuri.config :as config]
             [hesokuri.dynamic-config :as dynamic-config]
@@ -41,11 +42,21 @@ USAGE
 lein run
   Starts Hesokuri process.
 
+lein run config
+  Rewrites the configuration file in an equivalent, normalized format. This
+  causes any subsequent automated edits to be cleaner, since automated edits
+  always generate normalized configurations.
+
 lein run help
   Shows this help.
 
 lein run unwanted BRANCH_NAME
   Marks the given branch as unwanted in the configuration.
+
+NOTES
+-----
+Commands that update the configuration will also commit the changed config file
+if the file is inside one of the sources in the configuration.
 "))
 
 (defn exit
@@ -74,6 +85,7 @@ lein run unwanted BRANCH_NAME
 
     (apply exit
            (cond
+             (= "config" (first args)) (apply cmd.config/invoke (rest args))
              (= "unwanted" (first args)) (apply cmd.unwanted/invoke (rest args))
              (= ["help"] args) [usage *out* 0]
              true [usage *err* 1]))))

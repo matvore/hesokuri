@@ -63,7 +63,7 @@
     (is (= ["" *out* 0] (invoke "branch")))
     (is (= final-unwanted-shas
            (->> [:sources 0 :unwanted-branches "branch"]
-                (get-in (config/from-file env/heso-cfg-file))
+                (get-in (config/from-file))
                 set)))))
 
 (deftest test-invoke-no-existing-unwanted-commits
@@ -91,10 +91,8 @@
 
 (deftest test-invoke-commits-new-config
   (with-temp-repo [git-dir]
-    (with-temp-repo [cfg-dir _ true]
-      (let [cfg-git-ctx {:hesokuri.git/git-dir (cjio/file cfg-dir ".git")
-                         :hesokuri.git/work-tree cfg-dir}
-            orig-cfg {:sources [{"me" (str git-dir), "other" "/foo-bar"}
+    (with-temp-repo [cfg-dir _ true cfg-git-ctx]
+      (let [orig-cfg {:sources [{"me" (str git-dir), "other" "/foo-bar"}
                                 {"me" (str cfg-dir), "other" "/hesocfg"}]}
             cfg-file (cjio/file cfg-dir "cfg")]
         (spit cfg-file (pretty-printed orig-cfg))

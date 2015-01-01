@@ -15,6 +15,7 @@
 (ns hesokuri.config
   (:import [java.security PublicKey])
   (:require [clojure.java.io :as cjio]
+            [hesokuri.env :as env]
             [hesokuri.log :as log]
             [hesokuri.source-def :as source-def]
             [hesokuri.util :refer :all]
@@ -86,14 +87,15 @@
   "Reads and validates the configuration in the given file. If the configuration
   is not valid, logs the error and returns nil. If it is valid, returns that
   configuration."
-  [f]
-  (let [f (cjio/file f)
-        config (maybe (str "Read config from " f)
-                      (normalize (read-string (slurp f))))
-        validation (and config (validation config))]
-    (if validation
-      (do
-        (.severe (log/ger)
-                 (str "Configuration in file " f " is invalid: " validation))
-        nil)
-      config)))
+  ([] (from-file env/heso-cfg-file))
+  ([f]
+   (let [f (cjio/file f)
+         config (maybe (str "Read config from " f)
+                       (normalize (read-string (slurp f))))
+         validation (and config (validation config))]
+     (if validation
+       (do
+         (.severe (log/ger)
+                  (str "Configuration in file " f " is invalid: " validation))
+         nil)
+       config))))

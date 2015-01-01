@@ -13,18 +13,15 @@
 ; limitations under the License.
 
 (ns hesokuri.cmd.unwanted
-  (:require [clojure.pprint :as cppr]
-            [hesokuri.branch :as branch]
+  (:require [hesokuri.cmd.common :as cmd.common]
             [hesokuri.config :as config]
             [hesokuri.env :as env]
-            [hesokuri.git :as git]
             [hesokuri.heso :as heso]
-            [hesokuri.repo :as repo]
             [hesokuri.source :as source]
             [hesokuri.util :refer :all]))
 
 (defn invoke [branch-name]
-  (let [config (config/from-file env/heso-cfg-file)
+  (let [config (config/from-file)
         heso (heso/with-config config)
         source-with-unwanted (heso/source-containing heso env/startup-dir)]
     (if (nil? source-with-unwanted)
@@ -46,12 +43,6 @@
           [(str "No branches with name '" branch-name "'\n")
            *err* 1]
 
-          (do (spit env/heso-cfg-file (pretty-printed new-config))
-              (when-let [source-with-config
-                         (heso/source-containing heso env/heso-cfg-file)]
-                (git/invoke+log (:repo (source/init-repo @source-with-config))
-                                "commit"
-                                [(str env/heso-cfg-file)
-                                 "-m"
-                                 (str "Mark branch unwanted: " branch-name)]))
+          (do (cmd.common/update-config
+               heso new-config (str "Mark branch unwanted: " branch-name))
               ["" *out* 0]))))))
