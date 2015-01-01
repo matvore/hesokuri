@@ -47,7 +47,7 @@ value."
 (def default-cmd
   "The git command used by contexts that do not explicitly specify the git
   command. This can be overridden by setting the HESOGIT environment variable."
-  (or (getenv "HESOGIT") "git"))
+  (or (System/getenv "HESOGIT") "git"))
 
 (extend-type String
   Context

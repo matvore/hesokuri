@@ -38,7 +38,7 @@
   "The configuration file for storing the Hesokuri configuration, which includes
   things like the address of each peer machine, the paths of each source on each
   machine, which branches are live-edit, and which branches or unwanted."
-  (cjio/file (or (getenv "HESOCFG")
+  (cjio/file (or (System/getenv "HESOCFG")
                  (cjio/file home ".hesocfg"))))
 
 (defn ips
@@ -54,6 +54,6 @@
   the configuration file. This uses the IP addresses for this machine to help
   guess in some cases."
   [hostname?]
-  (or (getenv "HESOHOST")
+  (or (System/getenv "HESOHOST")
       (some #(and (hostname? %) %) (ips))
       (-> "hostname" cjshell/sh :out cstr/trim)))

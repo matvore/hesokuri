@@ -15,6 +15,7 @@
 (ns hesokuri.heso-test
   (:require [clojure.java.io :refer [file]]
             [clojure.test :refer :all]
+            [hesokuri.env :as env]
             [hesokuri.heso :refer :all]
             [hesokuri.peer :as peer]
             [hesokuri.repo :as repo]
@@ -56,7 +57,7 @@
    :else o))
 
 (deftest test-with-simple-sources
-  (with-redefs [getenv {"HESOHOST" "peer3"}]
+  (with-redefs [env/local-identity (constantly "peer3")]
     (let [result
           (-> *sources-eg* with-config (dissoc :heartbeats) de-agentify)
 

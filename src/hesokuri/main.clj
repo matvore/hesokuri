@@ -30,10 +30,7 @@
 (def diag-ui-port
   "The port on which to serve the diagnostics web UI, which is implemented in
 the hesokuri.web namespace."
-  (Integer. (or (getenv "HESOPORT") "8080")))
-
-(def hesoroot
-  (cjio/file (or (getenv "HESOROOT") env/home)))
+  (Integer. (or (System/getenv "HESOPORT") "8080")))
 
 (def usage
   (str "Hesokuri: Distributed Git repo synchronization tool
