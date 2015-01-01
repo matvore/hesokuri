@@ -123,6 +123,16 @@
   [{:keys [repo] :as self}]
   (assoc self :repo (repo/init repo)))
 
+(defn branch-shas
+  "Returns a set of the SHAs of branches with the given name and any peer. For
+  instance, if branch-name is 'foo', then the SHAs of Git branches named 'foo'
+  and 'foo_hesokr_bar' would be returned."
+  [self branch-name]
+  (set (for [[name sha] (git/branches (:repo self))
+             :let [unqual-name (:name (branch/parse-underscored-name name))]
+             :when (= unqual-name branch-name)]
+         sha)))
+
 (defn advance
   "Checks for local branches that meet the following criteria, and performs
   the given operation, 'advancing' when appropriate.

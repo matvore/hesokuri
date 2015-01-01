@@ -93,6 +93,40 @@
                       :checked-out-branch {:name "b1" :peer "peer"}})
                (refresh orig)))))))
 
+(deftest test-branch-shas-no-branches
+  (with-temp-repo [dir]
+    (is (= #{} (branch-shas {:repo (repo/init {:dir dir})} "foo")))))
+
+(deftest test-branch-shas-no-matching-branches
+  (with-temp-repo [dir]
+    (make-first-commit dir "refs/heads/bar")
+    (make-first-commit dir "refs/heads/baz")
+    (is (= #{} (branch-shas {:repo (repo/init {:dir dir})} "foo")))))
+
+(deftest test-branch-shas-one-match
+  (with-temp-repo [dir]
+    (make-first-commit dir "refs/heads/unmatch")
+    (make-first-commit dir "refs/heads/match")
+    (git/change dir "refs/heads/match" #(git/add-blob ["foo"] "foo-text\n" %)
+                *commit-tail*)
+    (is (= #{"09af13549fa508cda6d238da95376017ecf42ff3"}
+           (branch-shas {:repo (repo/init {:dir dir})} "match")))))
+
+(deftest test-branch-shas-two-matches
+  (with-temp-repo [dir]
+    (make-first-commit dir "refs/heads/unmatch")
+    (make-first-commit dir "refs/heads/match")
+    (make-first-commit dir "refs/heads/match_hesokr_peer")
+    (git/change dir "refs/heads/match" #(git/add-blob ["foo"] "foo-text\n" %)
+                *commit-tail*)
+    (git/change dir
+                "refs/heads/match_hesokr_peer"
+                #(git/add-blob ["bar"] "bar-text\n" %)
+                *commit-tail*)
+    (is (= #{"09af13549fa508cda6d238da95376017ecf42ff3"
+             "0eb5a3a87e72c8c838c3549c2ea4f1bbd336588a"}
+           (branch-shas {:repo (repo/init {:dir dir})} "match")))))
+
 (deftest test-advance-custom-advance-fn
   (with-temp-repo [dir]
     (make-first-commit dir "refs/heads/master")

@@ -13,8 +13,7 @@
 ; limitations under the License.
 
 (ns hesokuri.heso
-  (:require [clojure.java.shell :refer [sh]]
-            [clojure.string :refer [split trim]]
+  (:require [clojure.java.io :as cjio]
             [hesokuri.config :as config]
             [hesokuri.env :as env]
             [hesokuri.heartbeats :as heartbeats]
@@ -25,15 +24,6 @@
             [hesokuri.source :as source]
             [hesokuri.source-def :as source-def]
             [hesokuri.util :refer :all]))
-
-(defn- ips
-  "Returns the IP addresses of all network interfaces as a vector of strings."
-  []
-  (into [] (for [i (-> (java.net.NetworkInterface/getNetworkInterfaces)
-                       java.util.Collections/list)
-                 addr (and i (.getInterfaceAddresses i))
-                 :when addr]
-             (-> addr .getAddress .getHostAddress (split #"%") first))))
 
 (defn- common-sources
   "Returns a list of all host-to-path maps in the source-defs vector that are on
@@ -72,23 +62,20 @@
     :omit host-to-paths (map source-def/host-to-path source-defs)
     :omit all-hostnames (set (mapcat keys host-to-paths))
 
-    local-identity
-    (or (getenv "HESOHOST")
-        (first (for [ip (ips) :when (all-hostnames ip)] ip))
-        (-> "hostname" sh :out trim))
-
+    local-identity (env/local-identity all-hostnames)
     peer-hostnames (disj all-hostnames local-identity)
     peers (into {} (map (fn [p] [p (agent peer/default)]) peer-hostnames))
 
     source-agents
-    (into {} (for [source-def source-defs
+    (into {} (for [[source-def-index source-def] (map-indexed list source-defs)
                    :let [host-to-path (source-def/host-to-path source-def)
                          source-dir (host-to-path local-identity)]
                    :when source-dir]
                [source-dir (agent {:repo (repo/with-dir source-dir)
                                    :source-def source-def
                                    :peers peers
-                                   :local-identity local-identity})]))]))
+                                   :local-identity local-identity
+                                   ::source-def-index source-def-index})]))]))
 
 (defn push-sources-for-peer
   "Pushes all sources to the given peer. This operation happens asynchronously.
@@ -153,3 +140,16 @@
   (do (stop self)
       (.info (log/ger) (str "Starting new heso with config: " config))
       (-> config with-config start)))
+
+(defn source-containing
+  "Returns the source agent for the source which contains the file given by f. f
+  does not have to exist nor does it have to be tracked (e.g. it may be in
+  .gitignore)"
+  [self f]
+  (let [f (cjio/file f)
+        local-identity (:local-identity self)]
+    (loop [[[local-path agt] & agts] (seq (:source-agents self))]
+      (cond
+        (nil? local-path) nil
+        (inside? local-path f) agt
+        true (recur agts)))))

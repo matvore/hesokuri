@@ -65,7 +65,7 @@
 
           source-agents
           (into {}
-                (for [source *sources-eg*
+                (for [[source-def-index source] (map-indexed list *sources-eg*)
                       :let [host-to-path (source-def/host-to-path source)
                             source-dir (host-to-path "peer3")]
                       :when source-dir]
@@ -73,7 +73,9 @@
                                :source-def source
                                :peers peers
                                :local-identity "peer3"
-                               ::error nil}]))]
+                               ::error nil
+                               :hesokuri.heso/source-def-index
+                               ,source-def-index}]))]
       (is (= result
              {:config *sources-eg*
               :active false

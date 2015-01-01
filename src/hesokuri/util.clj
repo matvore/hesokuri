@@ -16,7 +16,9 @@
   (:import [java.io ByteArrayOutputStream ObjectInputStream ObjectOutputStream
             OutputStream OutputStreamWriter]
            [java.net URLDecoder URLEncoder])
-  (:require [clojure.string :refer [trim]]
+  (:require [clojure.java.io :as cjio]
+            [clojure.pprint :as cppr]
+            [clojure.string :refer [trim]]
             [hesokuri.log :as log]))
 
 (defmacro letmap
@@ -152,17 +154,19 @@ a String with str if it is not a String already."
 (defn %-decode [s] (URLDecoder/decode (str s) "UTF-8"))
 (defn %-encode [s] (URLEncoder/encode (str s) "UTF-8"))
 
-(defn conj-in
-  "Similar to assoc-in, but the deepest substructure is a collection that
-  supports conj rather than a map.
+(defn nested-in
+  "Similar to assoc-in, but performs some custom operation on the nested value.
+  f - Function which takes two arguments: the original value and 'v'
   m - Nested associative structure to alter.
   ks - Sequences of keys representing path to the collection to conj to.
-  v - The new value to conj into the collection.
-  default-coll - What to conj into if the collection is not present. Typically
-      this is [], #{}, or ()."
-  [m ks v default-coll]
-  (let [orig-coll (get-in m ks default-coll)]
-    (assoc-in m ks (conj orig-coll v))))
+  v - The second argument to pass to f.
+  default - What to pass as first argument to f if the value is not present."
+  [f m ks v default]
+  (let [orig (get-in m ks default)]
+    (assoc-in m ks (f orig v))))
+
+(def conj-in (partial nested-in conj))
+(def into-in (partial nested-in into))
 
 (defn like
   "Converts all args using convert, then calls f with them. For
@@ -183,3 +187,21 @@ a String with str if it is not a String already."
   [src dest extra]
   `(do (cjio/copy ~src ~dest)
        (~extra ~dest)))
+
+(defn inside?
+  "Returns truthy iff f refers to a file equivalent to, or within, the directory
+  specified by dir. This function does not actually access the file system."
+  [dir f]
+  (let [dir (cjio/file dir)]
+    (loop [f (cjio/file f)]
+      (if f
+        (or (= f dir)
+            (recur (.getParentFile f)))
+        false))))
+
+(defn pretty-printed
+  "Pretty-prints the given data with clojure.pprint to a String."
+  [data]
+  (let [pprint-writer (java.io.StringWriter.)]
+    (cppr/pprint data pprint-writer)
+    (str pprint-writer)))
