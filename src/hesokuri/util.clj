@@ -185,7 +185,9 @@ a String with str if it is not a String already."
 
 (defn pretty-printed
   "Pretty-prints the given data with clojure.pprint to a String."
-  [data]
-  (let [pprint-writer (java.io.StringWriter.)]
-    (cppr/pprint data pprint-writer)
-    (str pprint-writer)))
+  ([data] (pretty-printed "" data))
+  ([prefix data]
+   (let [pprint-writer (java.io.StringWriter.)]
+     (.write pprint-writer (str prefix))
+     (cppr/pprint data pprint-writer)
+     (str pprint-writer))))

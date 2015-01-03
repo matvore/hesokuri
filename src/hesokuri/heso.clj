@@ -137,7 +137,8 @@
   "Starts the heso again with the given config."
   [self config]
   (do (stop self)
-      (.info (log/ger) (str "Starting new heso with config: " config))
+      (.info (log/ger)
+             (pretty-printed "Starting new heso with config: \n" config))
       (-> config with-config start)))
 
 (defn source-containing
