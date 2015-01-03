@@ -100,16 +100,6 @@
                   e#)
        nil)))
 
-(defmacro cb
-  "This just resolves to a plain anonymous function. Do not use in new code."
-  [_ & fn-tail]
-  `(fn ~@fn-tail))
-
-(defn cbinvoke
-  "Do not use in new code."
-  [cb & args]
-  (apply cb args))
-
 (defn read-until
   "Reads bytes into a String until a terminator byte is reached. in is a
 java.io.InputStream. term? is a function that takes a byte as an int and

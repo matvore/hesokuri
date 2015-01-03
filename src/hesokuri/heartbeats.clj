@@ -23,7 +23,7 @@
   (Thread/sleep sleep-millis)
   (if (not= (:orig group) @(:current group))
     (assoc self :state :stopped)
-    (do (cbinvoke action-cb)
+    (do (action-cb)
         (send-off *agent* beat interval-millis)
         self)))
 

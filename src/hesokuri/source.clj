@@ -216,7 +216,7 @@
   {:pre [(identical? self @*agent*)]}
   (let [agt *agent*
         watcher (repo/watch-refs-heads-dir repo
-                                           (cb [agt] []
+                                           (fn []
                                                (send agt advance)
                                                (send agt push-for-all-peers)))]
     (-> self stop-watching refresh (assoc :watcher watcher))))

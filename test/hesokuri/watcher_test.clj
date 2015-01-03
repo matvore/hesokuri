@@ -29,8 +29,8 @@
                            "file3" (promise)
                            "file4" (promise)}
           watcher
-          (for-dir temp-dir (cb [change-promises] [path]
-                                (deliver (change-promises (str path)) true)))]
+          (for-dir temp-dir (fn [path]
+                              (deliver (change-promises (str path)) true)))]
       (Thread/sleep 1000)
 
       (spit (file temp-dir "file1") "new file #1")
@@ -52,8 +52,7 @@
   (let [changed-promise (promise)
         temp-dir (create-temp-dir)
         watcher (for-file (file temp-dir "foo")
-                          (cb [changed-promise] []
-                              (deliver changed-promise true)))]
+                          (fn [] (deliver changed-promise true)))]
     (Thread/sleep 1000)
 
     (->> "foo" (file temp-dir) .createNewFile)

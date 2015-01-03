@@ -29,7 +29,7 @@
   `(binding [*config-file* (File/createTempFile "dynamic-config-test" nil)]
      (let [~'handled (atom [])
            ~'initial (of *config-file*
-                         (cb [~'handled] [config#]
+                         (fn [config#]
                              (swap! ~'handled (fn [v#] (conj v# config#)))))]
        ~@body)))
 

@@ -39,10 +39,7 @@
   [config-file on-change-cb]
   (letmap
    [config-file (file config-file)
-
-    on-change-config-file
-    (cb [config-file on-change-cb] []
-        (handle-change config-file on-change-cb))]))
+    on-change-config-file (fn [] (handle-change config-file on-change-cb))]))
 
 (defn start
   "Starts the given dynamic-config, and returns its new state. If the instance
@@ -58,7 +55,7 @@
    self
 
    :else
-   (do (cbinvoke on-change-config-file)
+   (do (on-change-config-file)
        (assoc self
          :config-file-watcher
          (watcher/for-file config-file on-change-config-file)))))

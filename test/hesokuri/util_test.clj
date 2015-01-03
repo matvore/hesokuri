@@ -20,17 +20,6 @@
             [hesokuri.util :refer :all]
             [hesokuri.testing.mock :refer :all]))
 
-(deftest test-cb
-  (let [x 10
-        result (cb [x] [y] (+ x y))]
-    (is (= 110
-           (cbinvoke result 100)
-           (result 100))))
-  (let [result (cb [] [x y] (* x y))]
-    (is (= 121
-           (cbinvoke result 11 11)
-           (result 11 11)))))
-
 (deftest test-read-until
   (let [space? #{(int \space)}]
     (are [src term? exp-str exp-term stream-rest]

@@ -76,7 +76,7 @@
           (let [watch-key (take-watch-key service)]
             (doseq [event (and watch-key (.pollEvents watch-key))
                     :let [changed-file (-> event .context str file)]]
-              (cbinvoke on-change-cb changed-file))
+              (on-change-cb changed-file))
             (and watch-key (.reset watch-key) (recur))))]
     (register service path [:create :modify])
     (-> start Thread. .start)
@@ -106,6 +106,6 @@
   [path on-change-cb]
   (let [path (file path)]
     (for-dir (.getParent path)
-             (cb [path on-change-cb] [file]
+             (fn [file]
                  (when (= (str file) (.getName path))
-                   (cbinvoke on-change-cb))))))
+                   (on-change-cb))))))

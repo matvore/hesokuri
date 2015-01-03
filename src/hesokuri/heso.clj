@@ -115,8 +115,7 @@
         (apply send send-args))
       (doseq [peer-hostname peer-hostnames]
         (send heartbeats heartbeats/start 300000
-              (cb [self peer-hostname] []
-                  (push-sources-for-peer self peer-hostname))))
+              (fn [] (push-sources-for-peer self peer-hostname))))
       (key-files/refresh env/known-hosts-file (lines :known-hosts))
       (key-files/refresh env/authorized-keys-file (lines :authorized-keys)))
     (assoc self :active true)))
