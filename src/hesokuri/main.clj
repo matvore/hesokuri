@@ -39,18 +39,18 @@ Copyright (C) 2014 Google Inc.
 
 USAGE
 -----
-lein run
+" env/heso-invocation "
   Starts Hesokuri process.
 
-lein run config
+" env/heso-invocation " config
   Rewrites the configuration file in an equivalent, normalized format. This
   causes any subsequent automated edits to be cleaner, since automated edits
   always generate normalized configurations.
 
-lein run help
+" env/heso-invocation " help
   Shows this help.
 
-lein run unwanted BRANCH_NAME
+" env/heso-invocation " unwanted BRANCH_NAME
   Marks the given branch as unwanted in the configuration.
 
 NOTES

@@ -41,6 +41,13 @@
   (cjio/file (or (System/getenv "HESOCFG")
                  (cjio/file home ".hesocfg"))))
 
+(def heso-invocation
+  "The string entered in the command line to start Hesokuri. It's not really
+  possible to know this for certain, so this is just a guess unless the
+  HESOINVOKE environment variable is set."
+  (or (System/getenv "HESOINVOKE")
+      "java -jar hesokuri.jar"))
+
 (defn ips
   "Returns the IP addresses of all network interfaces as a sequence of strings."
   []
