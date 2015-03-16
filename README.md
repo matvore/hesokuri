@@ -53,16 +53,16 @@ changes that did not originate from it.
 All machines should have the following. Use earlier versions of each component
 at your own risk.
 
-1. Hesokuri source
-2. [Leiningen](http://leiningen.org/) 2.1.3 or higher
-3. Java Development Kit 1.7 or higher
-4. git version 1.7.10.1 or higher
-5. A Unix-like OS is recommended. Hesokuri is tested on Mac OS X and Linux, but
+1. The latest [Hesokuri release jar](http://github.com/google/hesokuri/releases)
+2. Java Development Kit 1.7 or higher
+3. Git version 1.8.5.6 or higher
+4. A Unix-like OS is recommended. Hesokuri is tested on Mac OS X and Linux, but
    Windows is worth a try if you are feeling adventurous.
-6. A static hostname or IP address. i.e. you should be able to do `ping FOO`
+5. A static hostname or IP address. i.e. you should be able to do `ping FOO`
    from any machine and get a response, where `FOO` always refers to the same
    machine. This is string is called the _identity_.
-7. Public-key ssh login enabled for each machine. Super-condensed directions
+6. Public-key ssh login enabled for each machine. You should not be asked for
+   credentials when logging in between peers. Super-condensed directions
    which will work for most cases (`CENTRAL` is the identity of some arbitrary
    "central peer"):
    - Enable ssh login on each machine if it is not already
@@ -76,98 +76,37 @@ at your own risk.
    - For each peer FOO (including CENTRAL), run  
      `scp CENTRAL:/tmp/heso_keys /tmp/heso_keys`  
      `cat /tmp/heso_keys >> ~/.ssh/authorized_keys`
+7. (alternative to 6) Be willing to use the experimental feature of authorized
+   keys synchronization, documented in
+   [the wiki](https://github.com/google/hesokuri/wiki/Authorized-keys-synchronization).
 
 ###Configure
-On each peer, create a file at `~/.hesocfg` which specifies all Git repos and
-peers to sync with. Each copy of the file can be the same. The file should
-contain a Clojure expression that is a vector of maps. Each element in the
-vector is a different Git repository to sync (called a _source_). The map is a
-dictionary which contains various parameters that control how the source is
-synchronized. It requires at least a `:host-to-path` entry, which must be set to
-a map of peer identities to local paths on each peer for the source. A source
-need not appear on every peer. Here is an example which demonstrates the syntax
-and optional source parameters:
+Decide on a directory in your home folder to put the configuration file. If you
+already have a Git repository for syncing configuration files and other assorted
+files between machines, use that. These instructions assume this directory is
+`~/etc` and the configuration file is `~/etc/hesocfg`.
 
-```Clojure
+On each peer, create a file at `~/[ETC]/.hesocfg` which specifies all Git repos
+and peers to sync with. `[ETC]` can be anything you like, and also contains
+other configuration files that you want to sync between machines. You are now
+ready to create your configuration file.
+
+1. Create a repo at `~/etc` (`git init ~/etc`)
+2. Assuming the peers to sync have addresses `host-1` and `host-2`, create the
+   configuration file at `~/etc/hesocfg` with this text:  
+   ```Clojure
 {:comment
  ["You can put any data here as notes to maintainers of this file."]
 
  :sources
- [{:host-to-path {"host-1" "/home/fbar/repo1"
-                  "host-2" "/home/fbar/repo1"}}
-
-  {:host-to-path {"host-1" "/home/fbar/repo2"
-                  "host-3" "/home/fbar/repo2"}
-   :unwanted-branches #{"baz" "42"}}
-
-  {:host-to-path {"host-1" "/home/fbar/repo3"
-                  "host-3" "/home/fbar/repo3"}
+ [{:host-to-path {"host-1" "/home/jdoe/etc"
+                  "host-2" "/home/jdoe/etc"}
    :live-edit-branches {:only #{"master"}}}]}
 ```
+3. Commit the file: `cd ~/etc; git add hesocfg; git commit -m 'add hesocfg'`
 
-The syntax is identical to Clojure literal syntax. The important constructs are:
-* `{}` indicates a map, which contains keys and values in alternating order.
-  Commas can be used in a map to separate key/value pairs, but they are
-  optional.
-* `:foo` indicates a keyword named `foo`, which is used for keys in maps
-* `#{}` indicates a set
-* `[]` indicates a vector
-
-Note that the distinction between maps, sets, and vectors are important when
-writing a configuration file. The top level data structure is a map with a
-`:sources` key (required) and `:comment` key (optional). The value of `:sources`
-must be a vector containing source definitions, each definition being a map.
-
-The meaning of each entry in a source definition is as follows:
-* `:host-to-path` is a map of peer identities to the local path of that repo on
-  the peer. Generally, you will want to make each peer have the same or similar
-  path for a given repo.
-* `:unwanted-branches` indicates the names of branches that should be deleted on
-  this host. In the example, `baz` is an unwanted branch, so any branch named
-  `baz` or `baz_hesokr_*` will be deleted on the host with this configuration.
-  Such branches are deleted with `git branch -D`, which means that unmerged
-  changes will be lost. Be careful using this option!
-* `:live-edit-branches` indicates which branches are considered live-edit, which
-  by default is only `hesokuri`. Live-edit branches are branches that, when a
-  peer pushes changes to a local repo for a source, those peer's changes are
-  merged in automatically if it is a fast-forward. If you specify `{:only FOO}`
-  for this parameter, only the branches in the set `FOO` will be live-edit. If
-  you specify `{:except BAR}`, then every branch will be live-edit except for
-  the ones in the set `BAR`. 
-
-You can edit a configuration file while Hesokuri is running, and it will
-automatically restart with the new configuration.
-
-An annotated, real-world configuration file may look something like this:
-```Clojure
-{:comment
- ["My machines:"
-  "192.168.0.2 - the Linux laptop"
-  "192.168.0.3 - the Mac desktop"
-  "192.168.0.4 - the home server"]
-
- :sources
- [{:comment "Whiz bang project"
-   :host-to-path {"192.168.0.2" "/home/johndoe/whizbang"
-                  "192.168.0.3" "/Users/johndoe/whizbang"
-                  "192.168.0.4" "/home/johndoe/whizbang"}
-   :unwanted-branches #{"abandoned-feature1"}
-   :live-edit-branches {:only #{"master" "vnext"}}}
-
-  {:comment "Code that may come in handy later"
-   :host-to-path {"192.168.0.3" "/Users/johndoe/hacks/lisp-snippits"
-                  "192.168.0.4" "/home/johndoe/hacks/lisp-snippits"}
-   :live-edit-branches {:except #{"private"}}}
-
-  {:host-to-path {"192.168.0.3" "/Users/johndoe/hacks/game-engine"
-                  "192.168.0.4" "/home/johndoe/hacks/game-engine"}}]}
-```
-
-Note that you can save the configuration file in a location other than
-`~/.hesocfg` and set the environment variable `HESOCFG` to its location. This
-way, you can store the `HESOCFG` in a subdirectory and put it in a Git repo to
-sync (along with other miscellaneous configuration files and utilities that are
-shared between all systems).
+For detailed guidance on the configuration file, see
+[the wiki](https://github.com/google/hesokuri/wiki/Configuration-file).
 
 If a repo or any containing directory does not exist on a peer and you start
 Hesokuri on it, the containing directory and repo will be created automatically.
@@ -177,14 +116,25 @@ repos does not exist on `192.168.0.4`, you can run Hesokuri anyway,
 peers will push the two repos to it as soon as they establish a connection.
 
 ###Run
-To run, switch to the directory containing the Hesokuri source and enter
-`lein run` at the command line.
+To run, execute `java -jar hesokuri.jar` at the command line. This starts
+Hesokuri in background mode, which means it is monitoring the repos for changes
+and pushing them or merging them automatically. Hesokuri also has sub-commands
+which may be handy. Run `java -jar hesokuri.jar help` for more information.
+
+When you first run Hesokuri, check the output occassionally to see if it shows
+prompts for passwords or to confirm host keys. (It is doing this through your
+`ssh` client, of course). If you see it, then the `known_hosts` and/or
+`authorized_keys` files are not up-to-date. `known_hosts` can be updated by
+manually ssh-ing to the host machine, (this can be impractical for large numbers
+of hosts). Updating `authorized_keys` requires more effort, although Hesokuri
+can help with this - see the **Requirements** section above.
 
 ###Web interface
-You can go to <http://localhost:8080> in a web browser on any peer to see the
-status of all sources and last-pushed hashes for each branch and peer. The port
-can be changed from the default of 8080 by setting the environment variable
-`HESOPORT` to the desired port number.
+When Hesokuri is running in background mode, you can go to
+<http://localhost:8080> in a web browser to see the status of all sources and
+last-pushed hashes for each branch and peer. The port can be changed from the
+default of 8080 by setting the environment variable `HESOPORT` to the desired
+port number.
 
 ##More information
 
