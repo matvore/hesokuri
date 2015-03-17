@@ -110,10 +110,6 @@ For detailed guidance on the configuration file, see
 
 If a repo or any containing directory does not exist on a peer and you start
 Hesokuri on it, the containing directory and repo will be created automatically.
-This means that, in the above example, if the `hacks` folder containing the two
-repos does not exist on `192.168.0.4`, you can run Hesokuri anyway,
-`192.168.0.4` will create the folders and initialize empty Git repos, and other
-peers will push the two repos to it as soon as they establish a connection.
 
 ###Run
 To run, execute `java -jar hesokuri.jar` at the command line. This starts
